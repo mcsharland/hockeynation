@@ -184,18 +184,22 @@ const parseStatsTable = () => {
     const minStats = JSON.parse(JSON.stringify(stats));
     let weakestRating = 10;
     let highestNonStrongestRating = 0;
-    // Update ratings and find the highest non-strongest rating
+    // find the weakest rating
     for (const key of Object.keys(minStats)) {
         const stat = minStats[key];
         if (stat.strength === "weakest") {
             weakestRating = stat.rating;
         }
+    }
+    // update ratings and find the highest non-strongest rating
+    for (const key of Object.keys(minStats)) {
+        const stat = minStats[key];
         minStats[key].rating = stat.hasRedPuck ? stat.rating : stat.rating + 1;
         if (stat.strength !== "strongest") {
             highestNonStrongestRating = Math.max(highestNonStrongestRating, minStats[key].rating);
         }
     }
-    // Adjust strongest stats
+    // adjust strongest stats
     for (const key of Object.keys(minStats)) {
         const stat = minStats[key];
         if (stat.strength === "strongest" &&
@@ -203,7 +207,7 @@ const parseStatsTable = () => {
             minStats[key].rating = highestNonStrongestRating;
         }
     }
-    // Adjust weakest stats
+    // adjust weakest stats
     for (const key of Object.keys(minStats)) {
         if (minStats[key].rating < weakestRating) {
             minStats[key].rating = weakestRating;
@@ -212,12 +216,16 @@ const parseStatsTable = () => {
     const maxStats = JSON.parse(JSON.stringify(stats));
     let strongestRating = 10;
     let lowestNonWeakestRating = 10;
-    // Update ratings and find the lowest non-weakest rating
+    // find the strongest rating
     for (const key of Object.keys(maxStats)) {
         const stat = maxStats[key];
         if (stat.strength === "strongest") {
             strongestRating = Math.min(strongestRating, stat.hasRedPuck ? stat.rating : 10);
         }
+    }
+    // update ratings and find the lowest non-weakest rating
+    for (const key of Object.keys(maxStats)) {
+        const stat = maxStats[key];
         if (!stat.hasRedPuck && stat.rating < strongestRating) {
             maxStats[key].rating = strongestRating;
         }
@@ -225,7 +233,14 @@ const parseStatsTable = () => {
             lowestNonWeakestRating = Math.min(lowestNonWeakestRating, maxStats[key].rating);
         }
     }
-    // Adjust weakest stats
+    // adjust strongest stats
+    for (const key of Object.keys(maxStats)) {
+        const stat = maxStats[key];
+        if (stat.strength === "strongest" && !stat.hasRedPuck && stat.rating < 10) {
+            maxStats[key].rating = 10;
+        }
+    }
+    // adjust weakest stats
     for (const key of Object.keys(maxStats)) {
         const stat = maxStats[key];
         if (stat.strength === "weakest" && stat.rating > lowestNonWeakestRating) {
