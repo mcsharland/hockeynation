@@ -212,6 +212,9 @@ const parseStatsTable = () => {
         if (minStats[key].rating < weakestRating) {
             minStats[key].rating = weakestRating;
         }
+        if (minStats[key].rating < 4) {
+            minStats[key].rating = 4;
+        }
     }
     const maxStats = JSON.parse(JSON.stringify(stats));
     let strongestRating = 10;
@@ -245,6 +248,9 @@ const parseStatsTable = () => {
         const stat = maxStats[key];
         if (stat.strength === "weakest" && stat.rating > lowestNonWeakestRating) {
             maxStats[key].rating = lowestNonWeakestRating;
+        }
+        if (maxStats[key].rating < 4) {
+            maxStats[key].rating = 4;
         }
     }
     updateHockeyPucks("Default");

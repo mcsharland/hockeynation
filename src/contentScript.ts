@@ -251,6 +251,9 @@ const parseStatsTable = (): boolean => {
     if (minStats[key].rating < weakestRating) {
       minStats[key].rating = weakestRating;
     }
+    if (minStats[key].rating < 4) {
+      minStats[key].rating = 4;
+    }
   }
 
   const maxStats: Stats = JSON.parse(JSON.stringify(stats));
@@ -295,6 +298,9 @@ const parseStatsTable = (): boolean => {
     const stat = maxStats[key];
     if (stat.strength === "weakest" && stat.rating > lowestNonWeakestRating) {
       maxStats[key].rating = lowestNonWeakestRating;
+    }
+    if (maxStats[key].rating < 4) {
+      maxStats[key].rating = 4;
     }
   }
 
