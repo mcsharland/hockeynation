@@ -21,7 +21,6 @@ const calculateOVR = (stats) => {
     return ovr;
 };
 const parseStatsTable = () => {
-    // Find a puck SVG and traverse up to find the table
     const puck = document.querySelector("svg.fa-hockey-puck");
     if (!puck) {
         return false;
@@ -34,7 +33,6 @@ const parseStatsTable = () => {
     if (!statsTable) {
         return false;
     }
-    // Select all div elements with the specific class name
     const divs = document.querySelectorAll("div.card-header");
     const updateOVR = (ovr) => {
         var _a;
@@ -69,8 +67,8 @@ const parseStatsTable = () => {
             const statName = ((_b = (_a = row.cells[0]) === null || _a === void 0 ? void 0 : _a.textContent) === null || _b === void 0 ? void 0 : _b.trim()) || "";
             const pucksCell = row.cells[1];
             const pucks = pucksCell.querySelectorAll("svg.fa-hockey-puck");
-            const ratingCell = row.cells[2]; // Select the third <td> element
-            const ratingSpan = ratingCell === null || ratingCell === void 0 ? void 0 : ratingCell.querySelector("span"); // Find the span element within the third <td>
+            const ratingCell = row.cells[2];
+            const ratingSpan = ratingCell === null || ratingCell === void 0 ? void 0 : ratingCell.querySelector("span");
             const stat = stats[statName];
             if (stat) {
                 let rating = stat.rating;
@@ -98,7 +96,7 @@ const parseStatsTable = () => {
                         puck.classList.remove("max-level");
                     }
                 });
-                // Update the rating value in the span element
+                // update the rating value in the span element
                 if (ratingSpan) {
                     ratingSpan.textContent = `(${rating})`;
                 }
@@ -113,9 +111,7 @@ const parseStatsTable = () => {
         }
         updateOVR(ovr);
     };
-    // Loop through each div element
     divs.forEach((div) => {
-        // Check if the text content includes 'Skills'
         if (div.textContent && div.textContent.trim() === "Skills") {
             const dropdown = document.createElement("select");
             dropdown.classList.add("stats-dropdown");
@@ -125,11 +121,11 @@ const parseStatsTable = () => {
             dropdown.style.border = "none";
             dropdown.style.backgroundColor = "#fff";
             dropdown.style.color = "#000";
-            dropdown.style.width = "85px"; // Adjust the width as needed
-            dropdown.style.height = "18px"; // Adjust the width as needed
+            dropdown.style.width = "85px";
+            dropdown.style.height = "18px";
             dropdown.style.lineHeight = "18px";
-            dropdown.style.paddingTop = "0px"; // Reduces the padding at the top to push the text up
-            dropdown.style.paddingBottom = "0px"; // Adjusts the bottom padding for better control
+            dropdown.style.paddingTop = "0px";
+            dropdown.style.paddingBottom = "0px";
             dropdown.style.paddingRight = "21px";
             dropdown.style.borderRadius = "2px";
             dropdown.addEventListener("change", (event) => {
@@ -137,7 +133,6 @@ const parseStatsTable = () => {
                 const selectedOption = selectElement.value;
                 updateHockeyPucks(selectedOption);
             });
-            // Create dropdown options
             const options = ["Default", "Min", "Max"];
             options.forEach((option) => {
                 const optionElement = document.createElement("option");
@@ -146,7 +141,6 @@ const parseStatsTable = () => {
                 optionElement.style.textAlign = "center";
                 dropdown.appendChild(optionElement);
             });
-            // Add the dropdown to the banner
             div.appendChild(dropdown);
         }
     });
@@ -169,7 +163,6 @@ const parseStatsTable = () => {
             strength: null,
         };
     });
-    // Process strongest and weakest talents
     const talentContainer = document.querySelector("body");
     if (talentContainer) {
         const talentText = talentContainer.textContent || "";
@@ -188,37 +181,57 @@ const parseStatsTable = () => {
             stats[weakestTalent].strength = "weakest";
         }
     }
-    // Create a deep copy of the stats object for minStats
     const minStats = JSON.parse(JSON.stringify(stats));
     let weakestRating = 10;
+    let highestNonStrongestRating = 0;
+    // Update ratings and find the highest non-strongest rating
     for (const key of Object.keys(minStats)) {
         const stat = minStats[key];
         if (stat.strength === "weakest") {
             weakestRating = stat.rating;
         }
         minStats[key].rating = stat.hasRedPuck ? stat.rating : stat.rating + 1;
+        if (stat.strength !== "strongest") {
+            highestNonStrongestRating = Math.max(highestNonStrongestRating, minStats[key].rating);
+        }
     }
+    // Adjust strongest stats
+    for (const key of Object.keys(minStats)) {
+        const stat = minStats[key];
+        if (stat.strength === "strongest" &&
+            stat.rating < highestNonStrongestRating) {
+            minStats[key].rating = highestNonStrongestRating;
+        }
+    }
+    // Adjust weakest stats
     for (const key of Object.keys(minStats)) {
         if (minStats[key].rating < weakestRating) {
             minStats[key].rating = weakestRating;
         }
     }
-    // Create a deep copy of the stats object for maxStats
     const maxStats = JSON.parse(JSON.stringify(stats));
     let strongestRating = 10;
+    let lowestNonWeakestRating = 10;
+    // Update ratings and find the lowest non-weakest rating
     for (const key of Object.keys(maxStats)) {
         const stat = maxStats[key];
         if (stat.strength === "strongest") {
             strongestRating = Math.min(strongestRating, stat.hasRedPuck ? stat.rating : 10);
         }
-    }
-    for (const key of Object.keys(maxStats)) {
-        const stat = maxStats[key];
         if (!stat.hasRedPuck && stat.rating < strongestRating) {
             maxStats[key].rating = strongestRating;
         }
+        if (stat.strength !== "weakest") {
+            lowestNonWeakestRating = Math.min(lowestNonWeakestRating, maxStats[key].rating);
+        }
     }
-    // Call updateHockeyPucks with the initial selection
+    // Adjust weakest stats
+    for (const key of Object.keys(maxStats)) {
+        const stat = maxStats[key];
+        if (stat.strength === "weakest" && stat.rating > lowestNonWeakestRating) {
+            maxStats[key].rating = lowestNonWeakestRating;
+        }
+    }
     updateHockeyPucks("Default");
     return true;
 };
@@ -229,10 +242,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 if (parseStatsTable()) {
                     clearInterval(interval);
                 }
-            }, 100); // Check every second
+            }, 100); // 0.1 Seconds
             setTimeout(() => {
                 clearInterval(interval);
-            }, 10000);
+            }, 10000); // 10 Seconds
         }
     }
 });
