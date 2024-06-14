@@ -45,12 +45,21 @@ const parseStatsTable = (): boolean => {
 
   const divs = document.querySelectorAll("div.card-header");
 
+  const ovrElement = document.querySelector<HTMLElement>(
+    "div.polygon.select-none text",
+  );
+  const baseOVR = ovrElement ? ovrElement.textContent : null;
+
   const updateOVR = (ovr: number) => {
     const ovrElement = document.querySelector<HTMLElement>(
       "div.polygon.select-none text",
     );
     if (ovrElement) {
-      ovrElement.textContent = ovr.toString();
+      if (scoutPlayer && baseOVR) {
+        ovrElement.textContent = baseOVR.toString();
+      } else {
+        ovrElement.textContent = ovr.toString();
+      }
 
       const polygonElement = ovrElement.parentElement?.querySelector("polygon");
       if (polygonElement) {

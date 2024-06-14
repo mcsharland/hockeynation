@@ -34,11 +34,18 @@ const parseStatsTable = () => {
         return false;
     }
     const divs = document.querySelectorAll("div.card-header");
+    const ovrElement = document.querySelector("div.polygon.select-none text");
+    const baseOVR = ovrElement ? ovrElement.textContent : null;
     const updateOVR = (ovr) => {
         var _a;
         const ovrElement = document.querySelector("div.polygon.select-none text");
         if (ovrElement) {
-            ovrElement.textContent = ovr.toString();
+            if (scoutPlayer && baseOVR) {
+                ovrElement.textContent = baseOVR.toString();
+            }
+            else {
+                ovrElement.textContent = ovr.toString();
+            }
             const polygonElement = (_a = ovrElement.parentElement) === null || _a === void 0 ? void 0 : _a.querySelector("polygon");
             if (polygonElement) {
                 let fillColor = "";
@@ -111,7 +118,6 @@ const parseStatsTable = () => {
         }
         if (option !== "Default" || !scoutPlayer) {
             updateOVR(ovr);
-            console.log("ovr updated!");
         }
     };
     divs.forEach((div) => {
