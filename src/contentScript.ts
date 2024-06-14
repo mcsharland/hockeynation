@@ -55,11 +55,7 @@ const parseStatsTable = (): boolean => {
       "div.polygon.select-none text",
     );
     if (ovrElement) {
-      if (scoutPlayer && baseOVR) {
-        ovrElement.textContent = baseOVR.toString();
-      } else {
-        ovrElement.textContent = ovr.toString();
-      }
+      ovrElement.textContent = ovr.toString();
 
       const polygonElement = ovrElement.parentElement?.querySelector("polygon");
       if (polygonElement) {
@@ -133,6 +129,8 @@ const parseStatsTable = (): boolean => {
 
     if (option !== "Default" || !scoutPlayer) {
       updateOVR(ovr);
+    } else {
+      updateOVR(baseOVR !== null ? parseInt(baseOVR) : ovr);
     }
   };
 

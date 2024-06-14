@@ -40,12 +40,7 @@ const parseStatsTable = () => {
         var _a;
         const ovrElement = document.querySelector("div.polygon.select-none text");
         if (ovrElement) {
-            if (scoutPlayer && baseOVR) {
-                ovrElement.textContent = baseOVR.toString();
-            }
-            else {
-                ovrElement.textContent = ovr.toString();
-            }
+            ovrElement.textContent = ovr.toString();
             const polygonElement = (_a = ovrElement.parentElement) === null || _a === void 0 ? void 0 : _a.querySelector("polygon");
             if (polygonElement) {
                 let fillColor = "";
@@ -118,6 +113,9 @@ const parseStatsTable = () => {
         }
         if (option !== "Default" || !scoutPlayer) {
             updateOVR(ovr);
+        }
+        else {
+            updateOVR(baseOVR !== null ? parseInt(baseOVR) : ovr);
         }
     };
     divs.forEach((div) => {
