@@ -109,7 +109,10 @@ const parseStatsTable = () => {
         else if (option === "Max") {
             ovr = calculateOVR(maxStats);
         }
-        updateOVR(ovr);
+        if (option !== "Default" || !scoutPlayer) {
+            updateOVR(ovr);
+            console.log("ovr updated!");
+        }
     };
     divs.forEach((div) => {
         if (div.textContent && div.textContent.trim() === "Skills") {
@@ -149,12 +152,16 @@ const parseStatsTable = () => {
         return false;
     }
     const stats = {};
+    let scoutPlayer = false;
     statsRows.forEach((row) => {
         var _a, _b, _c, _d;
         const statName = ((_b = (_a = row.cells[0]) === null || _a === void 0 ? void 0 : _a.textContent) === null || _b === void 0 ? void 0 : _b.trim()) || "";
         const pucks = row.querySelectorAll("svg.fa-hockey-puck");
         const ratingText = (_d = (_c = row.cells[row.cells.length - 1]) === null || _c === void 0 ? void 0 : _c.textContent) === null || _d === void 0 ? void 0 : _d.trim();
         const ratingMatch = ratingText ? ratingText.match(/\((\d+)\)/) : null;
+        if (!scoutPlayer && !ratingMatch) {
+            scoutPlayer = true;
+        }
         const rating = ratingMatch ? parseInt(ratingMatch[1], 10) : 0;
         const hasRedPuck = Array.from(pucks).some((puck) => puck.classList.contains("max-level"));
         stats[statName] = {
