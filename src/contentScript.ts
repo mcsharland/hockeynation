@@ -15,16 +15,14 @@ const calculateOVR = (stats: Stats): number => {
     0,
   );
   const avg = sum / statsValues.length;
-  let excess = 0;
-  for (const stat of statsValues) {
-    if (stat.rating > avg) {
-      excess += stat.rating - avg;
-    }
-  }
+  const excess = statsValues.reduce(
+    (acc: number, stat: Stat) =>
+      stat.rating > avg ? acc + stat.rating - avg : acc,
+    0,
+  );
   const correctedSum = sum + excess;
   const correctedAverage = correctedSum / statsValues.length;
-  const ovr = Math.round(correctedAverage * 10);
-  return ovr;
+  return Math.round(correctedAverage * 10);
 };
 
 const parseStatsTable = (): boolean => {
@@ -322,11 +320,86 @@ const parseStatsTable = (): boolean => {
   return true;
 };
 
+const parseRosterInfo = (): boolean => {
+  const statsPage = Array.from(document.querySelectorAll(".btn-toggle")).find(
+    (btn) => (btn.textContent ? btn.textContent.trim() === "Skills" : null),
+  ) as HTMLElement;
+  if (statsPage) {
+    statsPage.click();
+    const buttons = document.querySelectorAll("button.focus\\:outline-none");
+    for (let button of buttons) {
+      if (
+        button.querySelector("svg.svg-inline--fa.fa-eye-slash") &&
+        button.textContent?.trim().includes("Maxings")
+      ) {
+        // ???
+      }
+    }
+    console.log(buttons);
+    console.log("A bunch of stats and stuff...");
+    // Select all player rows
+    const playerRows = document.querySelectorAll<HTMLTableRowElement>(
+      "tbody tr:not(.footer-row)",
+    );
+
+    // Iterate over each player row
+    playerRows.forEach((row, index) => {
+      const positionElement =
+        row.querySelector<HTMLTableCellElement>("td:first-child");
+      const position = positionElement?.textContent?.trim() ?? "Unknown";
+      const nameElement = row.querySelector<HTMLAnchorElement>("a.player-link");
+      const name = nameElement?.textContent?.trim() ?? "Unknown";
+      const playerId =
+        nameElement?.getAttribute("href")?.split("/").pop() ?? "Unknown";
+      // Extract skills
+      const skillCells = Array.from(
+        row.querySelectorAll<HTMLTableCellElement>("td"),
+      ).slice(3);
+      console.log(skillCells);
+      const skills = skillCells.map((td) => {
+        const skillElement = td.querySelector<HTMLSpanElement>("span");
+        console.log("Skill element:");
+        console.log(skillElement);
+        return skillElement
+          ? parseInt(skillElement.textContent?.trim() ?? "0", 10)
+          : 0;
+      });
+
+      // Log or process the player data
+      console.log(`Player ${index + 1}:`);
+      console.log(`  Name: ${name}`);
+      console.log(`  ID: ${playerId}`);
+      console.log(`  Position: ${position}`);
+      console.log(`  Skills: ${skills.join(", ")}`);
+      console.log("---");
+      // Logic to process each player
+    });
+    const otherPage = Array.from(document.querySelectorAll(".btn-toggle")).find(
+      (btn) => (btn.textContent ? btn.textContent.trim() === "General" : null),
+    ) as HTMLElement;
+    // otherPage?.click();
+    return true;
+  }
+  return false; // Add this line to handle the case when statsPage is not found
+};
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "parseStatsTable") {
     if (!parseStatsTable()) {
       const interval = setInterval(() => {
         if (parseStatsTable()) {
+          clearInterval(interval);
+        }
+      }, 100); // 0.1 Seconds
+
+      setTimeout(() => {
+        clearInterval(interval);
+      }, 10000); // 10 Seconds
+    }
+  } else if (message.action === "parseRosterInfo") {
+    if (!parseRosterInfo()) {
+      const interval = setInterval(() => {
+        if (parseRosterInfo()) {
           clearInterval(interval);
         }
       }, 100); // 0.1 Seconds

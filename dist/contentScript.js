@@ -9,16 +9,10 @@ const calculateOVR = (stats) => {
     const statsValues = Object.keys(stats).map((key) => stats[key]);
     const sum = statsValues.reduce((acc, stat) => acc + stat.rating, 0);
     const avg = sum / statsValues.length;
-    let excess = 0;
-    for (const stat of statsValues) {
-        if (stat.rating > avg) {
-            excess += stat.rating - avg;
-        }
-    }
+    const excess = statsValues.reduce((acc, stat) => stat.rating > avg ? acc + stat.rating - avg : acc, 0);
     const correctedSum = sum + excess;
     const correctedAverage = correctedSum / statsValues.length;
-    const ovr = Math.round(correctedAverage * 10);
-    return ovr;
+    return Math.round(correctedAverage * 10);
 };
 const parseStatsTable = () => {
     const puck = document.querySelector("svg.fa-hockey-puck");
@@ -267,11 +261,74 @@ const parseStatsTable = () => {
     updateHockeyPucks("Default");
     return true;
 };
+const parseRosterInfo = () => {
+    var _a;
+    const statsPage = Array.from(document.querySelectorAll(".btn-toggle")).find((btn) => (btn.textContent ? btn.textContent.trim() === "Skills" : null));
+    if (statsPage) {
+        statsPage.click();
+        const buttons = document.querySelectorAll("button.focus\\:outline-none");
+        for (let button of buttons) {
+            if (button.querySelector("svg.svg-inline--fa.fa-eye-slash") &&
+                ((_a = button.textContent) === null || _a === void 0 ? void 0 : _a.trim().includes("Maxings"))) {
+                // ???
+            }
+        }
+        console.log(buttons);
+        console.log("A bunch of stats and stuff...");
+        // Select all player rows
+        const playerRows = document.querySelectorAll("tbody tr:not(.footer-row)");
+        // Iterate over each player row
+        playerRows.forEach((row, index) => {
+            var _a, _b, _c, _d, _e, _f;
+            const positionElement = row.querySelector("td:first-child");
+            const position = (_b = (_a = positionElement === null || positionElement === void 0 ? void 0 : positionElement.textContent) === null || _a === void 0 ? void 0 : _a.trim()) !== null && _b !== void 0 ? _b : "Unknown";
+            const nameElement = row.querySelector("a.player-link");
+            const name = (_d = (_c = nameElement === null || nameElement === void 0 ? void 0 : nameElement.textContent) === null || _c === void 0 ? void 0 : _c.trim()) !== null && _d !== void 0 ? _d : "Unknown";
+            const playerId = (_f = (_e = nameElement === null || nameElement === void 0 ? void 0 : nameElement.getAttribute("href")) === null || _e === void 0 ? void 0 : _e.split("/").pop()) !== null && _f !== void 0 ? _f : "Unknown";
+            // Extract skills
+            const skillCells = Array.from(row.querySelectorAll("td")).slice(3);
+            console.log(skillCells);
+            const skills = skillCells.map((td) => {
+                var _a, _b;
+                const skillElement = td.querySelector("span");
+                console.log("Skill element:");
+                console.log(skillElement);
+                return skillElement
+                    ? parseInt((_b = (_a = skillElement.textContent) === null || _a === void 0 ? void 0 : _a.trim()) !== null && _b !== void 0 ? _b : "0", 10)
+                    : 0;
+            });
+            // Log or process the player data
+            console.log(`Player ${index + 1}:`);
+            console.log(`  Name: ${name}`);
+            console.log(`  ID: ${playerId}`);
+            console.log(`  Position: ${position}`);
+            console.log(`  Skills: ${skills.join(", ")}`);
+            console.log("---");
+            // Logic to process each player
+        });
+        const otherPage = Array.from(document.querySelectorAll(".btn-toggle")).find((btn) => (btn.textContent ? btn.textContent.trim() === "General" : null));
+        // otherPage?.click();
+        return true;
+    }
+    return false; // Add this line to handle the case when statsPage is not found
+};
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === "parseStatsTable") {
         if (!parseStatsTable()) {
             const interval = setInterval(() => {
                 if (parseStatsTable()) {
+                    clearInterval(interval);
+                }
+            }, 100); // 0.1 Seconds
+            setTimeout(() => {
+                clearInterval(interval);
+            }, 10000); // 10 Seconds
+        }
+    }
+    else if (message.action === "parseRosterInfo") {
+        if (!parseRosterInfo()) {
+            const interval = setInterval(() => {
+                if (parseRosterInfo()) {
                     clearInterval(interval);
                 }
             }, 100); // 0.1 Seconds
