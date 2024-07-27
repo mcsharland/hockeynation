@@ -8,6 +8,16 @@ interface Stats {
   [key: string]: Stat;
 }
 
+interface Player {
+  id: string;
+  name: string;
+  position: string;
+  ovr: number | null;
+  minOvr: number | null;
+  maxOvr: number | null;
+  stats: Stats | null;
+}
+
 const calculateOVR = (stats: Stats): number => {
   const statsValues = Object.keys(stats).map((key) => stats[key]);
   const sum = statsValues.reduce(
@@ -27,203 +37,7 @@ const calculateOVR = (stats: Stats): number => {
   return ovr;
 };
 
-const parseStatsTable = (): boolean => {
-  const puck = document.querySelector<SVGSVGElement>("svg.fa-hockey-puck");
-  if (!puck) {
-    return false;
-  }
-
-  let ancestor = puck.parentElement;
-  while (ancestor && !ancestor.matches("table[data-v-a81c915e]")) {
-    ancestor = ancestor.parentElement;
-  }
-
-  const statsTable = ancestor as HTMLTableElement | null;
-  if (!statsTable) {
-    return false;
-  }
-
-  const divs = document.querySelectorAll("div.card-header");
-
-  const ovrElement = document.querySelector<HTMLElement>(
-    "div.polygon.select-none text",
-  );
-  const baseOVR = ovrElement ? ovrElement.textContent : null;
-
-  const updateOVR = (ovr: number) => {
-    const ovrElement = document.querySelector<HTMLElement>(
-      "div.polygon.select-none text",
-    );
-    if (ovrElement) {
-      ovrElement.textContent = ovr.toString();
-
-      const polygonElement = ovrElement.parentElement?.querySelector("polygon");
-      if (polygonElement) {
-        let fillColor = "";
-        if (ovr <= 39) {
-          fillColor = "#f56565";
-        } else if (ovr >= 40 && ovr <= 54) {
-          fillColor = "#ed8936";
-        } else if (ovr >= 55 && ovr <= 69) {
-          fillColor = "#1995AD";
-        } else if (ovr >= 70 && ovr <= 79) {
-          fillColor = "#10b981";
-        } else if (ovr >= 80) {
-          fillColor = "#383839";
-        }
-        polygonElement.setAttribute("fill", fillColor);
-      }
-    }
-  };
-
-  const updateHockeyPucks = (option: string) => {
-    statsRows.forEach((row) => {
-      const statName = row.cells[0]?.textContent?.trim() || "";
-      const pucksCell = row.cells[1];
-      const pucks =
-        pucksCell.querySelectorAll<SVGElement>("svg.fa-hockey-puck");
-      const ratingCell = row.cells[2];
-      const ratingSpan = ratingCell?.querySelector("span");
-      const stat = stats[statName];
-
-      if (stat) {
-        let rating = stat.rating;
-
-        if (option === "Min") {
-          rating = minStats[statName].rating;
-        } else if (option === "Max") {
-          rating = maxStats[statName].rating;
-        }
-
-        pucks.forEach((puck, index) => {
-          puck.classList.remove("text-blue-400");
-          if (index < rating) {
-            puck.classList.remove("text-gray-300");
-            if (index >= stat.rating) {
-              puck.classList.add("text-blue-400");
-            }
-          } else {
-            puck.classList.add("text-gray-300");
-          }
-
-          if (index === rating - 1 && stat.hasRedPuck) {
-            puck.classList.add("max-level");
-          } else {
-            puck.classList.remove("max-level");
-          }
-        });
-
-        // update the rating value in the span element
-        if (ratingSpan) {
-          ratingSpan.textContent = `(${rating})`;
-        }
-      }
-    });
-
-    let ovr = calculateOVR(stats);
-    if (option === "Min") {
-      ovr = calculateOVR(minStats);
-    } else if (option === "Max") {
-      ovr = calculateOVR(maxStats);
-    }
-
-    if (option !== "Default" || !scoutPlayer) {
-      updateOVR(ovr);
-    } else {
-      updateOVR(baseOVR !== null ? parseInt(baseOVR) : ovr);
-    }
-  };
-
-  divs.forEach((div) => {
-    if (div.textContent && div.textContent.trim() === "Skills") {
-      const dropdown = document.createElement("select");
-      dropdown.classList.add("stats-dropdown");
-      dropdown.style.marginLeft = "auto";
-      dropdown.style.fontSize = "12px";
-      dropdown.style.padding = "2px";
-      dropdown.style.border = "none";
-      dropdown.style.backgroundColor = "#fff";
-      dropdown.style.color = "#000";
-      dropdown.style.width = "85px";
-      dropdown.style.height = "18px";
-      dropdown.style.lineHeight = "18px";
-      dropdown.style.paddingTop = "0px";
-      dropdown.style.paddingBottom = "0px";
-      dropdown.style.paddingRight = "21px";
-      dropdown.style.borderRadius = "2px";
-
-      dropdown.addEventListener("change", (event) => {
-        const selectElement = event.target as HTMLSelectElement;
-        const selectedOption = selectElement.value;
-        updateHockeyPucks(selectedOption);
-      });
-
-      const options = ["Default", "Min", "Max"];
-      options.forEach((option) => {
-        const optionElement = document.createElement("option");
-        optionElement.value = option;
-        optionElement.textContent = option;
-        optionElement.style.textAlign = "center";
-        dropdown.appendChild(optionElement);
-      });
-
-      div.appendChild(dropdown);
-    }
-  });
-
-  const statsRows =
-    statsTable.querySelectorAll<HTMLTableRowElement>("tbody tr");
-  if (!statsRows.length) {
-    return false;
-  }
-
-  const stats: Stats = {};
-  let scoutPlayer = false;
-  statsRows.forEach((row) => {
-    const statName = row.cells[0]?.textContent?.trim() || "";
-    const pucks = row.querySelectorAll<SVGSVGElement>("svg.fa-hockey-puck");
-    const ratingText = row.cells[row.cells.length - 1]?.textContent?.trim();
-    const ratingMatch = ratingText ? ratingText.match(/\((\d+)\)/) : null;
-
-    if (!scoutPlayer && !ratingMatch) {
-      scoutPlayer = true;
-    }
-    const rating = ratingMatch ? parseInt(ratingMatch[1], 10) : 0;
-    const hasRedPuck = Array.from(pucks).some((puck) =>
-      puck.classList.contains("max-level"),
-    );
-
-    stats[statName] = {
-      rating,
-      hasRedPuck,
-      strength: null,
-    };
-  });
-
-  const talentContainer = document.querySelector<HTMLDivElement>("body");
-  if (talentContainer) {
-    const talentText = talentContainer.textContent || "";
-    const strongestMatch = talentText.match(
-      /Strongest talents of .+ are (\w+ and \w+)/,
-    );
-    const weakestMatch = talentText.match(/weakest talent is (\w+)/);
-
-    const strongestTalents = strongestMatch
-      ? strongestMatch[1].split(" and ")
-      : [];
-    const weakestTalent = weakestMatch ? weakestMatch[1] : "";
-
-    strongestTalents.forEach((talent) => {
-      if (stats[talent]) {
-        stats[talent].strength = "strongest";
-      }
-    });
-
-    if (weakestTalent && stats[weakestTalent]) {
-      stats[weakestTalent].strength = "weakest";
-    }
-  }
-
+const calculateMinStats = (stats: Stats): Stats => {
   const minStats: Stats = JSON.parse(JSON.stringify(stats));
   let weakestRating = 10;
   let highestNonStrongestRating = 0;
@@ -269,6 +83,10 @@ const parseStatsTable = (): boolean => {
     }
   }
 
+  return minStats;
+};
+
+const calculateMaxStats = (stats: Stats): Stats => {
   const maxStats: Stats = JSON.parse(JSON.stringify(stats));
   let strongestRating = 10;
   let lowestNonWeakestRating = 10;
@@ -317,17 +135,8 @@ const parseStatsTable = (): boolean => {
     }
   }
 
-  updateHockeyPucks("Default");
-  return true;
+  return maxStats;
 };
-
-interface Player {
-  id: string;
-  name: string;
-  position: string;
-  ovr: number | null;
-  stats: Stats | null;
-}
 
 const getStatsForPosition = (position: string): string[] => {
   const firstPosition = position.split("/")[0];
@@ -506,11 +315,16 @@ const parseDraftTable = (): boolean => {
         }
       });
 
+      const minStats = calculateMinStats(stats);
+      const maxStats = calculateMaxStats(stats);
+
       return {
         id,
         name,
         position,
         ovr,
+        minOvr: calculateOVR(minStats),
+        maxOvr: calculateOVR(maxStats),
         stats,
       };
     });
@@ -552,30 +366,8 @@ const parseDraftTable = (): boolean => {
   return true;
 };
 
-// process user preference data here
-const resetUserPreferences = (userPreferences: Element | null) => {
-  if (userPreferences) {
-    // process data here
-    console.log("Processing user preferences:", userPreferences);
-  } else {
-    return;
-  }
-};
-
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === "parseStatsTable") {
-    if (!parseStatsTable()) {
-      const interval = setInterval(() => {
-        if (parseStatsTable()) {
-          clearInterval(interval);
-        }
-      }, 100); // 0.1 Seconds
-
-      setTimeout(() => {
-        clearInterval(interval);
-      }, 10000); // 10 Seconds
-    }
-  } else if (message.action === "parseDraftTable") {
+  if (message.action === "parseDraftTable") {
     if (!parseDraftTable()) {
       const interval = setInterval(() => {
         if (parseDraftTable()) {
