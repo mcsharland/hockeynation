@@ -7,20 +7,30 @@ var __webpack_exports__ = {};
 
 chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
     if (details.frameId === 0) {
-        if (details.url.startsWith("https://hockey-nation.com/player")) {
-            chrome.tabs
-                .sendMessage(details.tabId, { action: "parseStatsTable" })
-                .catch((error) => {
-                //This error will be extremely common so it is masked
-            });
-        }
-        else if (details.url.startsWith("https://hockey-nation.com/draft-ranking")) {
-            chrome.tabs
-                .sendMessage(details.tabId, { action: "parseDraftTable" })
-                .catch((error) => {
-                //This error will be extremely common so it is masked
-            });
-        }
+        chrome.tabs.get(details.tabId, (tab) => {
+            if (chrome.runtime.lastError) {
+                console.error(chrome.runtime.lastError);
+                return;
+            }
+            const currentUrl = tab.url;
+            if (currentUrl &&
+                currentUrl.startsWith("https://hockey-nation.com/player/")) {
+                chrome.tabs
+                    .sendMessage(details.tabId, { action: "parseStatsTable" })
+                    .catch((error) => {
+                    // This error will be extremely common so it is masked
+                });
+            }
+            else if (currentUrl &&
+                currentUrl.startsWith("https://hockey-nation.com/draft-ranking/")) {
+                console.log("Draft ranking page detected");
+                chrome.tabs
+                    .sendMessage(details.tabId, { action: "parseDraftTable" })
+                    .catch((error) => {
+                    // This error will be extremely common so it is masked
+                });
+            }
+        });
     }
 }, {
     url: [
