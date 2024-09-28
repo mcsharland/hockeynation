@@ -444,13 +444,11 @@ const parseDraftTable = (): boolean => {
   ) as HTMLButtonElement;
 
   if (!infoButton) {
+    console.error("Could not find the info button");
     return false;
   }
 
   infoButton.click();
-
-  let players: Player[] = [];
-  let savedPreferencesGrid: Element | null = null;
 
   function findTargetGrid() {
     return document.querySelector(".grid.grid-cols-2.gap-x-2");
@@ -464,177 +462,12 @@ const parseDraftTable = (): boolean => {
     return document.querySelector("button.btn.btn-blue.flex-grow");
   }
 
-  function extractPlayers() {
-    const rows = document.querySelectorAll("tbody[data-v-e2e20c3e] tr");
-    players = Array.from(rows).map((row) => {
-      const cells = row.querySelectorAll("td");
-
-      const id = row.id;
-      const nameElement = cells[1].querySelector(
-        "a.text-link-primary span.lg\\:inline-block",
-      );
-      const name = nameElement ? nameElement.textContent?.trim() || "" : "";
-      const positionElement = cells[1].querySelector(
-        "span.text-gray-600.tracking-tighter span",
-      );
-      const position = positionElement
-        ? positionElement.textContent?.trim() || ""
-        : "";
-
-      const ovrElement = cells[6].querySelector("span");
-      let ovr: number | null = null;
-      if (ovrElement) {
-        const ovrText = ovrElement.textContent?.trim();
-        ovr = ovrText === "-" ? null : parseInt(ovrText || "0", 10);
-      }
-
-      const strengthsElement = cells[3].querySelector("span");
-      const weaknessElement = cells[4].querySelector("span");
-      const strengthsText = strengthsElement
-        ? strengthsElement.textContent?.trim() || ""
-        : "";
-      const weaknessText = weaknessElement
-        ? weaknessElement.textContent?.trim() || ""
-        : "";
-
-      const statMap: { [key: string]: string } = {
-        Skating: "SKA",
-        Endurance: "END",
-        Power: "PWR",
-        Shooting: "SHO",
-        Passing: "PAS",
-        Defending: "DEF",
-        Checking: "CHK",
-        Discipline: "DSC",
-        Faceoffs: "FOF",
-        Reflexes: "REF",
-        Positioning: "POS",
-        Pads: "PAD",
-        Glove: "GLO",
-        Blocker: "BLO",
-        Stick: "STK",
-      };
-
-      const strengths = strengthsText
-        .split("|")
-        .map((s) => statMap[s.trim()])
-        .filter(Boolean);
-      const weakness = statMap[weaknessText.trim()] || "";
-
-      const statsToTrack = getStatsForPosition(position);
-      const stats: Stats = {};
-
-      statsToTrack.forEach((stat) => {
-        let cellIndex: number;
-        switch (stat) {
-          case "SKA":
-            cellIndex = 18;
-            break;
-          case "END":
-            cellIndex = 19;
-            break;
-          case "PWR":
-            cellIndex = 20;
-            break;
-          case "SHO":
-            cellIndex = 21;
-            break;
-          case "PAS":
-            cellIndex = 22;
-            break;
-          case "DEF":
-            cellIndex = 23;
-            break;
-          case "CHK":
-            cellIndex = 24;
-            break;
-          case "DSC":
-            cellIndex = 25;
-            break;
-          case "FOF":
-            cellIndex = 26;
-            break;
-          case "REF":
-            cellIndex = 27;
-            break;
-          case "POS":
-            cellIndex = 28;
-            break;
-          case "PAD":
-            cellIndex = 29;
-            break;
-          case "GLO":
-            cellIndex = 30;
-            break;
-          case "BLO":
-            cellIndex = 31;
-            break;
-          case "STK":
-            cellIndex = 32;
-            break;
-          default:
-            cellIndex = -1;
-        }
-
-        if (cellIndex !== -1 && cellIndex < cells.length) {
-          const statElement = cells[cellIndex].querySelector("span");
-          if (statElement) {
-            const ratingText = statElement.textContent?.trim() || "";
-            const rating = ratingText === "-" ? 0 : parseInt(ratingText, 10);
-            const hasRedPuck = statElement.classList.contains("maxed");
-            stats[stat] = {
-              rating,
-              hasRedPuck,
-              strength:
-                strengths.indexOf(stat) !== -1
-                  ? "strongest"
-                  : stat === weakness
-                    ? "weakest"
-                    : null,
-            };
-          }
-        }
-
-        if (!stats[stat]) {
-          stats[stat] = {
-            rating: 0,
-            hasRedPuck: false,
-            strength: null,
-          };
-        }
-      });
-
-      const minStats = calculateMinStats(stats);
-      const maxStats = calculateMaxStats(stats);
-
-      return {
-        id,
-        name,
-        position,
-        ovr,
-        minOvr: calculateOVR(minStats),
-        maxOvr: calculateOVR(maxStats),
-        stats,
-      };
-    });
-
-    console.log("Extracted players:", players);
-
-    // After extracting and processing all player data, reset user preferences
-    if (savedPreferencesGrid) {
-      parsePreferencesTable(savedPreferencesGrid);
-    } else {
-      console.error("No saved preferences grid found");
-    }
-  }
-
   const observer = new MutationObserver((mutations) => {
     for (let mutation of mutations) {
       if (mutation.type === "childList") {
         const targetGrid = findTargetGrid();
         if (targetGrid) {
           observer.disconnect();
-          savedPreferencesGrid = targetGrid;
           const selectAllLabel = findSelectAllLabel();
           if (selectAllLabel) {
             const checkbox = document.getElementById("all") as HTMLInputElement;
@@ -648,10 +481,14 @@ const parseDraftTable = (): boolean => {
             (updateButton as HTMLButtonElement).click();
           }
 
-          //! Add an observer here later.
-          setTimeout(extractPlayers, 500); // Small delay to ensure table is updated
+          // Use setTimeout to ensure table is updated before extraction
+          setTimeout(() => {
+            extractPlayers(targetGrid as HTMLElement).catch((error) =>
+              console.error("Error extracting players:", error),
+            );
+          }, 500);
 
-          return;
+          return true;
         }
       }
     }
@@ -661,6 +498,205 @@ const parseDraftTable = (): boolean => {
 
   return true;
 };
+
+async function calculateMinStatsAsync(stats: Stats): Promise<Stats> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(calculateMinStats(stats));
+    }, 0);
+  });
+}
+
+async function calculateMaxStatsAsync(stats: Stats): Promise<Stats> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(calculateMaxStats(stats));
+    }, 0);
+  });
+}
+
+async function calculateOVRAsync(stats: Stats): Promise<number> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(calculateOVR(stats));
+    }, 0);
+  });
+}
+
+async function extractPlayers(
+  savedPreferencesGrid: HTMLElement,
+): Promise<Player[]> {
+  const rows = document.querySelectorAll("tbody[data-v-e2e20c3e] tr");
+
+  const extractPlayerData = async (row: Element): Promise<Player> => {
+    const cells = row.querySelectorAll("td");
+
+    const id = row.id;
+    const nameElement = cells[1].querySelector(
+      "a.text-link-primary span.lg\\:inline-block",
+    );
+    const name = nameElement ? nameElement.textContent?.trim() || "" : "";
+    const positionElement = cells[1].querySelector(
+      "span.text-gray-600.tracking-tighter span",
+    );
+    const position = positionElement
+      ? positionElement.textContent?.trim() || ""
+      : "";
+
+    const ovrElement = cells[6].querySelector("span");
+    let ovr: number | null = null;
+    if (ovrElement) {
+      const ovrText = ovrElement.textContent?.trim();
+      ovr = ovrText === "-" ? null : parseInt(ovrText || "0", 10);
+    }
+
+    const strengthsElement = cells[3].querySelector("span");
+    const weaknessElement = cells[4].querySelector("span");
+    const strengthsText = strengthsElement
+      ? strengthsElement.textContent?.trim() || ""
+      : "";
+    const weaknessText = weaknessElement
+      ? weaknessElement.textContent?.trim() || ""
+      : "";
+
+    const statMap: { [key: string]: string } = {
+      Skating: "SKA",
+      Endurance: "END",
+      Power: "PWR",
+      Shooting: "SHO",
+      Passing: "PAS",
+      Defending: "DEF",
+      Checking: "CHK",
+      Discipline: "DSC",
+      Faceoffs: "FOF",
+      Reflexes: "REF",
+      Positioning: "POS",
+      Pads: "PAD",
+      Glove: "GLO",
+      Blocker: "BLO",
+      Stick: "STK",
+    };
+
+    const strengths = strengthsText
+      .split("|")
+      .map((s) => statMap[s.trim()])
+      .filter(Boolean);
+    const weakness = statMap[weaknessText.trim()] || "";
+
+    const statsToTrack = getStatsForPosition(position);
+    const stats: Stats = {};
+
+    statsToTrack.forEach((stat) => {
+      let cellIndex: number;
+      switch (stat) {
+        case "SKA":
+          cellIndex = 18;
+          break;
+        case "END":
+          cellIndex = 19;
+          break;
+        case "PWR":
+          cellIndex = 20;
+          break;
+        case "SHO":
+          cellIndex = 21;
+          break;
+        case "PAS":
+          cellIndex = 22;
+          break;
+        case "DEF":
+          cellIndex = 23;
+          break;
+        case "CHK":
+          cellIndex = 24;
+          break;
+        case "DSC":
+          cellIndex = 25;
+          break;
+        case "FOF":
+          cellIndex = 26;
+          break;
+        case "REF":
+          cellIndex = 27;
+          break;
+        case "POS":
+          cellIndex = 28;
+          break;
+        case "PAD":
+          cellIndex = 29;
+          break;
+        case "GLO":
+          cellIndex = 30;
+          break;
+        case "BLO":
+          cellIndex = 31;
+          break;
+        case "STK":
+          cellIndex = 32;
+          break;
+        default:
+          cellIndex = -1;
+      }
+
+      if (cellIndex !== -1 && cellIndex < cells.length) {
+        const statElement = cells[cellIndex].querySelector("span");
+        if (statElement) {
+          const ratingText = statElement.textContent?.trim() || "";
+          const rating = ratingText === "-" ? 0 : parseInt(ratingText, 10);
+          const hasRedPuck = statElement.classList.contains("maxed");
+          stats[stat] = {
+            rating,
+            hasRedPuck,
+            strength:
+              strengths.indexOf(stat) !== -1
+                ? "strongest"
+                : stat === weakness
+                  ? "weakest"
+                  : null,
+          };
+        }
+      }
+
+      if (!stats[stat]) {
+        stats[stat] = {
+          rating: 0,
+          hasRedPuck: false,
+          strength: null,
+        };
+      }
+    });
+
+    const [minStats, maxStats] = await Promise.all([
+      calculateMinStatsAsync(stats),
+      calculateMaxStatsAsync(stats),
+    ]);
+
+    const [minOvr, maxOvr] = await Promise.all([
+      calculateOVRAsync(minStats),
+      calculateOVRAsync(maxStats),
+    ]);
+
+    return {
+      id,
+      name,
+      position,
+      ovr,
+      minOvr,
+      maxOvr,
+      stats,
+    };
+  };
+
+  const playerPromises = Array.from(rows).map(extractPlayerData);
+  const players = await Promise.all(playerPromises);
+
+  console.log("Extracted players:", players);
+
+  // After extracting and processing all player data, reset user preferences
+  parsePreferencesTable(savedPreferencesGrid);
+
+  return players;
+}
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "parseStatsTable") {

@@ -324,8 +324,6 @@ function updatePreferences(originalGrid, currentGrid) {
         currentCheckboxes.forEach((checkbox) => {
             currentPreferences[checkbox.id] = checkbox.checked;
         });
-        console.log("Original Preferences:", originalPreferences);
-        console.log("Current Preferences:", currentPreferences);
         // Determine which checkboxes need to be updated
         const checkboxesToUpdate = [];
         for (const id in originalPreferences) {
@@ -335,19 +333,16 @@ function updatePreferences(originalGrid, currentGrid) {
                 }
             }
         }
-        console.log("Checkboxes to update:", checkboxesToUpdate);
         // Update checkboxes sequentially
         for (const id of checkboxesToUpdate) {
             const label = currentGrid.querySelector(`label[for="${id}"]`);
             if (label) {
-                console.log(`Updating ${id} to ${originalPreferences[id]}`);
                 label.click();
                 // Wait for the change to be reflected
                 yield new Promise((resolve) => {
                     const checkForChange = () => {
                         const checkbox = currentGrid.querySelector(`#${id}`);
                         if (checkbox && checkbox.checked === originalPreferences[id]) {
-                            console.log(`${id} updated successfully`);
                             resolve();
                         }
                         else {
@@ -358,26 +353,21 @@ function updatePreferences(originalGrid, currentGrid) {
                 });
             }
         }
-        console.log("All updates completed");
         // Find and click the update button
         const updateButton = document.querySelector("button.btn.btn-blue.flex-grow");
         if (updateButton) {
-            console.log("Clicking update button");
             updateButton.click();
-        }
-        else {
-            console.error("Could not find the update button");
         }
     });
 }
+let parseDraftCompleted = false;
 const parseDraftTable = () => {
     const infoButton = document.querySelector('button:has(svg[data-icon="table-cells"])');
     if (!infoButton) {
+        console.error("Could not find the info button");
         return false;
     }
     infoButton.click();
-    let players = [];
-    let savedPreferencesGrid = null;
     function findTargetGrid() {
         return document.querySelector(".grid.grid-cols-2.gap-x-2");
     }
@@ -387,9 +377,67 @@ const parseDraftTable = () => {
     function findUpdateButton() {
         return document.querySelector("button.btn.btn-blue.flex-grow");
     }
-    function extractPlayers() {
+    const observer = new MutationObserver((mutations) => {
+        for (let mutation of mutations) {
+            if (mutation.type === "childList") {
+                const targetGrid = findTargetGrid();
+                if (targetGrid) {
+                    observer.disconnect();
+                    const selectAllLabel = findSelectAllLabel();
+                    if (selectAllLabel) {
+                        const checkbox = document.getElementById("all");
+                        if (checkbox && !checkbox.checked) {
+                            selectAllLabel.click();
+                        }
+                    }
+                    const updateButton = findUpdateButton();
+                    if (updateButton) {
+                        updateButton.click();
+                    }
+                    // Use setTimeout to ensure table is updated before extraction
+                    setTimeout(() => {
+                        extractPlayers(targetGrid).catch((error) => console.error("Error extracting players:", error));
+                    }, 500);
+                    return true;
+                }
+            }
+        }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    parseDraftCompleted = true;
+    return true;
+};
+function calculateMinStatsAsync(stats) {
+    return __awaiter(this, void 0, void 0, function* () {
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                resolve(calculateMinStats(stats));
+            }, 0);
+        });
+    });
+}
+function calculateMaxStatsAsync(stats) {
+    return __awaiter(this, void 0, void 0, function* () {
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                resolve(calculateMaxStats(stats));
+            }, 0);
+        });
+    });
+}
+function calculateOVRAsync(stats) {
+    return __awaiter(this, void 0, void 0, function* () {
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                resolve(calculateOVR(stats));
+            }, 0);
+        });
+    });
+}
+function extractPlayers(savedPreferencesGrid) {
+    return __awaiter(this, void 0, void 0, function* () {
         const rows = document.querySelectorAll("tbody[data-v-e2e20c3e] tr");
-        players = Array.from(rows).map((row) => {
+        const extractPlayerData = (row) => __awaiter(this, void 0, void 0, function* () {
             var _a, _b, _c, _d, _e;
             const cells = row.querySelectorAll("td");
             const id = row.id;
@@ -514,55 +562,32 @@ const parseDraftTable = () => {
                     };
                 }
             });
-            const minStats = calculateMinStats(stats);
-            const maxStats = calculateMaxStats(stats);
+            const [minStats, maxStats] = yield Promise.all([
+                calculateMinStatsAsync(stats),
+                calculateMaxStatsAsync(stats),
+            ]);
+            const [minOvr, maxOvr] = yield Promise.all([
+                calculateOVRAsync(minStats),
+                calculateOVRAsync(maxStats),
+            ]);
             return {
                 id,
                 name,
                 position,
                 ovr,
-                minOvr: calculateOVR(minStats),
-                maxOvr: calculateOVR(maxStats),
+                minOvr,
+                maxOvr,
                 stats,
             };
         });
+        const playerPromises = Array.from(rows).map(extractPlayerData);
+        const players = yield Promise.all(playerPromises);
         console.log("Extracted players:", players);
         // After extracting and processing all player data, reset user preferences
-        if (savedPreferencesGrid) {
-            parsePreferencesTable(savedPreferencesGrid);
-        }
-        else {
-            console.error("No saved preferences grid found");
-        }
-    }
-    const observer = new MutationObserver((mutations) => {
-        for (let mutation of mutations) {
-            if (mutation.type === "childList") {
-                const targetGrid = findTargetGrid();
-                if (targetGrid) {
-                    observer.disconnect();
-                    savedPreferencesGrid = targetGrid;
-                    const selectAllLabel = findSelectAllLabel();
-                    if (selectAllLabel) {
-                        const checkbox = document.getElementById("all");
-                        if (checkbox && !checkbox.checked) {
-                            selectAllLabel.click();
-                        }
-                    }
-                    const updateButton = findUpdateButton();
-                    if (updateButton) {
-                        updateButton.click();
-                    }
-                    //! Add an observer here later.
-                    setTimeout(extractPlayers, 500); // Small delay to ensure table is updated
-                    return;
-                }
-            }
-        }
+        parsePreferencesTable(savedPreferencesGrid);
+        return players;
     });
-    observer.observe(document.body, { childList: true, subtree: true });
-    return true;
-};
+}
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === "parseStatsTable") {
         if (!parseStatsTable()) {
@@ -577,6 +602,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
     }
     else if (message.action === "parseDraftTable") {
+        if (parseDraftCompleted)
+            return;
         if (!parseDraftTable()) {
             const interval = setInterval(() => {
                 if (parseDraftTable()) {
