@@ -195,19 +195,19 @@ const parseStatsTable = () => {
     const minStats = JSON.parse(JSON.stringify(stats));
     let weakestRating = 10;
     let highestNonStrongestRating = 0;
-    // find the weakest rating
-    for (const key of Object.keys(minStats)) {
-        const stat = minStats[key];
-        if (stat.strength === "weakest") {
-            weakestRating = stat.rating;
-        }
-    }
     // update ratings and find the highest non-strongest rating
     for (const key of Object.keys(minStats)) {
         const stat = minStats[key];
         minStats[key].rating = stat.hasRedPuck ? stat.rating : stat.rating + 1;
         if (stat.strength !== "strongest") {
             highestNonStrongestRating = Math.max(highestNonStrongestRating, minStats[key].rating);
+        }
+    }
+    // find the weakest rating
+    for (const key of Object.keys(minStats)) {
+        const stat = minStats[key];
+        if (stat.strength === "weakest") {
+            weakestRating = stat.rating;
         }
     }
     // adjust strongest stats
