@@ -233,6 +233,9 @@ const parseStatsTable = (): boolean => {
     const stat = minStats[key];
     if (stat.strength === "weakest") {
       weakestRating = stat.rating;
+      if(!stat.hasRedPuck && stat.rating < 10) {
+        weakestRating++;
+      }
     }
   }
 
