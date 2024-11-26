@@ -1,3 +1,9 @@
+declare global {
+  interface Window {
+    statsTableObserver?: MutationObserver | null;
+  }
+}
+
 interface Stat {
   rating: number;
   hasRedPuck: boolean;
@@ -25,13 +31,13 @@ const calculateOVR = (stats: Stats): number => {
   return Math.round(correctedAverage * 10);
 };
 
-const parseStatsTable = (): boolean => {
-  const puck = document.querySelector<SVGSVGElement>("svg.fa-hockey-puck");
+const parseStatsTable = (parentNode: HTMLElement): boolean => {
+  const puck = parentNode.querySelector<SVGSVGElement>("svg.fa-hockey-puck");
   if (!puck) {
     return false;
   }
 
-  let ancestor = puck.parentElement;
+  let ancestor: HTMLElement | null = puck.parentElement;
   while (ancestor && !ancestor.matches("table[data-v-a81c915e]")) {
     ancestor = ancestor.parentElement;
   }
@@ -41,15 +47,15 @@ const parseStatsTable = (): boolean => {
     return false;
   }
 
-  const divs = document.querySelectorAll("div.card-header");
+  const divs = parentNode.querySelectorAll("div.card-header");
 
-  const ovrElement = document.querySelector<HTMLElement>(
+  const ovrElement = parentNode.querySelector<HTMLElement>(
     "div.polygon.select-none text",
   );
   const baseOVR = ovrElement ? ovrElement.textContent : null;
 
   const updateOVR = (ovr: number) => {
-    const ovrElement = document.querySelector<HTMLElement>(
+    const ovrElement = parentNode.querySelector<HTMLElement>(
       "div.polygon.select-none text",
     );
     if (ovrElement) {
@@ -198,7 +204,9 @@ const parseStatsTable = (): boolean => {
     };
   });
 
-  const talentContainer = document.querySelector<HTMLDivElement>("body");
+  const talentContainer = parentNode.querySelector<HTMLDivElement>(
+    "div.flex.items-center.justify-end.flex-col span.text-muted",
+  );
   if (talentContainer) {
     const talentText = talentContainer.textContent || "";
     const strongestMatch = talentText.match(
@@ -221,11 +229,9 @@ const parseStatsTable = (): boolean => {
       stats[weakestTalent].strength = "weakest";
     }
   }
-
   const minStats: Stats = JSON.parse(JSON.stringify(stats));
   let weakestRating = 10;
   let highestNonStrongestRating = 0;
-
 
   // update ratings and find the highest non-strongest rating
   for (const key of Object.keys(minStats)) {
@@ -320,93 +326,75 @@ const parseStatsTable = (): boolean => {
   return true;
 };
 
-const parseRosterInfo = (): boolean => {
-  const statsPage = Array.from(document.querySelectorAll(".btn-toggle")).find(
-    (btn) => (btn.textContent ? btn.textContent.trim() === "Skills" : null),
-  ) as HTMLElement;
-  if (statsPage) {
-    statsPage.click();
-    const buttons = document.querySelectorAll("button.focus\\:outline-none");
-    for (let button of buttons) {
-      if (
-        button.querySelector("svg.svg-inline--fa.fa-eye-slash") &&
-        button.textContent?.trim().includes("Maxings")
-      ) {
-        // ???
+(function (history) {
+  console.log(history);
+  const targetUrls = ["https://hockey-nation.com/player/"];
+
+  function handlePageLoad() {
+    const currentUrl = window.location.href;
+    const isTargetPage = targetUrls.some((url) => currentUrl.startsWith(url));
+
+    if (isTargetPage) {
+      if (!window.statsTableObserver) {
+        initializeObserver();
+      }
+    } else {
+      if (window.statsTableObserver) {
+        window.statsTableObserver.disconnect();
+        window.statsTableObserver = null;
       }
     }
-    console.log(buttons);
-    console.log("A bunch of stats and stuff...");
-    // Select all player rows
-    const playerRows = document.querySelectorAll<HTMLTableRowElement>(
-      "tbody tr:not(.footer-row)",
-    );
+  }
 
-    // Iterate over each player row
-    playerRows.forEach((row, index) => {
-      const positionElement =
-        row.querySelector<HTMLTableCellElement>("td:first-child");
-      const position = positionElement?.textContent?.trim() ?? "Unknown";
-      const nameElement = row.querySelector<HTMLAnchorElement>("a.player-link");
-      const name = nameElement?.textContent?.trim() ?? "Unknown";
-      const playerId =
-        nameElement?.getAttribute("href")?.split("/").pop() ?? "Unknown";
-      // Extract skills
-      const skillCells = Array.from(
-        row.querySelectorAll<HTMLTableCellElement>("td"),
-      ).slice(3);
-      console.log(skillCells);
-      const skills = skillCells.map((td) => {
-        const skillElement = td.querySelector<HTMLSpanElement>("span");
-        console.log("Skill element:");
-        console.log(skillElement);
-        return skillElement
-          ? parseInt(skillElement.textContent?.trim() ?? "0", 10)
-          : 0;
+  const originalPushState = history.pushState;
+  const originalReplaceState = history.replaceState;
+
+  history.pushState = function (...args) {
+    const result = originalPushState.apply(this, args);
+    window.dispatchEvent(new Event("locationchange"));
+    return result;
+  };
+
+  history.replaceState = function (...args) {
+    const result = originalReplaceState.apply(this, args);
+    window.dispatchEvent(new Event("locationchange"));
+    return result;
+  };
+
+  window.addEventListener("popstate", () => {
+    window.dispatchEvent(new Event("locationchange"));
+  });
+
+  window.addEventListener("locationchange", handlePageLoad);
+
+  handlePageLoad();
+
+  function initializeObserver() {
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
+          mutation.addedNodes.forEach((node) => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              const element = node as HTMLElement;
+              if (
+                element.matches("div[data-v-3c6c075b]") &&
+                element.querySelector("table[data-v-a81c915e]")
+              ) {
+                parseStatsTable(element);
+              }
+            }
+          });
+        }
       });
-
-      // Log or process the player data
-      console.log(`Player ${index + 1}:`);
-      console.log(`  Name: ${name}`);
-      console.log(`  ID: ${playerId}`);
-      console.log(`  Position: ${position}`);
-      console.log(`  Skills: ${skills.join(", ")}`);
-      console.log("---");
-      // Logic to process each player
     });
-    const otherPage = Array.from(document.querySelectorAll(".btn-toggle")).find(
-      (btn) => (btn.textContent ? btn.textContent.trim() === "General" : null),
-    ) as HTMLElement;
-    // otherPage?.click();
-    return true;
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+
+    window.statsTableObserver = observer;
   }
-  return false; // Add this line to handle the case when statsPage is not found
-};
+})(window.history);
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === "parseStatsTable") {
-    if (!parseStatsTable()) {
-      const interval = setInterval(() => {
-        if (parseStatsTable()) {
-          clearInterval(interval);
-        }
-      }, 100); // 0.1 Seconds
-
-      setTimeout(() => {
-        clearInterval(interval);
-      }, 10000); // 10 Seconds
-    }
-  } else if (message.action === "parseRosterInfo") {
-    if (!parseRosterInfo()) {
-      const interval = setInterval(() => {
-        if (parseRosterInfo()) {
-          clearInterval(interval);
-        }
-      }, 100); // 0.1 Seconds
-
-      setTimeout(() => {
-        clearInterval(interval);
-      }, 10000); // 10 Seconds
-    }
-  }
-});
+export {};

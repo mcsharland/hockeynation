@@ -1,10 +1,14 @@
 /******/ (() => { // webpackBootstrap
 /******/ 	"use strict";
 var __webpack_exports__ = {};
+// This entry need to be wrapped in an IIFE because it uses a non-standard name for the exports (exports).
+(() => {
+var exports = __webpack_exports__;
 /*!******************************!*\
   !*** ./src/contentScript.ts ***!
   \******************************/
 
+Object.defineProperty(exports, "__esModule", ({ value: true }));
 const calculateOVR = (stats) => {
     const statsValues = Object.keys(stats).map((key) => stats[key]);
     const sum = statsValues.reduce((acc, stat) => acc + stat.rating, 0);
@@ -14,8 +18,8 @@ const calculateOVR = (stats) => {
     const correctedAverage = correctedSum / statsValues.length;
     return Math.round(correctedAverage * 10);
 };
-const parseStatsTable = () => {
-    const puck = document.querySelector("svg.fa-hockey-puck");
+const parseStatsTable = (parentNode) => {
+    const puck = parentNode.querySelector("svg.fa-hockey-puck");
     if (!puck) {
         return false;
     }
@@ -27,12 +31,12 @@ const parseStatsTable = () => {
     if (!statsTable) {
         return false;
     }
-    const divs = document.querySelectorAll("div.card-header");
-    const ovrElement = document.querySelector("div.polygon.select-none text");
+    const divs = parentNode.querySelectorAll("div.card-header");
+    const ovrElement = parentNode.querySelector("div.polygon.select-none text");
     const baseOVR = ovrElement ? ovrElement.textContent : null;
     const updateOVR = (ovr) => {
         var _a;
-        const ovrElement = document.querySelector("div.polygon.select-none text");
+        const ovrElement = parentNode.querySelector("div.polygon.select-none text");
         if (ovrElement) {
             ovrElement.textContent = ovr.toString();
             const polygonElement = (_a = ovrElement.parentElement) === null || _a === void 0 ? void 0 : _a.querySelector("polygon");
@@ -168,7 +172,7 @@ const parseStatsTable = () => {
             strength: null,
         };
     });
-    const talentContainer = document.querySelector("body");
+    const talentContainer = parentNode.querySelector("div.flex.items-center.justify-end.flex-col span.text-muted");
     if (talentContainer) {
         const talentText = talentContainer.textContent || "";
         const strongestMatch = talentText.match(/Strongest talents of .+ are (\w+ and \w+)/);
@@ -261,83 +265,66 @@ const parseStatsTable = () => {
     updateHockeyPucks("Default");
     return true;
 };
-const parseRosterInfo = () => {
-    var _a;
-    const statsPage = Array.from(document.querySelectorAll(".btn-toggle")).find((btn) => (btn.textContent ? btn.textContent.trim() === "Skills" : null));
-    if (statsPage) {
-        statsPage.click();
-        const buttons = document.querySelectorAll("button.focus\\:outline-none");
-        for (let button of buttons) {
-            if (button.querySelector("svg.svg-inline--fa.fa-eye-slash") &&
-                ((_a = button.textContent) === null || _a === void 0 ? void 0 : _a.trim().includes("Maxings"))) {
-                // ???
+(function (history) {
+    console.log(history);
+    const targetUrls = ["https://hockey-nation.com/player/"];
+    function handlePageLoad() {
+        const currentUrl = window.location.href;
+        const isTargetPage = targetUrls.some((url) => currentUrl.startsWith(url));
+        if (isTargetPage) {
+            if (!window.statsTableObserver) {
+                initializeObserver();
             }
         }
-        console.log(buttons);
-        console.log("A bunch of stats and stuff...");
-        // Select all player rows
-        const playerRows = document.querySelectorAll("tbody tr:not(.footer-row)");
-        // Iterate over each player row
-        playerRows.forEach((row, index) => {
-            var _a, _b, _c, _d, _e, _f;
-            const positionElement = row.querySelector("td:first-child");
-            const position = (_b = (_a = positionElement === null || positionElement === void 0 ? void 0 : positionElement.textContent) === null || _a === void 0 ? void 0 : _a.trim()) !== null && _b !== void 0 ? _b : "Unknown";
-            const nameElement = row.querySelector("a.player-link");
-            const name = (_d = (_c = nameElement === null || nameElement === void 0 ? void 0 : nameElement.textContent) === null || _c === void 0 ? void 0 : _c.trim()) !== null && _d !== void 0 ? _d : "Unknown";
-            const playerId = (_f = (_e = nameElement === null || nameElement === void 0 ? void 0 : nameElement.getAttribute("href")) === null || _e === void 0 ? void 0 : _e.split("/").pop()) !== null && _f !== void 0 ? _f : "Unknown";
-            // Extract skills
-            const skillCells = Array.from(row.querySelectorAll("td")).slice(3);
-            console.log(skillCells);
-            const skills = skillCells.map((td) => {
-                var _a, _b;
-                const skillElement = td.querySelector("span");
-                console.log("Skill element:");
-                console.log(skillElement);
-                return skillElement
-                    ? parseInt((_b = (_a = skillElement.textContent) === null || _a === void 0 ? void 0 : _a.trim()) !== null && _b !== void 0 ? _b : "0", 10)
-                    : 0;
+        else {
+            if (window.statsTableObserver) {
+                window.statsTableObserver.disconnect();
+                window.statsTableObserver = null;
+            }
+        }
+    }
+    const originalPushState = history.pushState;
+    const originalReplaceState = history.replaceState;
+    history.pushState = function (...args) {
+        const result = originalPushState.apply(this, args);
+        window.dispatchEvent(new Event("locationchange"));
+        return result;
+    };
+    history.replaceState = function (...args) {
+        const result = originalReplaceState.apply(this, args);
+        window.dispatchEvent(new Event("locationchange"));
+        return result;
+    };
+    window.addEventListener("popstate", () => {
+        window.dispatchEvent(new Event("locationchange"));
+    });
+    window.addEventListener("locationchange", handlePageLoad);
+    handlePageLoad();
+    function initializeObserver() {
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
+                    mutation.addedNodes.forEach((node) => {
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                            const element = node;
+                            if (element.matches("div[data-v-3c6c075b]") &&
+                                element.querySelector("table[data-v-a81c915e]")) {
+                                parseStatsTable(element);
+                            }
+                        }
+                    });
+                }
             });
-            // Log or process the player data
-            console.log(`Player ${index + 1}:`);
-            console.log(`  Name: ${name}`);
-            console.log(`  ID: ${playerId}`);
-            console.log(`  Position: ${position}`);
-            console.log(`  Skills: ${skills.join(", ")}`);
-            console.log("---");
-            // Logic to process each player
         });
-        const otherPage = Array.from(document.querySelectorAll(".btn-toggle")).find((btn) => (btn.textContent ? btn.textContent.trim() === "General" : null));
-        // otherPage?.click();
-        return true;
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+        });
+        window.statsTableObserver = observer;
     }
-    return false; // Add this line to handle the case when statsPage is not found
-};
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.action === "parseStatsTable") {
-        if (!parseStatsTable()) {
-            const interval = setInterval(() => {
-                if (parseStatsTable()) {
-                    clearInterval(interval);
-                }
-            }, 100); // 0.1 Seconds
-            setTimeout(() => {
-                clearInterval(interval);
-            }, 10000); // 10 Seconds
-        }
-    }
-    else if (message.action === "parseRosterInfo") {
-        if (!parseRosterInfo()) {
-            const interval = setInterval(() => {
-                if (parseRosterInfo()) {
-                    clearInterval(interval);
-                }
-            }, 100); // 0.1 Seconds
-            setTimeout(() => {
-                clearInterval(interval);
-            }, 10000); // 10 Seconds
-        }
-    }
-});
+})(window.history);
+
+})();
 
 /******/ })()
 ;
