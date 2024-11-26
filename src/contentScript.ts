@@ -326,8 +326,7 @@ const parseStatsTable = (parentNode: HTMLElement): boolean => {
   return true;
 };
 
-(function (history) {
-  console.log(history);
+(function () {
   const targetUrls = ["https://hockey-nation.com/player/"];
 
   function handlePageLoad() {
@@ -346,26 +345,8 @@ const parseStatsTable = (parentNode: HTMLElement): boolean => {
     }
   }
 
-  const originalPushState = history.pushState;
-  const originalReplaceState = history.replaceState;
-
-  history.pushState = function (...args) {
-    const result = originalPushState.apply(this, args);
-    window.dispatchEvent(new Event("locationchange"));
-    return result;
-  };
-
-  history.replaceState = function (...args) {
-    const result = originalReplaceState.apply(this, args);
-    window.dispatchEvent(new Event("locationchange"));
-    return result;
-  };
-
-  window.addEventListener("popstate", () => {
-    window.dispatchEvent(new Event("locationchange"));
-  });
-
-  window.addEventListener("locationchange", handlePageLoad);
+  // @ts-ignore
+  window.navigation.addEventListener("currententrychange", handlePageLoad);
 
   handlePageLoad();
 
@@ -395,6 +376,6 @@ const parseStatsTable = (parentNode: HTMLElement): boolean => {
 
     window.statsTableObserver = observer;
   }
-})(window.history);
+})();
 
 export {};

@@ -265,8 +265,7 @@ const parseStatsTable = (parentNode) => {
     updateHockeyPucks("Default");
     return true;
 };
-(function (history) {
-    console.log(history);
+(function () {
     const targetUrls = ["https://hockey-nation.com/player/"];
     function handlePageLoad() {
         const currentUrl = window.location.href;
@@ -283,22 +282,8 @@ const parseStatsTable = (parentNode) => {
             }
         }
     }
-    const originalPushState = history.pushState;
-    const originalReplaceState = history.replaceState;
-    history.pushState = function (...args) {
-        const result = originalPushState.apply(this, args);
-        window.dispatchEvent(new Event("locationchange"));
-        return result;
-    };
-    history.replaceState = function (...args) {
-        const result = originalReplaceState.apply(this, args);
-        window.dispatchEvent(new Event("locationchange"));
-        return result;
-    };
-    window.addEventListener("popstate", () => {
-        window.dispatchEvent(new Event("locationchange"));
-    });
-    window.addEventListener("locationchange", handlePageLoad);
+    // @ts-ignore
+    window.navigation.addEventListener("currententrychange", handlePageLoad);
     handlePageLoad();
     function initializeObserver() {
         const observer = new MutationObserver((mutations) => {
@@ -322,7 +307,7 @@ const parseStatsTable = (parentNode) => {
         });
         window.statsTableObserver = observer;
     }
-})(window.history);
+})();
 
 })();
 
