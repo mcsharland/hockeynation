@@ -15,7 +15,7 @@ interface Stats {
 }
 
 const calculateOVR = (stats: Stats): number => {
-  const statsValues = Object.keys(stats).map((key) => stats[key]);
+  const statsValues = Object.values(stats);
   const sum = statsValues.reduce(
     (acc: number, stat: Stat) => acc + stat.rating,
     0,
@@ -234,43 +234,40 @@ const parseStatsTable = (parentNode: HTMLElement): boolean => {
   let highestNonStrongestRating = 0;
 
   // update ratings and find the highest non-strongest rating
-  for (const key of Object.keys(minStats)) {
-    const stat = minStats[key];
-    minStats[key].rating = stat.hasRedPuck ? stat.rating : stat.rating + 1;
+  for (const stat of Object.values(minStats)) {
+    stat.rating = stat.hasRedPuck ? stat.rating : stat.rating + 1;
     if (stat.strength !== "strongest") {
       highestNonStrongestRating = Math.max(
         highestNonStrongestRating,
-        minStats[key].rating,
+        stat.rating,
       );
     }
   }
 
   // find the weakest rating
-  for (const key of Object.keys(minStats)) {
-    const stat = minStats[key];
+  for (const stat of Object.values(minStats)) {
     if (stat.strength === "weakest") {
       weakestRating = stat.rating;
     }
   }
 
   // adjust strongest stats
-  for (const key of Object.keys(minStats)) {
-    const stat = minStats[key];
+  for (const stat of Object.values(minStats)) {
     if (
       stat.strength === "strongest" &&
       stat.rating < highestNonStrongestRating
     ) {
-      minStats[key].rating = highestNonStrongestRating;
+      stat.rating = highestNonStrongestRating;
     }
   }
 
   // adjust weakest stats
-  for (const key of Object.keys(minStats)) {
-    if (minStats[key].rating < weakestRating) {
-      minStats[key].rating = weakestRating;
+  for (const stat of Object.values(minStats)) {
+    if (stat.rating < weakestRating) {
+      stat.rating = weakestRating;
     }
-    if (minStats[key].rating < 4) {
-      minStats[key].rating = 4;
+    if (stat.rating < 4) {
+      stat.rating = 4;
     }
   }
 
@@ -279,8 +276,7 @@ const parseStatsTable = (parentNode: HTMLElement): boolean => {
   let lowestNonWeakestRating = 10;
 
   // find the strongest rating
-  for (const key of Object.keys(maxStats)) {
-    const stat = maxStats[key];
+  for (const stat of Object.values(maxStats)) {
     if (stat.strength === "strongest") {
       strongestRating = Math.min(
         strongestRating,
@@ -290,35 +286,29 @@ const parseStatsTable = (parentNode: HTMLElement): boolean => {
   }
 
   // update ratings and find the lowest non-weakest rating
-  for (const key of Object.keys(maxStats)) {
-    const stat = maxStats[key];
+  for (const stat of Object.values(maxStats)) {
     if (!stat.hasRedPuck && stat.rating < strongestRating) {
-      maxStats[key].rating = strongestRating;
+      stat.rating = strongestRating;
     }
     if (stat.strength !== "weakest") {
-      lowestNonWeakestRating = Math.min(
-        lowestNonWeakestRating,
-        maxStats[key].rating,
-      );
+      lowestNonWeakestRating = Math.min(lowestNonWeakestRating, stat.rating);
     }
   }
 
   // adjust strongest stats
-  for (const key of Object.keys(maxStats)) {
-    const stat = maxStats[key];
+  for (const stat of Object.values(maxStats)) {
     if (stat.strength === "strongest" && !stat.hasRedPuck && stat.rating < 10) {
-      maxStats[key].rating = 10;
+      stat.rating = 10;
     }
   }
 
   // adjust weakest stats
-  for (const key of Object.keys(maxStats)) {
-    const stat = maxStats[key];
+  for (const stat of Object.values(maxStats)) {
     if (stat.strength === "weakest" && stat.rating > lowestNonWeakestRating) {
-      maxStats[key].rating = lowestNonWeakestRating;
+      stat.rating = lowestNonWeakestRating;
     }
-    if (maxStats[key].rating < 4) {
-      maxStats[key].rating = 4;
+    if (stat.rating < 4) {
+      stat.rating = 4;
     }
   }
 

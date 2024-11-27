@@ -1,16 +1,28 @@
 /******/ (() => { // webpackBootstrap
 /******/ 	"use strict";
+/******/ 	// The require scope
+/******/ 	var __webpack_require__ = {};
+/******/ 	
+/************************************************************************/
+/******/ 	/* webpack/runtime/make namespace object */
+/******/ 	(() => {
+/******/ 		// define __esModule on exports
+/******/ 		__webpack_require__.r = (exports) => {
+/******/ 			if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
+/******/ 				Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
+/******/ 			}
+/******/ 			Object.defineProperty(exports, '__esModule', { value: true });
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/************************************************************************/
 var __webpack_exports__ = {};
-// This entry need to be wrapped in an IIFE because it uses a non-standard name for the exports (exports).
-(() => {
-var exports = __webpack_exports__;
 /*!******************************!*\
   !*** ./src/contentScript.ts ***!
   \******************************/
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
+__webpack_require__.r(__webpack_exports__);
 const calculateOVR = (stats) => {
-    const statsValues = Object.keys(stats).map((key) => stats[key]);
+    const statsValues = Object.values(stats);
     const sum = statsValues.reduce((acc, stat) => acc + stat.rating, 0);
     const avg = sum / statsValues.length;
     const excess = statsValues.reduce((acc, stat) => stat.rating > avg ? acc + stat.rating - avg : acc, 0);
@@ -194,72 +206,65 @@ const parseStatsTable = (parentNode) => {
     let weakestRating = 10;
     let highestNonStrongestRating = 0;
     // update ratings and find the highest non-strongest rating
-    for (const key of Object.keys(minStats)) {
-        const stat = minStats[key];
-        minStats[key].rating = stat.hasRedPuck ? stat.rating : stat.rating + 1;
+    for (const stat of Object.values(minStats)) {
+        stat.rating = stat.hasRedPuck ? stat.rating : stat.rating + 1;
         if (stat.strength !== "strongest") {
-            highestNonStrongestRating = Math.max(highestNonStrongestRating, minStats[key].rating);
+            highestNonStrongestRating = Math.max(highestNonStrongestRating, stat.rating);
         }
     }
     // find the weakest rating
-    for (const key of Object.keys(minStats)) {
-        const stat = minStats[key];
+    for (const stat of Object.values(minStats)) {
         if (stat.strength === "weakest") {
             weakestRating = stat.rating;
         }
     }
     // adjust strongest stats
-    for (const key of Object.keys(minStats)) {
-        const stat = minStats[key];
+    for (const stat of Object.values(minStats)) {
         if (stat.strength === "strongest" &&
             stat.rating < highestNonStrongestRating) {
-            minStats[key].rating = highestNonStrongestRating;
+            stat.rating = highestNonStrongestRating;
         }
     }
     // adjust weakest stats
-    for (const key of Object.keys(minStats)) {
-        if (minStats[key].rating < weakestRating) {
-            minStats[key].rating = weakestRating;
+    for (const stat of Object.values(minStats)) {
+        if (stat.rating < weakestRating) {
+            stat.rating = weakestRating;
         }
-        if (minStats[key].rating < 4) {
-            minStats[key].rating = 4;
+        if (stat.rating < 4) {
+            stat.rating = 4;
         }
     }
     const maxStats = JSON.parse(JSON.stringify(stats));
     let strongestRating = 10;
     let lowestNonWeakestRating = 10;
     // find the strongest rating
-    for (const key of Object.keys(maxStats)) {
-        const stat = maxStats[key];
+    for (const stat of Object.values(maxStats)) {
         if (stat.strength === "strongest") {
             strongestRating = Math.min(strongestRating, stat.hasRedPuck ? stat.rating : 10);
         }
     }
     // update ratings and find the lowest non-weakest rating
-    for (const key of Object.keys(maxStats)) {
-        const stat = maxStats[key];
+    for (const stat of Object.values(maxStats)) {
         if (!stat.hasRedPuck && stat.rating < strongestRating) {
-            maxStats[key].rating = strongestRating;
+            stat.rating = strongestRating;
         }
         if (stat.strength !== "weakest") {
-            lowestNonWeakestRating = Math.min(lowestNonWeakestRating, maxStats[key].rating);
+            lowestNonWeakestRating = Math.min(lowestNonWeakestRating, stat.rating);
         }
     }
     // adjust strongest stats
-    for (const key of Object.keys(maxStats)) {
-        const stat = maxStats[key];
+    for (const stat of Object.values(maxStats)) {
         if (stat.strength === "strongest" && !stat.hasRedPuck && stat.rating < 10) {
-            maxStats[key].rating = 10;
+            stat.rating = 10;
         }
     }
     // adjust weakest stats
-    for (const key of Object.keys(maxStats)) {
-        const stat = maxStats[key];
+    for (const stat of Object.values(maxStats)) {
         if (stat.strength === "weakest" && stat.rating > lowestNonWeakestRating) {
-            maxStats[key].rating = lowestNonWeakestRating;
+            stat.rating = lowestNonWeakestRating;
         }
-        if (maxStats[key].rating < 4) {
-            maxStats[key].rating = 4;
+        if (stat.rating < 4) {
+            stat.rating = 4;
         }
     }
     updateHockeyPucks("Default");
@@ -309,7 +314,6 @@ const parseStatsTable = (parentNode) => {
     }
 })();
 
-})();
 
 /******/ })()
 ;
