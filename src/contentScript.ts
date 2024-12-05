@@ -348,7 +348,7 @@ const parseStatsTable = (parentNode: HTMLElement): boolean => {
             if (node.nodeType === Node.ELEMENT_NODE) {
               const element = node as HTMLElement;
               if (
-                element.matches("div[data-v-3c6c075b]") &&
+                element.matches("div[data-v-40397639]") &&
                 element.querySelector("table[data-v-a81c915e]")
               ) {
                 parseStatsTable(element);
