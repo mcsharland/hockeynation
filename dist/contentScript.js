@@ -297,8 +297,7 @@ const parseStatsTable = (parentNode) => {
                     mutation.addedNodes.forEach((node) => {
                         if (node.nodeType === Node.ELEMENT_NODE) {
                             const element = node;
-                            if (element.matches("div[data-v-40397639]") &&
-                                element.querySelector("table[data-v-a81c915e]")) {
+                            if (element.querySelector("table[data-v-a81c915e]")) {
                                 parseStatsTable(element);
                             }
                         }
