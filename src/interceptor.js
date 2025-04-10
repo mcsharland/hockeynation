@@ -1,4 +1,28 @@
+import { handlePlayerData } from "./pages/player.ts";
+
 (function () {
+  const URL_HANDLERS = {
+    player: {
+      pattern: /\/api\/player\/[^\/]+$/,
+      handler: (data) => {
+        handlePlayerData(data);
+      },
+    },
+    roster: {
+      pattern: /\/api\/team\/[^\/]+\/roster/,
+      handler: (data) => {
+        console.log("Found roster data:", data);
+      },
+    },
+  };
+
+  function findHandler(url) {
+    for (const { pattern, handler } of Object.values(URL_HANDLERS)) {
+      if (pattern.test(url)) return handler;
+    }
+    return null;
+  }
+
   // intercept XHR
   const originalOpen = XMLHttpRequest.prototype.open;
   const originalSend = XMLHttpRequest.prototype.send;
@@ -9,21 +33,15 @@
   };
 
   XMLHttpRequest.prototype.send = function (...args) {
-    if (
-      this._interceptedUrl &&
-      this._interceptedUrl.includes("/api/team/") &&
-      this._interceptedUrl.includes("/roster")
-    ) {
+    let handler;
+    if (this._interceptedUrl && (handler = findHandler(this._interceptedUrl))) {
       const originalOnReadyState = this.onreadystatechange;
 
       this.onreadystatechange = function () {
         if (this.readyState === 4 && this.status === 200) {
           try {
             const data = JSON.parse(this.responseText);
-            console.log("INTERCEPTED ROSTER DATA:", data);
-
-            // Call data processing here
-            // Maybe split if statements to become a routing table for different request processing
+            handler(data);
           } catch (e) {
             console.error("Error parsing response:", e);
           }
@@ -45,12 +63,12 @@
     const url = typeof resource === "string" ? resource : resource.url;
     const response = await originalFetch.apply(this, arguments);
 
-    // split in routing table
-    if (url && url.includes("/api/team/") && url.includes("/roster")) {
+    let handler;
+    if (url && (handler = findHandler(url))) {
       try {
         const clonedResponse = response.clone();
         const data = await clonedResponse.json();
-        console.log("INTERCEPTED ROSTER DATA (fetch):", data);
+        handler(data);
       } catch (e) {
         console.error("Error processing fetch response:", e);
       }
