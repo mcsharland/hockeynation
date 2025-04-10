@@ -5,7 +5,7 @@ module.exports = {
   devtool: "source-map",
   entry: {
     contentScript: "./src/contentScript.ts",
-    background: "./src/background.ts",
+    interceptor: "./src/interceptor.js",
   },
   module: {
     rules: [

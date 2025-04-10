@@ -1,41 +1,30 @@
-chrome.webNavigation.onHistoryStateUpdated.addListener(
-  (details) => {
-    if (details.frameId === 0) {
-      chrome.tabs.get(details.tabId, (tab) => {
-        if (chrome.runtime.lastError) {
-          console.error(chrome.runtime.lastError);
-          return;
-        }
+// background.js
+// Listen for messages from content script
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === "HOCKEY_ROSTER_DATA") {
+    console.log("Received hockey roster data in background script");
 
-        const currentUrl = tab.url;
+    // Store for later use
+    chrome.storage.local.set({
+      rosterData: message.data,
+      interceptedAt: Date.now(),
+      sourceUrl: message.url,
+    });
 
-        if (
-          currentUrl &&
-          currentUrl.startsWith("https://hockey-nation.com/player/")
-        ) {
-          chrome.tabs
-            .sendMessage(details.tabId, { action: "parseStatsTable" })
-            .catch((error) => {
-              // This error will be extremely common so it is masked
-            });
-        } else if (
-          currentUrl &&
-          currentUrl.startsWith("https://hockey-nation.com/draft-ranking/")
-        ) {
-          console.log("Draft ranking page detected");
-          chrome.tabs
-            .sendMessage(details.tabId, { action: "parseDraftTable" })
-            .catch((error) => {
-              // This error will be extremely common so it is masked
-            });
-        }
-      });
-    }
-  },
-  {
-    url: [
-      { urlPrefix: "https://hockey-nation.com/player/" },
-      { urlPrefix: "https://hockey-nation.com/draft-ranking/" },
-    ],
-  },
-);
+    // You could also send a notification or update UI
+  }
+});
+
+// You could also set up the initial injection from here
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (
+    changeInfo.status === "loading" &&
+    tab?.url?.includes("hockey-nation.com")
+  ) {
+    // Ensure content script is injected
+    chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      files: ["content.js"],
+    });
+  }
+});
