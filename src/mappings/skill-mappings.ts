@@ -1,0 +1,17 @@
+export const SKILL_NAME_TO_ID: Record<string, string> = {
+  Skating: "SKA",
+  Reflexes: "REF",
+  Endurance: "END",
+  Power: "PWR",
+  Positioning: "POS",
+  Shooting: "SHO",
+  Pads: "PAD",
+  Passing: "PAS",
+  Glove: "GLO",
+  Defending: "DEF",
+  Blocker: "BLO",
+  Checking: "CHK",
+  Stick: "STK",
+  Discipline: "DSC",
+  Faceoffs: "FOF",
+};

@@ -2,6 +2,37 @@
 /******/ 	"use strict";
 /******/ 	var __webpack_modules__ = ({
 
+/***/ "./src/mappings/skill-mappings.ts":
+/*!****************************************!*\
+  !*** ./src/mappings/skill-mappings.ts ***!
+  \****************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   SKILL_NAME_TO_ID: () => (/* binding */ SKILL_NAME_TO_ID)
+/* harmony export */ });
+const SKILL_NAME_TO_ID = {
+    Skating: "SKA",
+    Reflexes: "REF",
+    Endurance: "END",
+    Power: "PWR",
+    Positioning: "POS",
+    Shooting: "SHO",
+    Pads: "PAD",
+    Passing: "PAS",
+    Glove: "GLO",
+    Defending: "DEF",
+    Blocker: "BLO",
+    Checking: "CHK",
+    Stick: "STK",
+    Discipline: "DSC",
+    Faceoffs: "FOF",
+};
+
+
+/***/ }),
+
 /***/ "./src/pages/player.ts":
 /*!*****************************!*\
   !*** ./src/pages/player.ts ***!
@@ -12,143 +43,303 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   handlePlayerData: () => (/* binding */ handlePlayerData)
 /* harmony export */ });
-function parsePlayerData(data) {
-    const player = {};
-    player.stats = {};
-    player.scout = data.data.skills.some((skill) => skill?.hidden ?? false);
-    for (const s of data.data.skills) {
-        player.stats[s.id] = {
-            rating: parseInt(s?.lvl ?? 0),
-            max: s?.max ?? false,
-            strength: null, // default, change below
-        };
+/* harmony import */ var _mappings_skill_mappings__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../mappings/skill-mappings */ "./src/mappings/skill-mappings.ts");
+
+class PlayerStats {
+    stats;
+    minStats;
+    maxStats;
+    isScout;
+    constructor(data) {
+        const player = this.parsePlayerData(data);
+        this.stats = player.stats;
+        this.isScout = player.scout;
+        this.minStats = this.calcMinStats(this.stats);
+        this.maxStats = this.calcMaxStats(this.stats);
     }
-    if (data.data?.talents?.weakest) {
-        // if weakness exists so does strength
-        player.stats[data.data.talents.weakest].strength = "weakest";
-        data.data.talents.strongest.forEach((str) => (player.stats[str].strength = "strongest"));
+    parsePlayerData(data) {
+        const player = {};
+        player.stats = {};
+        player.scout = data.data.skills.some((skill) => skill?.hidden ?? false);
+        for (const s of data.data.skills) {
+            player.stats[s.id] = {
+                rating: parseInt(s?.lvl ?? 0),
+                max: s?.max ?? false,
+                strength: null, // default, change below
+            };
+        }
+        if (data.data?.talents?.weakest) {
+            // if weakness exists so does strength
+            player.stats[data.data.talents.weakest].strength = "weakest";
+            data.data.talents.strongest.forEach((str) => (player.stats[str].strength =
+                "strongest"));
+        }
+        return player;
     }
-    return player;
+    calcMinStats(stats) {
+        const minStats = structuredClone(stats);
+        let weakestRating = 10;
+        let highestNonStrongestRating = 0;
+        // update ratings and find the highest non-strongest rating
+        for (const stat of Object.values(minStats)) {
+            stat.rating = stat.max ? stat.rating : stat.rating + 1;
+            if (stat.strength !== "strongest") {
+                highestNonStrongestRating = Math.max(highestNonStrongestRating, stat.rating);
+            }
+        }
+        // find the weakest rating
+        for (const stat of Object.values(minStats)) {
+            if (stat.strength === "weakest") {
+                weakestRating = stat.rating;
+            }
+        }
+        // adjust strongest stats
+        for (const stat of Object.values(minStats)) {
+            if (stat.strength === "strongest" &&
+                stat.rating < highestNonStrongestRating) {
+                stat.rating = highestNonStrongestRating;
+            }
+        }
+        // adjust weakest stats
+        for (const stat of Object.values(minStats)) {
+            if (stat.rating < weakestRating) {
+                stat.rating = weakestRating;
+            }
+            if (stat.rating < 4) {
+                stat.rating = 4;
+            }
+        }
+        return minStats;
+    }
+    calcMaxStats(stats) {
+        const maxStats = structuredClone(stats);
+        let strongestRating = 10;
+        let lowestNonWeakestRating = 10;
+        // find the strongest rating
+        for (const stat of Object.values(maxStats)) {
+            if (stat.strength === "strongest") {
+                strongestRating = Math.min(strongestRating, stat.max ? stat.rating : 10);
+            }
+        }
+        // update ratings and find the lowest non-weakest rating
+        for (const stat of Object.values(maxStats)) {
+            if (!stat.max && stat.rating < strongestRating) {
+                stat.rating = strongestRating;
+            }
+            if (stat.strength !== "weakest") {
+                lowestNonWeakestRating = Math.min(lowestNonWeakestRating, stat.rating);
+            }
+        }
+        // adjust strongest stats
+        for (const stat of Object.values(maxStats)) {
+            if (stat.strength === "strongest" && !stat.max && stat.rating < 10) {
+                stat.rating = 10;
+            }
+        }
+        // adjust weakest stats
+        for (const stat of Object.values(maxStats)) {
+            if (stat.strength === "weakest" && stat.rating > lowestNonWeakestRating) {
+                stat.rating = lowestNonWeakestRating;
+            }
+            if (stat.rating < 4) {
+                stat.rating = 4;
+            }
+        }
+        return maxStats;
+    }
+    calculateOVR(stats) {
+        const statsValues = Object.values(stats);
+        const sum = statsValues.reduce((acc, stat) => acc + stat.rating, 0);
+        const avg = sum / statsValues.length;
+        const excess = statsValues.reduce((acc, stat) => stat.rating > avg ? acc + stat.rating - avg : acc, 0);
+        const correctedSum = sum + excess;
+        const correctedAverage = correctedSum / statsValues.length;
+        return Math.round(correctedAverage * 10);
+    }
 }
-function calcMinStats(stats) {
-    const minStats = structuredClone(stats);
-    let weakestRating = 10;
-    let highestNonStrongestRating = 0;
-    // update ratings and find the highest non-strongest rating
-    for (const stat of Object.values(minStats)) {
-        stat.rating = stat.max ? stat.rating : stat.rating + 1;
-        if (stat.strength !== "strongest") {
-            highestNonStrongestRating = Math.max(highestNonStrongestRating, stat.rating);
+class StatsVisualizer {
+    playerStats;
+    parentNode;
+    ovrElement = null;
+    baseOVR = null;
+    statsTable = null;
+    statsRows = null;
+    constructor(playerStats, parentNode) {
+        this.playerStats = playerStats;
+        this.parentNode = parentNode;
+        this.initialize();
+    }
+    initialize() {
+        const puck = this.parentNode.querySelector("svg.fa-hockey-puck");
+        if (!puck) {
+            return;
+        }
+        let ancestor = puck.parentElement;
+        while (ancestor && !ancestor.matches("table[data-v-a81c915e]")) {
+            ancestor = ancestor.parentElement;
+        }
+        this.statsTable = ancestor;
+        if (!this.statsTable) {
+            return;
+        }
+        // get stats rows
+        this.statsRows =
+            this.statsTable.querySelectorAll("tbody tr");
+        if (!this.statsRows.length) {
+            return;
+        }
+        // get OVR element
+        this.ovrElement = this.parentNode.querySelector("div.polygon.select-none text");
+        this.baseOVR = this.ovrElement ? this.ovrElement.textContent : null;
+        // add dropdown to skills header
+        this.addDropdown();
+        // initialize display
+        this.updateHockeyPucks("Default");
+    }
+    addDropdown() {
+        const div = Array.from(document.querySelectorAll("div.card-header")).filter((d) => d?.textContent?.trim() === "Skills")?.[0];
+        if (div === undefined)
+            return;
+        if (div.querySelector(".stats-dropdown"))
+            return;
+        const dropdown = document.createElement("select");
+        dropdown.classList.add("stats-dropdown");
+        dropdown.style.marginLeft = "auto";
+        dropdown.style.fontSize = "12px";
+        dropdown.style.padding = "2px";
+        dropdown.style.border = "none";
+        dropdown.style.backgroundColor = "#fff";
+        dropdown.style.color = "#000";
+        dropdown.style.width = "85px";
+        dropdown.style.height = "18px";
+        dropdown.style.lineHeight = "18px";
+        dropdown.style.paddingTop = "0px";
+        dropdown.style.paddingBottom = "0px";
+        dropdown.style.paddingRight = "21px";
+        dropdown.style.borderRadius = "2px";
+        dropdown.addEventListener("change", (event) => {
+            const selectElement = event.target;
+            const selectedOption = selectElement.value;
+            this.updateHockeyPucks(selectedOption);
+        });
+        const options = ["Default", "Min", "Max"];
+        options.forEach((option) => {
+            const optionElement = document.createElement("option");
+            optionElement.value = option;
+            optionElement.textContent = option;
+            optionElement.style.textAlign = "center";
+            dropdown.appendChild(optionElement);
+        });
+        div.appendChild(dropdown);
+    }
+    updateHockeyPucks(option) {
+        if (!this.statsRows)
+            return;
+        const statsToUse = option === "Min"
+            ? this.playerStats.minStats
+            : option === "Max"
+                ? this.playerStats.maxStats
+                : this.playerStats.stats;
+        this.statsRows.forEach((row) => {
+            const statName = _mappings_skill_mappings__WEBPACK_IMPORTED_MODULE_0__.SKILL_NAME_TO_ID[row.cells[0]?.textContent?.trim() || ""];
+            const pucksCell = row.cells[1];
+            const pucks = pucksCell.querySelectorAll("svg.fa-hockey-puck");
+            const ratingCell = row.cells[2];
+            const ratingSpan = ratingCell?.querySelector("span");
+            const baseStat = this.playerStats.stats[statName];
+            const displayStat = statsToUse[statName];
+            if (baseStat && displayStat) {
+                pucks.forEach((puck, index) => {
+                    puck.classList.remove("text-blue-400");
+                    if (index < displayStat.rating) {
+                        puck.classList.remove("text-gray-300");
+                        if (index >= baseStat.rating) {
+                            puck.classList.add("text-blue-400");
+                        }
+                    }
+                    else {
+                        puck.classList.add("text-gray-300");
+                    }
+                    if (index === displayStat.rating - 1 && baseStat.max) {
+                        puck.classList.add("max-level");
+                    }
+                    else {
+                        puck.classList.remove("max-level");
+                    }
+                });
+                // update the rating value in the span element
+                if (ratingSpan) {
+                    ratingSpan.textContent = `(${displayStat.rating})`;
+                }
+            }
+        });
+        // update OVR
+        let ovr = this.playerStats.calculateOVR(statsToUse);
+        if (option !== "Default" || !this.playerStats.isScout) {
+            this.updateOVR(ovr);
+        }
+        else if (this.baseOVR !== null) {
+            this.updateOVR(parseInt(this.baseOVR));
         }
     }
-    // find the weakest rating
-    for (const stat of Object.values(minStats)) {
-        if (stat.strength === "weakest") {
-            weakestRating = stat.rating;
+    updateOVR(ovr) {
+        if (!this.ovrElement)
+            return;
+        this.ovrElement.textContent = ovr.toString();
+        const polygonElement = this.ovrElement.parentElement?.querySelector("polygon");
+        if (polygonElement) {
+            let fillColor = "";
+            if (ovr <= 39) {
+                fillColor = "#f56565";
+            }
+            else if (ovr >= 40 && ovr <= 54) {
+                fillColor = "#ed8936";
+            }
+            else if (ovr >= 55 && ovr <= 69) {
+                fillColor = "#1995AD";
+            }
+            else if (ovr >= 70 && ovr <= 79) {
+                fillColor = "#10b981";
+            }
+            else if (ovr >= 80) {
+                fillColor = "#383839";
+            }
+            polygonElement.setAttribute("fill", fillColor);
         }
     }
-    // adjust strongest stats
-    for (const stat of Object.values(minStats)) {
-        if (stat.strength === "strongest" &&
-            stat.rating < highestNonStrongestRating) {
-            stat.rating = highestNonStrongestRating;
-        }
-    }
-    // adjust weakest stats
-    for (const stat of Object.values(minStats)) {
-        if (stat.rating < weakestRating) {
-            stat.rating = weakestRating;
-        }
-        if (stat.rating < 4) {
-            stat.rating = 4;
-        }
-    }
-    return minStats;
 }
-function calcMaxStats(stats) {
-    const maxStats = structuredClone(stats);
-    let strongestRating = 10;
-    let lowestNonWeakestRating = 10;
-    // find the strongest rating
-    for (const stat of Object.values(maxStats)) {
-        if (stat.strength === "strongest") {
-            strongestRating = Math.min(strongestRating, stat.max ? stat.rating : 10);
-        }
-    }
-    // update ratings and find the lowest non-weakest rating
-    for (const stat of Object.values(maxStats)) {
-        if (!stat.max && stat.rating < strongestRating) {
-            stat.rating = strongestRating;
-        }
-        if (stat.strength !== "weakest") {
-            lowestNonWeakestRating = Math.min(lowestNonWeakestRating, stat.rating);
-        }
-    }
-    // adjust strongest stats
-    for (const stat of Object.values(maxStats)) {
-        if (stat.strength === "strongest" && !stat.max && stat.rating < 10) {
-            stat.rating = 10;
-        }
-    }
-    // adjust weakest stats
-    for (const stat of Object.values(maxStats)) {
-        if (stat.strength === "weakest" && stat.rating > lowestNonWeakestRating) {
-            stat.rating = lowestNonWeakestRating;
-        }
-        if (stat.rating < 4) {
-            stat.rating = 4;
-        }
-    }
-    return maxStats;
-}
-function insertDropdown(div) {
-    const dropdown = document.createElement("select");
-    dropdown.classList.add("stats-dropdown");
-    dropdown.style.marginLeft = "auto";
-    dropdown.style.fontSize = "12px";
-    dropdown.style.padding = "2px";
-    dropdown.style.border = "none";
-    dropdown.style.backgroundColor = "#fff";
-    dropdown.style.color = "#000";
-    dropdown.style.width = "85px";
-    dropdown.style.height = "18px";
-    dropdown.style.lineHeight = "18px";
-    dropdown.style.paddingTop = "0px";
-    dropdown.style.paddingBottom = "0px";
-    dropdown.style.paddingRight = "21px";
-    dropdown.style.borderRadius = "2px";
-    dropdown.addEventListener("change", (event) => {
-        const selectElement = event.target;
-        const selectedOption = selectElement.value;
-        // updateHockeyPucks(selectedOption);
-    });
-    const options = ["Default", "Min", "Max"];
-    options.forEach((option) => {
-        const optionElement = document.createElement("option");
-        optionElement.value = option;
-        optionElement.textContent = option;
-        optionElement.style.textAlign = "center";
-        dropdown.appendChild(optionElement);
-    });
-    div.appendChild(dropdown);
-}
-function checkPageLoad() {
-    const div = Array.from(document.querySelectorAll("div.card-header")).filter((d) => d?.textContent?.trim() === "Skills")?.[0];
-    if (div) {
-        insertDropdown(div);
+function observerCallback(mutations) {
+    if (!window.playerStatsData)
         return;
+    for (const mutation of mutations) {
+        if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
+            for (const node of mutation.addedNodes) {
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    const element = node;
+                    if (element.querySelector("table[data-v-a81c915e]")) {
+                        new StatsVisualizer(window.playerStatsData, element);
+                    }
+                }
+            }
+        }
     }
-    requestAnimationFrame(checkPageLoad);
+}
+function initializeObserver() {
+    if (!window.statsTableObserver) {
+        window.statsTableObserver = new MutationObserver(observerCallback);
+        window.statsTableObserver.observe(document.body, {
+            childList: true,
+            subtree: true,
+        });
+    }
 }
 function handlePlayerData(data) {
     // I just naturally assumed that the player request would only be used on the player page...
     // This is probably true but this will be left in until I confirm or refactor the handler
     if (!window.location.href.startsWith("https://hockey-nation.com/player"))
         return;
-    const player = parsePlayerData(data);
-    const minStats = calcMinStats(player.stats);
-    const maxStats = calcMaxStats(player.stats);
-    requestAnimationFrame(checkPageLoad);
+    window.playerStatsData = new PlayerStats(data);
+    initializeObserver();
 }
 
 
