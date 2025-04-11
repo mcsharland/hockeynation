@@ -33,6 +33,130 @@ const SKILL_NAME_TO_ID = {
 
 /***/ }),
 
+/***/ "./src/navigation-handler.ts":
+/*!***********************************!*\
+  !*** ./src/navigation-handler.ts ***!
+  \***********************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   initNavigationHandler: () => (/* binding */ initNavigationHandler)
+/* harmony export */ });
+/* harmony import */ var _observer_handler__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./observer-handler */ "./src/observer-handler.ts");
+/* harmony import */ var _pages_player__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./pages/player */ "./src/pages/player.ts");
+
+
+const PAGE_HANDLERS = {
+    player: {
+        url: "https://hockey-nation.com/player/",
+        selector: "table[data-v-a81c915e]",
+        handler: (table) => {
+            (0,_pages_player__WEBPACK_IMPORTED_MODULE_1__.manipulatePlayerPage)(table);
+        },
+    },
+    // roster: {
+    //   url: "https://hockey-nation.com/club/roster/",
+    //   selector: "", //TBD
+    //   handler: (table) => {},
+    // },
+};
+function findPageHandler(url) {
+    for (const page of Object.values(PAGE_HANDLERS)) {
+        if (url.startsWith(page.url)) {
+            return page;
+        }
+    }
+    return null;
+}
+function initNavigationHandler() {
+    handleNavigation();
+    // @ts-ignore
+    window.navigation.addEventListener("currententrychange", handleNavigation);
+}
+function handleNavigation() {
+    const url = window.location.href;
+    const pageHandler = findPageHandler(url);
+    // reset previous observer
+    _observer_handler__WEBPACK_IMPORTED_MODULE_0__.ObserverManager.getInstance().resetCallback();
+    // set new callback if we have a handler for the page
+    if (pageHandler) {
+        _observer_handler__WEBPACK_IMPORTED_MODULE_0__.ObserverManager.getInstance().setCallback(pageHandler.selector, pageHandler.handler);
+    }
+}
+
+
+/***/ }),
+
+/***/ "./src/observer-handler.ts":
+/*!*********************************!*\
+  !*** ./src/observer-handler.ts ***!
+  \*********************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   ObserverManager: () => (/* binding */ ObserverManager)
+/* harmony export */ });
+class ObserverManager {
+    static instance;
+    observer = null;
+    currentSelector = null;
+    currentCallback = null;
+    constructor() { } //singleton
+    static getInstance() {
+        if (!ObserverManager.instance) {
+            ObserverManager.instance = new ObserverManager();
+        }
+        return ObserverManager.instance;
+    }
+    setCallback(selector, callback) {
+        this.currentSelector = selector;
+        this.currentCallback = callback;
+        this.ensureObserverActive();
+    }
+    resetCallback() {
+        this.currentSelector = null;
+        this.currentCallback = null;
+    }
+    ensureObserverActive() {
+        if (!this.observer) {
+            this.observer = new MutationObserver((mutations) => {
+                const currentSelector = this.currentSelector;
+                const currentCallback = this.currentCallback;
+                if (!currentSelector || !currentCallback)
+                    return;
+                mutations.forEach((mutation) => {
+                    if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
+                        mutation.addedNodes.forEach((node) => {
+                            if (node.nodeType === Node.ELEMENT_NODE) {
+                                const element = node;
+                                const target = element.querySelector(currentSelector);
+                                if (target) {
+                                    currentCallback(element);
+                                }
+                            }
+                        });
+                    }
+                });
+            });
+            this.observer.observe(document.body, {
+                childList: true,
+                subtree: true,
+            });
+        }
+    }
+    disconnect() {
+        if (this.observer) {
+            this.observer.disconnect();
+            this.observer = null;
+        }
+    }
+}
+
+
+/***/ }),
+
 /***/ "./src/pages/player.ts":
 /*!*****************************!*\
   !*** ./src/pages/player.ts ***!
@@ -41,7 +165,8 @@ const SKILL_NAME_TO_ID = {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   handlePlayerData: () => (/* binding */ handlePlayerData)
+/* harmony export */   handlePlayerData: () => (/* binding */ handlePlayerData),
+/* harmony export */   manipulatePlayerPage: () => (/* binding */ manipulatePlayerPage)
 /* harmony export */ });
 /* harmony import */ var _mappings_skill_mappings__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../mappings/skill-mappings */ "./src/mappings/skill-mappings.ts");
 
@@ -196,6 +321,7 @@ class StatsVisualizer {
         // initialize display
         this.updateHockeyPucks("Default");
     }
+    // Consider not adding / disabling twhen all of a player's stats are maxed
     addDropdown() {
         const div = Array.from(document.querySelectorAll("div.card-header")).filter((d) => d?.textContent?.trim() === "Skills")?.[0];
         if (div === undefined)
@@ -324,22 +450,22 @@ function observerCallback(mutations) {
         }
     }
 }
-function initializeObserver() {
-    if (!window.statsTableObserver) {
-        window.statsTableObserver = new MutationObserver(observerCallback);
-        window.statsTableObserver.observe(document.body, {
-            childList: true,
-            subtree: true,
-        });
-    }
-}
 function handlePlayerData(data) {
-    // I just naturally assumed that the player request would only be used on the player page...
-    // This is probably true but this will be left in until I confirm or refactor the handler
-    if (!window.location.href.startsWith("https://hockey-nation.com/player"))
-        return;
     window.playerStatsData = new PlayerStats(data);
-    initializeObserver();
+    const event = new CustomEvent("playerDataReady");
+    window.dispatchEvent(event);
+}
+function manipulatePlayerPage(table) {
+    if (window.playerStatsData) {
+        new StatsVisualizer(window.playerStatsData, table);
+    }
+    else {
+        const handler = () => {
+            new StatsVisualizer(window.playerStatsData, table);
+            window.removeEventListener("playerDataReady", handler);
+        };
+        window.addEventListener("playerDataReady", handler);
+    }
 }
 
 
@@ -409,9 +535,13 @@ var __webpack_exports__ = {};
   \****************************/
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _pages_player_ts__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./pages/player.ts */ "./src/pages/player.ts");
+/* harmony import */ var _navigation_handler__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./navigation-handler */ "./src/navigation-handler.ts");
+
 
 
 (function () {
+  (0,_navigation_handler__WEBPACK_IMPORTED_MODULE_1__.initNavigationHandler)(); // Initialize Observer from script context
+
   const URL_HANDLERS = {
     player: {
       pattern: /\/api\/player\/[^\/]+$/,
@@ -422,7 +552,7 @@ __webpack_require__.r(__webpack_exports__);
     roster: {
       pattern: /\/api\/team\/[^\/]+\/roster/,
       handler: (data) => {
-        console.log("Found roster data:", data);
+        // console.log("Found roster data:", data);
       },
     },
   };

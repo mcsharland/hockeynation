@@ -2,7 +2,6 @@ import { SKILL_NAME_TO_ID } from "../mappings/skill-mappings";
 
 declare global {
   interface Window {
-    statsTableObserver?: MutationObserver | null;
     playerStatsData?: PlayerStats | null;
   }
 }
@@ -55,7 +54,7 @@ class PlayerStats {
       // if weakness exists so does strength
       player.stats[data.data.talents.weakest].strength = "weakest";
       data.data.talents.strongest.forEach(
-        (str: String) =>
+        (str: string) =>
           (player.stats[str as keyof typeof player.stats].strength =
             "strongest"),
       );
@@ -264,7 +263,7 @@ class StatsVisualizer {
     div.appendChild(dropdown);
   }
 
-  private updateHockeyPucks(option: String): void {
+  private updateHockeyPucks(option: string): void {
     if (!this.statsRows) return;
 
     const statsToUse =
@@ -363,23 +362,20 @@ function observerCallback(mutations: MutationRecord[]): void {
   }
 }
 
-function initializeObserver(): void {
-  if (!window.statsTableObserver) {
-    window.statsTableObserver = new MutationObserver(observerCallback);
-
-    window.statsTableObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
-  }
+export function handlePlayerData(data: any) {
+  window.playerStatsData = new PlayerStats(data);
+  const event = new CustomEvent("playerDataReady");
+  window.dispatchEvent(event);
 }
 
-export function handlePlayerData(data: any) {
-  // I just naturally assumed that the player request would only be used on the player page...
-  // This is probably true but this will be left in until I confirm or refactor the handler
-  if (!window.location.href.startsWith("https://hockey-nation.com/player"))
-    return;
-
-  window.playerStatsData = new PlayerStats(data);
-  initializeObserver();
+export function manipulatePlayerPage(table: HTMLElement) {
+  if (window.playerStatsData) {
+    new StatsVisualizer(window.playerStatsData, table);
+  } else {
+    const handler = () => {
+      new StatsVisualizer(window.playerStatsData!, table);
+      window.removeEventListener("playerDataReady", handler);
+    };
+    window.addEventListener("playerDataReady", handler);
+  }
 }

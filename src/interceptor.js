@@ -1,6 +1,9 @@
 import { handlePlayerData } from "./pages/player.ts";
+import { initNavigationHandler } from "./navigation-handler";
 
 (function () {
+  initNavigationHandler(); // Initialize Observer from script context
+
   const URL_HANDLERS = {
     player: {
       pattern: /\/api\/player\/[^\/]+$/,
@@ -11,7 +14,7 @@ import { handlePlayerData } from "./pages/player.ts";
     roster: {
       pattern: /\/api\/team\/[^\/]+\/roster/,
       handler: (data) => {
-        console.log("Found roster data:", data);
+        // console.log("Found roster data:", data);
       },
     },
   };
