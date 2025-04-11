@@ -151,6 +151,18 @@ export class Player {
     return maxStats;
   }
 
+  public getStats(): Stats {
+    return this.stats;
+  }
+
+  public getMinStats(): Stats {
+    return this.minStats;
+  }
+
+  public getMaxStats(): Stats {
+    return this.maxStats;
+  }
+
   public calculateOVR(stats: Stats): number {
     const statsValues = Object.values(stats);
     const sum = statsValues.reduce(
@@ -169,7 +181,7 @@ export class Player {
   }
 }
 
-class StatsVisualizer {
+class PlayerStatsVisualizer {
   private playerStats: Player;
   private parentNode: HTMLElement;
   private ovrElement: HTMLElement | null = null;
@@ -190,27 +202,22 @@ class StatsVisualizer {
       return;
     }
 
-    let ancestor: HTMLElement | null = puck.parentElement;
-    while (ancestor && !ancestor.matches("table[data-v-a81c915e]")) {
-      ancestor = ancestor.parentElement;
-    }
-
-    this.statsTable = ancestor as HTMLTableElement | null;
+    // this.statsTable = ancestor as HTMLTableElement | null;
+    this.statsTable = puck.closest(`tbody`) as HTMLTableElement | null;
     if (!this.statsTable) {
       return;
     }
 
     // get stats rows
     this.statsRows =
-      this.statsTable.querySelectorAll<HTMLTableRowElement>("tbody tr");
+      this.statsTable.querySelectorAll<HTMLTableRowElement>("tr");
     if (!this.statsRows.length) {
       return;
     }
 
     // get OVR element
-    this.ovrElement = this.parentNode.querySelector<HTMLElement>(
-      "div.polygon.select-none text",
-    );
+    this.ovrElement =
+      this.parentNode.querySelector<HTMLElement>(".polygon text");
     this.baseOVR = this.ovrElement ? this.ovrElement.textContent : null;
 
     // add dropdown to skills header
@@ -222,7 +229,7 @@ class StatsVisualizer {
 
   // Consider not adding / disabling twhen all of a player's stats are maxed
   private addDropdown(): void {
-    const div = Array.from(document.querySelectorAll("div.card-header")).filter(
+    const div = Array.from(document.querySelectorAll(".card-header")).filter(
       (d) => d?.textContent?.trim() === "Skills",
     )?.[0] as HTMLDivElement;
 
@@ -353,10 +360,10 @@ export function handlePlayerData(data: any) {
 
 export function manipulatePlayerPage(table: HTMLElement) {
   if (window.playerData) {
-    new StatsVisualizer(window.playerData, table);
+    new PlayerStatsVisualizer(window.playerData, table);
   } else {
     const handler = () => {
-      new StatsVisualizer(window.playerData!, table);
+      new PlayerStatsVisualizer(window.playerData!, table);
       window.removeEventListener("playerDataReady", handler);
     };
     window.addEventListener("playerDataReady", handler);

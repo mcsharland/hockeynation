@@ -43,6 +43,7 @@ export class ObserverManager {
 
                 if (target) {
                   currentCallback(element);
+                  this.disconnect();
                 }
               }
             });

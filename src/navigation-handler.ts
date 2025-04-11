@@ -1,5 +1,6 @@
 import { ObserverManager } from "./observer-handler";
 import { manipulatePlayerPage } from "./pages/player";
+import { manipulateRosterPage } from "./pages/roster";
 
 type MutationHandler = (element: HTMLElement) => void;
 
@@ -11,17 +12,19 @@ interface PageHandler {
 
 const PAGE_HANDLERS: Record<string, PageHandler> = {
   player: {
-    url: "https://hockey-nation.com/player/",
-    selector: "table[data-v-a81c915e]",
+    url: "https://hockey-nation.com/player",
+    selector: "table tbody tr",
     handler: (table) => {
       manipulatePlayerPage(table);
     },
   },
-  // roster: {
-  //   url: "https://hockey-nation.com/club/roster/",
-  //   selector: "", //TBD
-  //   handler: (table) => {},
-  // },
+  roster: {
+    url: "https://hockey-nation.com/club/roster",
+    selector: "table tbody tr",
+    handler: (table) => {
+      manipulateRosterPage(table);
+    },
+  },
 };
 
 function findPageHandler(url: string): PageHandler | null {

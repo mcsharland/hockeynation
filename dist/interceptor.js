@@ -45,21 +45,25 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ });
 /* harmony import */ var _observer_handler__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./observer-handler */ "./src/observer-handler.ts");
 /* harmony import */ var _pages_player__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./pages/player */ "./src/pages/player.ts");
+/* harmony import */ var _pages_roster__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./pages/roster */ "./src/pages/roster.ts");
+
 
 
 const PAGE_HANDLERS = {
     player: {
-        url: "https://hockey-nation.com/player/",
-        selector: "table[data-v-a81c915e]",
+        url: "https://hockey-nation.com/player",
+        selector: "table tbody tr",
         handler: (table) => {
             (0,_pages_player__WEBPACK_IMPORTED_MODULE_1__.manipulatePlayerPage)(table);
         },
     },
-    // roster: {
-    //   url: "https://hockey-nation.com/club/roster/",
-    //   selector: "", //TBD
-    //   handler: (table) => {},
-    // },
+    roster: {
+        url: "https://hockey-nation.com/club/roster",
+        selector: "table tbody tr",
+        handler: (table) => {
+            (0,_pages_roster__WEBPACK_IMPORTED_MODULE_2__.manipulateRosterPage)(table);
+        },
+    },
 };
 function findPageHandler(url) {
     for (const page of Object.values(PAGE_HANDLERS)) {
@@ -134,6 +138,7 @@ class ObserverManager {
                                 const target = element.querySelector(currentSelector);
                                 if (target) {
                                     currentCallback(element);
+                                    this.disconnect();
                                 }
                             }
                         });
@@ -273,6 +278,15 @@ class Player {
         }
         return maxStats;
     }
+    getStats() {
+        return this.stats;
+    }
+    getMinStats() {
+        return this.minStats;
+    }
+    getMaxStats() {
+        return this.maxStats;
+    }
     calculateOVR(stats) {
         const statsValues = Object.values(stats);
         const sum = statsValues.reduce((acc, stat) => acc + stat.rating, 0);
@@ -283,7 +297,7 @@ class Player {
         return Math.round(correctedAverage * 10);
     }
 }
-class StatsVisualizer {
+class PlayerStatsVisualizer {
     playerStats;
     parentNode;
     ovrElement = null;
@@ -300,22 +314,20 @@ class StatsVisualizer {
         if (!puck) {
             return;
         }
-        let ancestor = puck.parentElement;
-        while (ancestor && !ancestor.matches("table[data-v-a81c915e]")) {
-            ancestor = ancestor.parentElement;
-        }
-        this.statsTable = ancestor;
+        // this.statsTable = ancestor as HTMLTableElement | null;
+        this.statsTable = puck.closest(`tbody`);
         if (!this.statsTable) {
             return;
         }
         // get stats rows
         this.statsRows =
-            this.statsTable.querySelectorAll("tbody tr");
+            this.statsTable.querySelectorAll("tr");
         if (!this.statsRows.length) {
             return;
         }
         // get OVR element
-        this.ovrElement = this.parentNode.querySelector("div.polygon.select-none text");
+        this.ovrElement =
+            this.parentNode.querySelector(".polygon text");
         this.baseOVR = this.ovrElement ? this.ovrElement.textContent : null;
         // add dropdown to skills header
         this.addDropdown();
@@ -324,7 +336,7 @@ class StatsVisualizer {
     }
     // Consider not adding / disabling twhen all of a player's stats are maxed
     addDropdown() {
-        const div = Array.from(document.querySelectorAll("div.card-header")).filter((d) => d?.textContent?.trim() === "Skills")?.[0];
+        const div = Array.from(document.querySelectorAll(".card-header")).filter((d) => d?.textContent?.trim() === "Skills")?.[0];
         if (div === undefined)
             return;
         if (div.querySelector(".stats-dropdown"))
@@ -442,11 +454,11 @@ function handlePlayerData(data) {
 }
 function manipulatePlayerPage(table) {
     if (window.playerData) {
-        new StatsVisualizer(window.playerData, table);
+        new PlayerStatsVisualizer(window.playerData, table);
     }
     else {
         const handler = () => {
-            new StatsVisualizer(window.playerData, table);
+            new PlayerStatsVisualizer(window.playerData, table);
             window.removeEventListener("playerDataReady", handler);
         };
         window.addEventListener("playerDataReady", handler);
@@ -464,7 +476,8 @@ function manipulatePlayerPage(table) {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   handleRosterData: () => (/* binding */ handleRosterData)
+/* harmony export */   handleRosterData: () => (/* binding */ handleRosterData),
+/* harmony export */   manipulateRosterPage: () => (/* binding */ manipulateRosterPage)
 /* harmony export */ });
 /* harmony import */ var _player__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./player */ "./src/pages/player.ts");
 
@@ -478,12 +491,174 @@ class Roster {
         for (const p of data.players) {
             roster[p.id] = new _player__WEBPACK_IMPORTED_MODULE_0__.Player(p);
         }
-        console.log(roster);
         return roster;
+    }
+    getPlayer(playerId) {
+        return this.players[playerId];
+    }
+    getAllPlayers() {
+        return this.players;
+    }
+}
+class RosterStatsVisualizer {
+    roster;
+    parent;
+    header = null;
+    footer = null;
+    dataRows = null;
+    generalButton = null;
+    skillsButton = null;
+    onGeneralPage = true;
+    constructor(roster, parentNode) {
+        this.roster = roster;
+        this.parent = parentNode;
+        this.initialize();
+    }
+    initialize() {
+        this.generalButton = this.parent.querySelector(`.btn-toggle.active`);
+        if (!this.generalButton)
+            return;
+        this.skillsButton = this.parent.querySelector(`.btn-toggle:not(.active)`);
+        if (!this.skillsButton)
+            return;
+        this.generalButton.addEventListener("click", async (event) => {
+            if (this.onGeneralPage)
+                return;
+            this.onGeneralPage = true;
+            // re-initialize the table references since dom has changed
+            this.initializeTableReferences();
+            if (this.dataRows && Object.keys(this.dataRows).length > 0) {
+                this.addNewColumns();
+            }
+        });
+        this.skillsButton.addEventListener("click", (event) => {
+            if (!this.onGeneralPage)
+                return;
+            this.onGeneralPage = false;
+        });
+        // initialize table references and add columns on first load
+        this.initializeTableReferences();
+        if (this.dataRows && Object.keys(this.dataRows).length > 0) {
+            this.addNewColumns();
+        }
+    }
+    initializeTableReferences() {
+        // reset references to get the latest dom nodes
+        const rows = this.parent.querySelectorAll(`tbody tr`);
+        const dr = {};
+        rows.forEach((row) => {
+            const tableRow = row;
+            const playerLink = tableRow.querySelector("a.player-link");
+            if (playerLink?.getAttribute("href")) {
+                const playerId = playerLink.getAttribute("href").split("/").pop() || "";
+                dr[playerId] = tableRow;
+            }
+        });
+        this.dataRows = dr;
+        this.header = this.parent.querySelector(`table thead tr`);
+        this.footer = this.parent.querySelector(`table tfoot tr`);
+    }
+    getRosterAvgOvr(ovrType) {
+        const statFunction = {
+            Default: (player) => player.getStats(),
+            Min: (player) => player.getMinStats(),
+            Max: (player) => player.getMaxStats(),
+        };
+        const players = this.roster.getAllPlayers();
+        return Math.round(Object.values(players)
+            .map((player) => player.calculateOVR(statFunction[ovrType](player)))
+            .reduce((sum, value, _, array) => sum + value / array.length, 0));
+    }
+    createRatingSpan(ovr) {
+        const ratingSpan = document.createElement("span");
+        ratingSpan.classList.add("badge");
+        ratingSpan.style.color = "#f8f8f9";
+        ratingSpan.style.userSelect = "none";
+        let bgColor = "";
+        if (ovr <= 39) {
+            bgColor = "#f56565";
+        }
+        else if (ovr >= 40 && ovr <= 54) {
+            bgColor = "#ed8936";
+        }
+        else if (ovr >= 55 && ovr <= 69) {
+            bgColor = "#1995AD";
+        }
+        else if (ovr >= 70 && ovr <= 79) {
+            bgColor = "#10b981";
+        }
+        else if (ovr >= 80) {
+            bgColor = "#383839";
+        }
+        ratingSpan.style.backgroundColor = bgColor;
+        ratingSpan.innerText = ovr.toString();
+        return ratingSpan;
+    }
+    addNewColumns() {
+        if (!this.dataRows || !this.header || !this.footer)
+            return;
+        // safety incase columns are already added
+        const headerText = this.header.textContent || "";
+        if (headerText.includes(" Min ") && headerText.includes(" Max ")) {
+            return;
+        }
+        Object.entries(this.dataRows).forEach(([playerId, row]) => {
+            const player = this.roster.getPlayer(playerId);
+            if (!player)
+                return;
+            const minDataCell = document.createElement("td");
+            minDataCell.className = "md:px-4 px-2 py-2 text-center";
+            minDataCell.dataset.column = "min-ovr";
+            minDataCell.appendChild(this.createRatingSpan(player.calculateOVR(player.getMinStats())));
+            const maxDataCell = document.createElement("td");
+            maxDataCell.className = "md:px-4 px-2 py-2 text-center";
+            maxDataCell.dataset.column = "max-ovr";
+            maxDataCell.appendChild(this.createRatingSpan(player.calculateOVR(player.getMaxStats())));
+            row.insertBefore(minDataCell, null);
+            row.insertBefore(maxDataCell, null);
+        });
+        const minHeaderCell = document.createElement("th");
+        minHeaderCell.className = "md:px-4 px-2 py-2 text-left sort-column";
+        minHeaderCell.innerText = " Min ";
+        minHeaderCell.style.textAlign = "center";
+        minHeaderCell.addEventListener("click", (event) => {
+            console.log("sorting by min...");
+        });
+        const maxHeaderCell = document.createElement("th");
+        maxHeaderCell.className = "md:px-4 px-2 py-2 text-left sort-column";
+        maxHeaderCell.innerText = " Max ";
+        maxHeaderCell.style.textAlign = "center";
+        maxHeaderCell.addEventListener("click", (event) => {
+            console.log("sorting by max...");
+        });
+        this.header.insertBefore(minHeaderCell, null);
+        this.header.insertBefore(maxHeaderCell, null);
+        const minFooterCell = document.createElement("td");
+        minFooterCell.className = "md:px-4 px-2 py-2";
+        minFooterCell.appendChild(this.createRatingSpan(this.getRosterAvgOvr("Min")));
+        const maxFooterCell = document.createElement("td");
+        maxFooterCell.className = "md:px-4 px-2 py-2";
+        maxFooterCell.appendChild(this.createRatingSpan(this.getRosterAvgOvr("Max")));
+        this.footer.insertBefore(minFooterCell, null);
+        this.footer.insertBefore(maxFooterCell, null);
     }
 }
 function handleRosterData(data) {
     window.rosterData = new Roster(data);
+    const event = new CustomEvent("rosterDataReady");
+    window.dispatchEvent(event);
+}
+function manipulateRosterPage(table) {
+    if (window.rosterData) {
+        new RosterStatsVisualizer(window.rosterData, table);
+    }
+    else {
+        const handler = () => {
+            new RosterStatsVisualizer(window.rosterData, table);
+            window.removeEventListener("rosterDataReady", handler);
+        };
+        window.addEventListener("rosterDataReady", handler);
+    }
 }
 
 
