@@ -434,22 +434,6 @@ class StatsVisualizer {
         }
     }
 }
-function observerCallback(mutations) {
-    if (!window.playerStatsData)
-        return;
-    for (const mutation of mutations) {
-        if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
-            for (const node of mutation.addedNodes) {
-                if (node.nodeType === Node.ELEMENT_NODE) {
-                    const element = node;
-                    if (element.querySelector("table[data-v-a81c915e]")) {
-                        new StatsVisualizer(window.playerStatsData, element);
-                    }
-                }
-            }
-        }
-    }
-}
 function handlePlayerData(data) {
     window.playerStatsData = new PlayerStats(data);
     const event = new CustomEvent("playerDataReady");
@@ -531,91 +515,91 @@ var __webpack_exports__ = {};
 // This entry needs to be wrapped in an IIFE because it needs to be isolated against other modules in the chunk.
 (() => {
 /*!****************************!*\
-  !*** ./src/interceptor.js ***!
+  !*** ./src/interceptor.ts ***!
   \****************************/
 __webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _pages_player_ts__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./pages/player.ts */ "./src/pages/player.ts");
+/* harmony import */ var _pages_player__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./pages/player */ "./src/pages/player.ts");
 /* harmony import */ var _navigation_handler__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./navigation-handler */ "./src/navigation-handler.ts");
 
 
-
 (function () {
-  (0,_navigation_handler__WEBPACK_IMPORTED_MODULE_1__.initNavigationHandler)(); // Initialize Observer from script context
-
-  const URL_HANDLERS = {
-    player: {
-      pattern: /\/api\/player\/[^\/]+$/,
-      handler: (data) => {
-        (0,_pages_player_ts__WEBPACK_IMPORTED_MODULE_0__.handlePlayerData)(data);
-      },
-    },
-    roster: {
-      pattern: /\/api\/team\/[^\/]+\/roster/,
-      handler: (data) => {
-        // console.log("Found roster data:", data);
-      },
-    },
-  };
-
-  function findHandler(url) {
-    for (const { pattern, handler } of Object.values(URL_HANDLERS)) {
-      if (pattern.test(url)) return handler;
-    }
-    return null;
-  }
-
-  // intercept XHR
-  const originalOpen = XMLHttpRequest.prototype.open;
-  const originalSend = XMLHttpRequest.prototype.send;
-
-  XMLHttpRequest.prototype.open = function (method, url, ...rest) {
-    this._interceptedUrl = url;
-    return originalOpen.apply(this, arguments);
-  };
-
-  XMLHttpRequest.prototype.send = function (...args) {
-    let handler;
-    if (this._interceptedUrl && (handler = findHandler(this._interceptedUrl))) {
-      const originalOnReadyState = this.onreadystatechange;
-
-      this.onreadystatechange = function () {
-        if (this.readyState === 4 && this.status === 200) {
-          try {
-            const data = JSON.parse(this.responseText);
-            handler(data);
-          } catch (e) {
-            console.error("Error parsing response:", e);
-          }
+    (0,_navigation_handler__WEBPACK_IMPORTED_MODULE_1__.initNavigationHandler)(); // Initialize Observer from script context
+    const URL_HANDLERS = {
+        player: {
+            pattern: /\/api\/player\/[^\/]+$/,
+            handler: (data) => {
+                (0,_pages_player__WEBPACK_IMPORTED_MODULE_0__.handlePlayerData)(data);
+            },
+        },
+        roster: {
+            pattern: /\/api\/team\/[^\/]+\/roster/,
+            handler: (data) => {
+                console.log("Found roster data:", data);
+            },
+        },
+    };
+    function findHandler(url) {
+        for (const { pattern, handler } of Object.values(URL_HANDLERS)) {
+            if (pattern.test(url))
+                return handler;
         }
-
-        if (originalOnReadyState) {
-          originalOnReadyState.apply(this, arguments);
+        return null;
+    }
+    class Interceptor extends XMLHttpRequest {
+        interceptedUrl = null;
+        // @ts-ignore
+        open(method, url, ...rest) {
+            this.interceptedUrl = url;
+            // @ts-ignore
+            super.open(method, url, ...rest);
         }
-      };
+        send(...args) {
+            const handler = findHandler(this.interceptedUrl ?? "");
+            if (handler) {
+                const originalOnReadyState = this.onreadystatechange;
+                this.onreadystatechange = function () {
+                    if (this.readyState === 4 && this.status === 200) {
+                        try {
+                            const data = JSON.parse(this.responseText);
+                            handler(data);
+                        }
+                        catch (e) {
+                            console.error("Error parsing response:", e);
+                        }
+                    }
+                    if (originalOnReadyState) {
+                        // @ts-ignore
+                        originalOnReadyState.apply(this, arguments);
+                    }
+                };
+            }
+            super.send(...args);
+        }
     }
-
-    return originalSend.apply(this, args);
-  };
-
-  // intercept fetch as well, although I don't think this is used
-  const originalFetch = window.fetch;
-  window.fetch = async function (resource, init) {
-    // handle strings & request obj
-    const url = typeof resource === "string" ? resource : resource.url;
-    const response = await originalFetch.apply(this, arguments);
-
-    let handler;
-    if (url && (handler = findHandler(url))) {
-      try {
-        const clonedResponse = response.clone();
-        const data = await clonedResponse.json();
-        handler(data);
-      } catch (e) {
-        console.error("Error processing fetch response:", e);
-      }
-    }
-    return response;
-  };
+    window.XMLHttpRequest = Interceptor;
+    // intercept fetch as well, although I don't think this is used
+    const originalFetch = window.fetch;
+    window.fetch = async function (resource, init) {
+        // handle strings & request obj
+        const url = typeof resource === "string"
+            ? resource
+            : resource instanceof Request
+                ? resource.url
+                : resource.toString();
+        const response = await originalFetch.call(this, resource, init);
+        const handler = url && findHandler(url);
+        if (handler) {
+            try {
+                const clonedResponse = response.clone();
+                const data = await clonedResponse.json();
+                handler(data);
+            }
+            catch (e) {
+                console.error("Error processing fetch response:", e);
+            }
+        }
+        return response;
+    };
 })();
 
 })();
