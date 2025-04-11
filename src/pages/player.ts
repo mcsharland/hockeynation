@@ -345,23 +345,6 @@ class StatsVisualizer {
   }
 }
 
-function observerCallback(mutations: MutationRecord[]): void {
-  if (!window.playerStatsData) return;
-
-  for (const mutation of mutations) {
-    if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
-      for (const node of mutation.addedNodes) {
-        if (node.nodeType === Node.ELEMENT_NODE) {
-          const element = node as HTMLElement;
-          if (element.querySelector("table[data-v-a81c915e]")) {
-            new StatsVisualizer(window.playerStatsData, element);
-          }
-        }
-      }
-    }
-  }
-}
-
 export function handlePlayerData(data: any) {
   window.playerStatsData = new PlayerStats(data);
   const event = new CustomEvent("playerDataReady");
