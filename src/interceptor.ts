@@ -1,5 +1,6 @@
 import { handlePlayerData } from "./pages/player";
 import { initNavigationHandler } from "./navigation-handler";
+import { handleRosterData } from "./pages/roster";
 
 (function () {
   initNavigationHandler(); // Initialize Observer from script context
@@ -14,7 +15,7 @@ import { initNavigationHandler } from "./navigation-handler";
     roster: {
       pattern: /\/api\/team\/[^\/]+\/roster/,
       handler: (data: any) => {
-        console.log("Found roster data:", data);
+        handleRosterData(data);
       },
     },
   };
@@ -44,7 +45,7 @@ import { initNavigationHandler } from "./navigation-handler";
         this.onreadystatechange = function () {
           if (this.readyState === 4 && this.status === 200) {
             try {
-              const data = JSON.parse(this.responseText);
+              const { data } = JSON.parse(this.responseText);
               handler(data);
             } catch (e) {
               console.error("Error parsing response:", e);

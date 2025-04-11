@@ -165,12 +165,13 @@ class ObserverManager {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   Player: () => (/* binding */ Player),
 /* harmony export */   handlePlayerData: () => (/* binding */ handlePlayerData),
 /* harmony export */   manipulatePlayerPage: () => (/* binding */ manipulatePlayerPage)
 /* harmony export */ });
 /* harmony import */ var _mappings_skill_mappings__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../mappings/skill-mappings */ "./src/mappings/skill-mappings.ts");
 
-class PlayerStats {
+class Player {
     stats;
     minStats;
     maxStats;
@@ -185,18 +186,18 @@ class PlayerStats {
     parsePlayerData(data) {
         const player = {};
         player.stats = {};
-        player.scout = data.data.skills.some((skill) => skill?.hidden ?? false);
-        for (const s of data.data.skills) {
+        player.scout = data.skills.some((skill) => skill?.hidden ?? false);
+        for (const s of data.skills) {
             player.stats[s.id] = {
                 rating: parseInt(s?.lvl ?? 0),
                 max: s?.max ?? false,
                 strength: null, // default, change below
             };
         }
-        if (data.data?.talents?.weakest) {
+        if (data?.talents?.weakest) {
             // if weakness exists so does strength
-            player.stats[data.data.talents.weakest].strength = "weakest";
-            data.data.talents.strongest.forEach((str) => (player.stats[str].strength =
+            player.stats[data.talents.weakest].strength = "weakest";
+            data.talents.strongest.forEach((str) => (player.stats[str].strength =
                 "strongest"));
         }
         return player;
@@ -435,21 +436,54 @@ class StatsVisualizer {
     }
 }
 function handlePlayerData(data) {
-    window.playerStatsData = new PlayerStats(data);
+    window.playerData = new Player(data);
     const event = new CustomEvent("playerDataReady");
     window.dispatchEvent(event);
 }
 function manipulatePlayerPage(table) {
-    if (window.playerStatsData) {
-        new StatsVisualizer(window.playerStatsData, table);
+    if (window.playerData) {
+        new StatsVisualizer(window.playerData, table);
     }
     else {
         const handler = () => {
-            new StatsVisualizer(window.playerStatsData, table);
+            new StatsVisualizer(window.playerData, table);
             window.removeEventListener("playerDataReady", handler);
         };
         window.addEventListener("playerDataReady", handler);
     }
+}
+
+
+/***/ }),
+
+/***/ "./src/pages/roster.ts":
+/*!*****************************!*\
+  !*** ./src/pages/roster.ts ***!
+  \*****************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   handleRosterData: () => (/* binding */ handleRosterData)
+/* harmony export */ });
+/* harmony import */ var _player__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./player */ "./src/pages/player.ts");
+
+class Roster {
+    players;
+    constructor(data) {
+        this.players = this.parseRosterData(data);
+    }
+    parseRosterData(data) {
+        const roster = {};
+        for (const p of data.players) {
+            roster[p.id] = new _player__WEBPACK_IMPORTED_MODULE_0__.Player(p);
+        }
+        console.log(roster);
+        return roster;
+    }
+}
+function handleRosterData(data) {
+    window.rosterData = new Roster(data);
 }
 
 
@@ -520,6 +554,8 @@ var __webpack_exports__ = {};
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _pages_player__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./pages/player */ "./src/pages/player.ts");
 /* harmony import */ var _navigation_handler__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./navigation-handler */ "./src/navigation-handler.ts");
+/* harmony import */ var _pages_roster__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./pages/roster */ "./src/pages/roster.ts");
+
 
 
 (function () {
@@ -534,7 +570,7 @@ __webpack_require__.r(__webpack_exports__);
         roster: {
             pattern: /\/api\/team\/[^\/]+\/roster/,
             handler: (data) => {
-                console.log("Found roster data:", data);
+                (0,_pages_roster__WEBPACK_IMPORTED_MODULE_2__.handleRosterData)(data);
             },
         },
     };
@@ -560,7 +596,7 @@ __webpack_require__.r(__webpack_exports__);
                 this.onreadystatechange = function () {
                     if (this.readyState === 4 && this.status === 200) {
                         try {
-                            const data = JSON.parse(this.responseText);
+                            const { data } = JSON.parse(this.responseText);
                             handler(data);
                         }
                         catch (e) {

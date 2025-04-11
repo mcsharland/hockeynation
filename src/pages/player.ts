@@ -2,7 +2,7 @@ import { SKILL_NAME_TO_ID } from "../mappings/skill-mappings";
 
 declare global {
   interface Window {
-    playerStatsData?: PlayerStats | null;
+    playerData?: Player | null;
   }
 }
 
@@ -14,14 +14,16 @@ interface Stat {
   strength: StatStrength;
 }
 
-type Stats = Record<string, Stat>;
+interface Stats {
+  [id: string]: Stat;
+}
 
-interface Player {
+interface PlayerStats {
   stats: Stats;
   scout: boolean;
 }
 
-class PlayerStats {
+export class Player {
   public stats: Stats;
   public minStats: Stats;
   public maxStats: Stats;
@@ -35,25 +37,23 @@ class PlayerStats {
     this.maxStats = this.calcMaxStats(this.stats);
   }
 
-  private parsePlayerData(data: any): Player {
-    const player = {} as Player;
+  private parsePlayerData(data: any): PlayerStats {
+    const player = {} as PlayerStats;
     player.stats = {};
 
-    player.scout = data.data.skills.some(
-      (skill: any) => skill?.hidden ?? false,
-    );
+    player.scout = data.skills.some((skill: any) => skill?.hidden ?? false);
 
-    for (const s of data.data.skills) {
+    for (const s of data.skills) {
       player.stats[s.id] = {
         rating: parseInt(s?.lvl ?? 0),
         max: s?.max ?? false,
         strength: null, // default, change below
       };
     }
-    if (data.data?.talents?.weakest) {
+    if (data?.talents?.weakest) {
       // if weakness exists so does strength
-      player.stats[data.data.talents.weakest].strength = "weakest";
-      data.data.talents.strongest.forEach(
+      player.stats[data.talents.weakest].strength = "weakest";
+      data.talents.strongest.forEach(
         (str: string) =>
           (player.stats[str as keyof typeof player.stats].strength =
             "strongest"),
@@ -170,14 +170,14 @@ class PlayerStats {
 }
 
 class StatsVisualizer {
-  private playerStats: PlayerStats;
+  private playerStats: Player;
   private parentNode: HTMLElement;
   private ovrElement: HTMLElement | null = null;
   private baseOVR: string | null = null;
   private statsTable: HTMLTableElement | null = null;
   private statsRows: NodeListOf<HTMLTableRowElement> | null = null;
 
-  constructor(playerStats: PlayerStats, parentNode: HTMLElement) {
+  constructor(playerStats: Player, parentNode: HTMLElement) {
     this.playerStats = playerStats;
     this.parentNode = parentNode;
     this.initialize();
@@ -346,17 +346,17 @@ class StatsVisualizer {
 }
 
 export function handlePlayerData(data: any) {
-  window.playerStatsData = new PlayerStats(data);
+  window.playerData = new Player(data);
   const event = new CustomEvent("playerDataReady");
   window.dispatchEvent(event);
 }
 
 export function manipulatePlayerPage(table: HTMLElement) {
-  if (window.playerStatsData) {
-    new StatsVisualizer(window.playerStatsData, table);
+  if (window.playerData) {
+    new StatsVisualizer(window.playerData, table);
   } else {
     const handler = () => {
-      new StatsVisualizer(window.playerStatsData!, table);
+      new StatsVisualizer(window.playerData!, table);
       window.removeEventListener("playerDataReady", handler);
     };
     window.addEventListener("playerDataReady", handler);
