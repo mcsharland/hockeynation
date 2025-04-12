@@ -49,7 +49,12 @@ class RosterStatsVisualizer {
   private dataRows: DataRow | null = null;
   private generalButton: HTMLButtonElement | null = null;
   private skillsButton: HTMLButtonElement | null = null;
+  private tbody: HTMLTableSectionElement | null = null;
   private onGeneralPage: boolean = true;
+  private minHeaderCell: HTMLTableCellElement | null = null;
+  private maxHeaderCell: HTMLTableCellElement | null = null;
+  // private sortColumn: "min-ovr" | "max-ovr" | null = null;
+  // private sortAscending: boolean = true;
 
   constructor(roster: Roster, parentNode: HTMLElement) {
     this.roster = roster;
@@ -74,11 +79,14 @@ class RosterStatsVisualizer {
       if (this.dataRows && Object.keys(this.dataRows).length > 0) {
         this.addNewColumns();
       }
+      // if (this.sortColumn) this.sortRows()
     });
 
     this.skillsButton.addEventListener("click", (event) => {
       if (!this.onGeneralPage) return;
       this.onGeneralPage = false;
+      this.initializeTableReferences();
+      // if (this.sortColumn) this.sortRows();
     });
 
     // initialize table references and add columns on first load
@@ -87,8 +95,22 @@ class RosterStatsVisualizer {
       this.addNewColumns();
     }
   }
+
   private initializeTableReferences() {
     // reset references to get the latest dom nodes
+
+    this.header = this.parent.querySelector(`table thead tr`);
+    this.footer = this.parent.querySelector(`table tfoot tr`);
+    this.tbody = this.parent.querySelector("table tbody");
+
+    // const headerElements = this.header?.querySelectorAll(`th`);
+    // headerElements?.forEach((node) =>
+    //   node.addEventListener("click", () => {
+    //     this.sortColumn = null;
+    //     this.sortAscending = false;
+    //   }),
+    // );
+
     const rows = this.parent.querySelectorAll(`tbody tr`);
     const dr = {} as DataRow;
 
@@ -103,8 +125,6 @@ class RosterStatsVisualizer {
     });
 
     this.dataRows = dr;
-    this.header = this.parent.querySelector(`table thead tr`);
-    this.footer = this.parent.querySelector(`table tfoot tr`);
   }
 
   private getRosterAvgOvr(ovrType: OvrType): number {
@@ -119,6 +139,14 @@ class RosterStatsVisualizer {
         .map((player) => player.calculateOVR(statFunction[ovrType](player)))
         .reduce((sum, value, _, array) => sum + value / array.length, 0),
     );
+  }
+
+  private getRowPlayerName(row: HTMLTableRowElement): [string, string] {
+    const fullName = row
+      .querySelector(`a.player-link span`)
+      ?.textContent?.trim();
+    const [firstname = "", lastname = ""] = fullName?.split(" ") ?? [];
+    return [firstname, lastname];
   }
 
   private createRatingSpan(ovr: number): HTMLSpanElement {
@@ -143,6 +171,88 @@ class RosterStatsVisualizer {
 
     return ratingSpan;
   }
+
+  // private addSorting(): void { if (!this.minHeaderCell || !this.maxHeaderCell) return;
+
+  //   // min ovr sorting
+  //   this.minHeaderCell.addEventListener("click", () => {
+  //     if (this.sortColumn === "min-ovr") {
+  //       // if already sorting by this column, toggle direction
+  //       this.sortAscending = !this.sortAscending;
+  //     } else {
+  //       this.sortColumn = "min-ovr";
+  //       this.sortAscending = false; // default descending
+  //     }
+
+  //     this.sortRows();
+  //   });
+
+  //   // max ovr sorting
+  //   this.maxHeaderCell.addEventListener("click", () => {
+  //     if (this.sortColumn === "max-ovr") {
+  //       this.sortAscending = !this.sortAscending;
+  //     } else {
+  //       this.sortColumn = "max-ovr";
+  //       this.sortAscending = false;
+  //     }
+
+  //     this.sortRows();
+  //   });
+  // }
+
+  // private sortRows(): void {
+  //   if (!this.dataRows || !this.sortColumn || !this.tbody) return;
+  //   console.log("1");
+  //   const tbody = this.tbody;
+
+  //   const rows = Object.entries(this.dataRows).map(([playerId, row]) => {
+  //     console.log("rrrr");
+  //     const player = this.roster.getPlayer(playerId);
+
+  //     const ovrValue = player
+  //       ? this.sortColumn === "min-ovr"
+  //         ? player.calculateOVR(player.getMinStats())
+  //         : player.calculateOVR(player.getMaxStats())
+  //       : 0;
+
+  //     const [firstName, lastName] = this.getRowPlayerName(row);
+
+  //     return {
+  //       row,
+  //       ovrValue,
+  //       firstName,
+  //       lastName,
+  //       playerId,
+  //     };
+  //   });
+
+  //   const collator = new Intl.Collator(undefined, {
+  //     usage: "sort",
+  //     sensitivity: "base",
+  //   });
+
+  //   rows.sort((a, b) => {
+  //     if (a.ovrValue !== b.ovrValue) {
+  //       return this.sortAscending
+  //         ? a.ovrValue - b.ovrValue
+  //         : b.ovrValue - a.ovrValue;
+  //     }
+
+  //     const lastNameCompare = collator.compare(a.lastName, b.lastName);
+  //     if (lastNameCompare !== 0) {
+  //       return this.sortAscending ? lastNameCompare : -lastNameCompare;
+  //     }
+
+  //     return this.sortAscending
+  //       ? collator.compare(a.firstName, b.firstName)
+  //       : collator.compare(b.firstName, a.firstName);
+  //   });
+
+  //   rows.forEach((item) => {
+  //     console.log("appending row?!", item);
+  //     tbody.appendChild(item.row);
+  //   });
+  // }
 
   private addNewColumns(): void {
     if (!this.dataRows || !this.header || !this.footer) return;
@@ -177,24 +287,18 @@ class RosterStatsVisualizer {
       row.insertBefore(maxDataCell, null);
     });
 
-    const minHeaderCell = document.createElement("th");
-    minHeaderCell.className = "md:px-4 px-2 py-2 text-left sort-column";
-    minHeaderCell.innerText = " Min ";
-    minHeaderCell.style.textAlign = "center";
-    minHeaderCell.addEventListener("click", (event) => {
-      console.log("sorting by min...");
-    });
+    this.minHeaderCell = document.createElement("th");
+    this.minHeaderCell.className = "md:px-4 px-2 py-2 text-left sort-column";
+    this.minHeaderCell.innerText = " Min ";
+    this.minHeaderCell.style.textAlign = "center";
 
-    const maxHeaderCell = document.createElement("th");
-    maxHeaderCell.className = "md:px-4 px-2 py-2 text-left sort-column";
-    maxHeaderCell.innerText = " Max ";
-    maxHeaderCell.style.textAlign = "center";
-    maxHeaderCell.addEventListener("click", (event) => {
-      console.log("sorting by max...");
-    });
+    this.maxHeaderCell = document.createElement("th");
+    this.maxHeaderCell.className = "md:px-4 px-2 py-2 text-left sort-column";
+    this.maxHeaderCell.innerText = " Max ";
+    this.maxHeaderCell.style.textAlign = "center";
 
-    this.header.insertBefore(minHeaderCell, null);
-    this.header.insertBefore(maxHeaderCell, null);
+    this.header.insertBefore(this.minHeaderCell, null);
+    this.header.insertBefore(this.maxHeaderCell, null);
 
     const minFooterCell = document.createElement("td");
     minFooterCell.className = "md:px-4 px-2 py-2";
@@ -212,6 +316,8 @@ class RosterStatsVisualizer {
 
     this.footer.insertBefore(minFooterCell, null);
     this.footer.insertBefore(maxFooterCell, null);
+
+    // this.addSorting();
   }
 }
 

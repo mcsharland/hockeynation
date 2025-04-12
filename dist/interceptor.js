@@ -508,7 +508,12 @@ class RosterStatsVisualizer {
     dataRows = null;
     generalButton = null;
     skillsButton = null;
+    tbody = null;
     onGeneralPage = true;
+    minHeaderCell = null;
+    maxHeaderCell = null;
+    // private sortColumn: "min-ovr" | "max-ovr" | null = null;
+    // private sortAscending: boolean = true;
     constructor(roster, parentNode) {
         this.roster = roster;
         this.parent = parentNode;
@@ -530,11 +535,14 @@ class RosterStatsVisualizer {
             if (this.dataRows && Object.keys(this.dataRows).length > 0) {
                 this.addNewColumns();
             }
+            // if (this.sortColumn) this.sortRows()
         });
         this.skillsButton.addEventListener("click", (event) => {
             if (!this.onGeneralPage)
                 return;
             this.onGeneralPage = false;
+            this.initializeTableReferences();
+            // if (this.sortColumn) this.sortRows();
         });
         // initialize table references and add columns on first load
         this.initializeTableReferences();
@@ -544,6 +552,16 @@ class RosterStatsVisualizer {
     }
     initializeTableReferences() {
         // reset references to get the latest dom nodes
+        this.header = this.parent.querySelector(`table thead tr`);
+        this.footer = this.parent.querySelector(`table tfoot tr`);
+        this.tbody = this.parent.querySelector("table tbody");
+        // const headerElements = this.header?.querySelectorAll(`th`);
+        // headerElements?.forEach((node) =>
+        //   node.addEventListener("click", () => {
+        //     this.sortColumn = null;
+        //     this.sortAscending = false;
+        //   }),
+        // );
         const rows = this.parent.querySelectorAll(`tbody tr`);
         const dr = {};
         rows.forEach((row) => {
@@ -555,8 +573,6 @@ class RosterStatsVisualizer {
             }
         });
         this.dataRows = dr;
-        this.header = this.parent.querySelector(`table thead tr`);
-        this.footer = this.parent.querySelector(`table tfoot tr`);
     }
     getRosterAvgOvr(ovrType) {
         const statFunction = {
@@ -568,6 +584,13 @@ class RosterStatsVisualizer {
         return Math.round(Object.values(players)
             .map((player) => player.calculateOVR(statFunction[ovrType](player)))
             .reduce((sum, value, _, array) => sum + value / array.length, 0));
+    }
+    getRowPlayerName(row) {
+        const fullName = row
+            .querySelector(`a.player-link span`)
+            ?.textContent?.trim();
+        const [firstname = "", lastname = ""] = fullName?.split(" ") ?? [];
+        return [firstname, lastname];
     }
     createRatingSpan(ovr) {
         const ratingSpan = document.createElement("span");
@@ -594,6 +617,73 @@ class RosterStatsVisualizer {
         ratingSpan.innerText = ovr.toString();
         return ratingSpan;
     }
+    // private addSorting(): void { if (!this.minHeaderCell || !this.maxHeaderCell) return;
+    //   // min ovr sorting
+    //   this.minHeaderCell.addEventListener("click", () => {
+    //     if (this.sortColumn === "min-ovr") {
+    //       // if already sorting by this column, toggle direction
+    //       this.sortAscending = !this.sortAscending;
+    //     } else {
+    //       this.sortColumn = "min-ovr";
+    //       this.sortAscending = false; // default descending
+    //     }
+    //     this.sortRows();
+    //   });
+    //   // max ovr sorting
+    //   this.maxHeaderCell.addEventListener("click", () => {
+    //     if (this.sortColumn === "max-ovr") {
+    //       this.sortAscending = !this.sortAscending;
+    //     } else {
+    //       this.sortColumn = "max-ovr";
+    //       this.sortAscending = false;
+    //     }
+    //     this.sortRows();
+    //   });
+    // }
+    // private sortRows(): void {
+    //   if (!this.dataRows || !this.sortColumn || !this.tbody) return;
+    //   console.log("1");
+    //   const tbody = this.tbody;
+    //   const rows = Object.entries(this.dataRows).map(([playerId, row]) => {
+    //     console.log("rrrr");
+    //     const player = this.roster.getPlayer(playerId);
+    //     const ovrValue = player
+    //       ? this.sortColumn === "min-ovr"
+    //         ? player.calculateOVR(player.getMinStats())
+    //         : player.calculateOVR(player.getMaxStats())
+    //       : 0;
+    //     const [firstName, lastName] = this.getRowPlayerName(row);
+    //     return {
+    //       row,
+    //       ovrValue,
+    //       firstName,
+    //       lastName,
+    //       playerId,
+    //     };
+    //   });
+    //   const collator = new Intl.Collator(undefined, {
+    //     usage: "sort",
+    //     sensitivity: "base",
+    //   });
+    //   rows.sort((a, b) => {
+    //     if (a.ovrValue !== b.ovrValue) {
+    //       return this.sortAscending
+    //         ? a.ovrValue - b.ovrValue
+    //         : b.ovrValue - a.ovrValue;
+    //     }
+    //     const lastNameCompare = collator.compare(a.lastName, b.lastName);
+    //     if (lastNameCompare !== 0) {
+    //       return this.sortAscending ? lastNameCompare : -lastNameCompare;
+    //     }
+    //     return this.sortAscending
+    //       ? collator.compare(a.firstName, b.firstName)
+    //       : collator.compare(b.firstName, a.firstName);
+    //   });
+    //   rows.forEach((item) => {
+    //     console.log("appending row?!", item);
+    //     tbody.appendChild(item.row);
+    //   });
+    // }
     addNewColumns() {
         if (!this.dataRows || !this.header || !this.footer)
             return;
@@ -617,22 +707,16 @@ class RosterStatsVisualizer {
             row.insertBefore(minDataCell, null);
             row.insertBefore(maxDataCell, null);
         });
-        const minHeaderCell = document.createElement("th");
-        minHeaderCell.className = "md:px-4 px-2 py-2 text-left sort-column";
-        minHeaderCell.innerText = " Min ";
-        minHeaderCell.style.textAlign = "center";
-        minHeaderCell.addEventListener("click", (event) => {
-            console.log("sorting by min...");
-        });
-        const maxHeaderCell = document.createElement("th");
-        maxHeaderCell.className = "md:px-4 px-2 py-2 text-left sort-column";
-        maxHeaderCell.innerText = " Max ";
-        maxHeaderCell.style.textAlign = "center";
-        maxHeaderCell.addEventListener("click", (event) => {
-            console.log("sorting by max...");
-        });
-        this.header.insertBefore(minHeaderCell, null);
-        this.header.insertBefore(maxHeaderCell, null);
+        this.minHeaderCell = document.createElement("th");
+        this.minHeaderCell.className = "md:px-4 px-2 py-2 text-left sort-column";
+        this.minHeaderCell.innerText = " Min ";
+        this.minHeaderCell.style.textAlign = "center";
+        this.maxHeaderCell = document.createElement("th");
+        this.maxHeaderCell.className = "md:px-4 px-2 py-2 text-left sort-column";
+        this.maxHeaderCell.innerText = " Max ";
+        this.maxHeaderCell.style.textAlign = "center";
+        this.header.insertBefore(this.minHeaderCell, null);
+        this.header.insertBefore(this.maxHeaderCell, null);
         const minFooterCell = document.createElement("td");
         minFooterCell.className = "md:px-4 px-2 py-2";
         minFooterCell.appendChild(this.createRatingSpan(this.getRosterAvgOvr("Min")));
@@ -641,6 +725,7 @@ class RosterStatsVisualizer {
         maxFooterCell.appendChild(this.createRatingSpan(this.getRosterAvgOvr("Max")));
         this.footer.insertBefore(minFooterCell, null);
         this.footer.insertBefore(maxFooterCell, null);
+        // this.addSorting();
     }
 }
 function handleRosterData(data) {
@@ -811,6 +896,22 @@ __webpack_require__.r(__webpack_exports__);
         }
         return response;
     };
+    /////
+    // const origAdd = EventTarget.prototype.addEventListener;
+    // EventTarget.prototype.addEventListener = function (type, listener, options) {
+    //   if (type === "click") {
+    //     // @ts-ignore
+    //     const wrapped = (e) => {
+    //       console.log("before");
+    //       // @ts-ignore
+    //       listener.call(this, e);
+    //       console.log("after");
+    //     };
+    //     origAdd.call(this, type, wrapped, options);
+    //   } else {
+    //     origAdd.call(this, type, listener, options);
+    //   }
+    // };
 })();
 
 })();
