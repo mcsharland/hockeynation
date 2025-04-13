@@ -18,6 +18,13 @@ import { handleRosterData } from "./pages/roster";
         handleRosterData(data);
       },
     },
+    draftClass: {
+      pattern: /\/api\/league\/[^\/]+\/draft-class/,
+      handler: (data: any, url: string) => {
+        console.log(data);
+        console.log(url);
+      },
+    },
   };
 
   function findHandler(url: string) {
@@ -38,6 +45,7 @@ import { handleRosterData } from "./pages/roster";
     }
 
     send(...args: any[]) {
+      const url = this.interceptedUrl ?? "";
       const handler: Function | null = findHandler(this.interceptedUrl ?? "");
       if (handler) {
         const originalOnReadyState = this.onreadystatechange;
@@ -46,7 +54,7 @@ import { handleRosterData } from "./pages/roster";
           if (this.readyState === 4 && this.status === 200) {
             try {
               const { data } = JSON.parse(this.responseText);
-              handler(data);
+              handler(data, url);
             } catch (e) {
               console.error("Error parsing response:", e);
             }
@@ -86,7 +94,7 @@ import { handleRosterData } from "./pages/roster";
       try {
         const clonedResponse = response.clone();
         const data = await clonedResponse.json();
-        handler(data);
+        handler(data, url);
       } catch (e) {
         console.error("Error processing fetch response:", e);
       }

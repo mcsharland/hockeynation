@@ -16,7 +16,7 @@ interface DataRow {
 
 type OvrType = "Default" | "Min" | "Max";
 
-class Roster {
+export class Roster {
   private players: Players;
 
   constructor(data: any) {
@@ -53,6 +53,7 @@ class RosterStatsVisualizer {
   private onGeneralPage: boolean = true;
   private minHeaderCell: HTMLTableCellElement | null = null;
   private maxHeaderCell: HTMLTableCellElement | null = null;
+  private selectElement: HTMLSelectElement | null = null;
   // private sortColumn: "min-ovr" | "max-ovr" | null = null;
   // private sortAscending: boolean = true;
 
@@ -63,12 +64,17 @@ class RosterStatsVisualizer {
   }
 
   private initialize() {
-    this.generalButton = this.parent.querySelector(`.btn-toggle.active`);
-    if (!this.generalButton) return;
+    const tabButtons = this.parent.querySelectorAll(
+      `.btn-toggle`,
+    ) as NodeListOf<HTMLButtonElement>;
+    if (!tabButtons.length) return;
 
-    this.skillsButton = this.parent.querySelector(`.btn-toggle:not(.active)`);
-    if (!this.skillsButton) return;
+    const isGeneral = tabButtons[0]?.textContent?.trim() === "General";
+    this.generalButton = isGeneral ? tabButtons[0] : tabButtons[1];
+    this.skillsButton = isGeneral ? tabButtons[1] : tabButtons[0];
+    this.onGeneralPage = this.generalButton.classList.contains("active");
 
+    // this.skillsButton =
     this.generalButton.addEventListener("click", async (event) => {
       if (this.onGeneralPage) return;
       this.onGeneralPage = true;
@@ -87,6 +93,12 @@ class RosterStatsVisualizer {
       this.onGeneralPage = false;
       this.initializeTableReferences();
       // if (this.sortColumn) this.sortRows();
+    });
+
+    this.selectElement = this.parent.querySelector(`select[value]`);
+    this.selectElement?.addEventListener("input", () => {
+      this.initializeTableReferences();
+      this.addNewColumns();
     });
 
     // initialize table references and add columns on first load
@@ -172,7 +184,8 @@ class RosterStatsVisualizer {
     return ratingSpan;
   }
 
-  // private addSorting(): void { if (!this.minHeaderCell || !this.maxHeaderCell) return;
+  // private addSorting(): void {
+  //   if (!this.minHeaderCell || !this.maxHeaderCell) return;
 
   //   // min ovr sorting
   //   this.minHeaderCell.addEventListener("click", () => {
@@ -202,11 +215,9 @@ class RosterStatsVisualizer {
 
   // private sortRows(): void {
   //   if (!this.dataRows || !this.sortColumn || !this.tbody) return;
-  //   console.log("1");
   //   const tbody = this.tbody;
 
   //   const rows = Object.entries(this.dataRows).map(([playerId, row]) => {
-  //     console.log("rrrr");
   //     const player = this.roster.getPlayer(playerId);
 
   //     const ovrValue = player
@@ -249,19 +260,19 @@ class RosterStatsVisualizer {
   //   });
 
   //   rows.forEach((item) => {
-  //     console.log("appending row?!", item);
   //     tbody.appendChild(item.row);
   //   });
   // }
 
   private addNewColumns(): void {
-    if (!this.dataRows || !this.header || !this.footer) return;
-
-    // safety incase columns are already added
-    const headerText = this.header.textContent || "";
-    if (headerText.includes(" Min ") && headerText.includes(" Max ")) {
+    if (!this.onGeneralPage || !this.dataRows || !this.header || !this.footer)
       return;
-    }
+
+    // delete old columns
+
+    this.parent
+      .querySelectorAll(`[data-column]`)
+      .forEach((node) => node.remove());
 
     Object.entries(this.dataRows).forEach(([playerId, row]) => {
       const player = this.roster.getPlayer(playerId);
@@ -291,17 +302,20 @@ class RosterStatsVisualizer {
     this.minHeaderCell.className = "md:px-4 px-2 py-2 text-left sort-column";
     this.minHeaderCell.innerText = " Min ";
     this.minHeaderCell.style.textAlign = "center";
+    this.minHeaderCell.dataset.column = "min-ovr";
 
     this.maxHeaderCell = document.createElement("th");
     this.maxHeaderCell.className = "md:px-4 px-2 py-2 text-left sort-column";
     this.maxHeaderCell.innerText = " Max ";
     this.maxHeaderCell.style.textAlign = "center";
+    this.maxHeaderCell.dataset.column = "max-ovr";
 
     this.header.insertBefore(this.minHeaderCell, null);
     this.header.insertBefore(this.maxHeaderCell, null);
 
     const minFooterCell = document.createElement("td");
     minFooterCell.className = "md:px-4 px-2 py-2";
+    minFooterCell.dataset.column = "min-ovr";
 
     minFooterCell.appendChild(
       this.createRatingSpan(this.getRosterAvgOvr("Min")),
@@ -309,6 +323,7 @@ class RosterStatsVisualizer {
 
     const maxFooterCell = document.createElement("td");
     maxFooterCell.className = "md:px-4 px-2 py-2";
+    maxFooterCell.dataset.column = "max-ovr";
 
     maxFooterCell.appendChild(
       this.createRatingSpan(this.getRosterAvgOvr("Max")),

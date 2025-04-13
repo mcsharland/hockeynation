@@ -334,7 +334,7 @@ class PlayerStatsVisualizer {
         // initialize display
         this.updateHockeyPucks("Default");
     }
-    // Consider not adding / disabling twhen all of a player's stats are maxed
+    // Consider not adding / disabling when all of a player's stats are maxed
     addDropdown() {
         const div = Array.from(document.querySelectorAll(".card-header")).filter((d) => d?.textContent?.trim() === "Skills")?.[0];
         if (div === undefined)
@@ -476,6 +476,7 @@ function manipulatePlayerPage(table) {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   Roster: () => (/* binding */ Roster),
 /* harmony export */   handleRosterData: () => (/* binding */ handleRosterData),
 /* harmony export */   manipulateRosterPage: () => (/* binding */ manipulateRosterPage)
 /* harmony export */ });
@@ -512,6 +513,7 @@ class RosterStatsVisualizer {
     onGeneralPage = true;
     minHeaderCell = null;
     maxHeaderCell = null;
+    selectElement = null;
     // private sortColumn: "min-ovr" | "max-ovr" | null = null;
     // private sortAscending: boolean = true;
     constructor(roster, parentNode) {
@@ -520,12 +522,14 @@ class RosterStatsVisualizer {
         this.initialize();
     }
     initialize() {
-        this.generalButton = this.parent.querySelector(`.btn-toggle.active`);
-        if (!this.generalButton)
+        const tabButtons = this.parent.querySelectorAll(`.btn-toggle`);
+        if (!tabButtons.length)
             return;
-        this.skillsButton = this.parent.querySelector(`.btn-toggle:not(.active)`);
-        if (!this.skillsButton)
-            return;
+        const isGeneral = tabButtons[0]?.textContent?.trim() === "General";
+        this.generalButton = isGeneral ? tabButtons[0] : tabButtons[1];
+        this.skillsButton = isGeneral ? tabButtons[1] : tabButtons[0];
+        this.onGeneralPage = this.generalButton.classList.contains("active");
+        // this.skillsButton =
         this.generalButton.addEventListener("click", async (event) => {
             if (this.onGeneralPage)
                 return;
@@ -543,6 +547,11 @@ class RosterStatsVisualizer {
             this.onGeneralPage = false;
             this.initializeTableReferences();
             // if (this.sortColumn) this.sortRows();
+        });
+        this.selectElement = this.parent.querySelector(`select[value]`);
+        this.selectElement?.addEventListener("input", () => {
+            this.initializeTableReferences();
+            this.addNewColumns();
         });
         // initialize table references and add columns on first load
         this.initializeTableReferences();
@@ -617,7 +626,8 @@ class RosterStatsVisualizer {
         ratingSpan.innerText = ovr.toString();
         return ratingSpan;
     }
-    // private addSorting(): void { if (!this.minHeaderCell || !this.maxHeaderCell) return;
+    // private addSorting(): void {
+    //   if (!this.minHeaderCell || !this.maxHeaderCell) return;
     //   // min ovr sorting
     //   this.minHeaderCell.addEventListener("click", () => {
     //     if (this.sortColumn === "min-ovr") {
@@ -642,10 +652,8 @@ class RosterStatsVisualizer {
     // }
     // private sortRows(): void {
     //   if (!this.dataRows || !this.sortColumn || !this.tbody) return;
-    //   console.log("1");
     //   const tbody = this.tbody;
     //   const rows = Object.entries(this.dataRows).map(([playerId, row]) => {
-    //     console.log("rrrr");
     //     const player = this.roster.getPlayer(playerId);
     //     const ovrValue = player
     //       ? this.sortColumn === "min-ovr"
@@ -680,18 +688,16 @@ class RosterStatsVisualizer {
     //       : collator.compare(b.firstName, a.firstName);
     //   });
     //   rows.forEach((item) => {
-    //     console.log("appending row?!", item);
     //     tbody.appendChild(item.row);
     //   });
     // }
     addNewColumns() {
-        if (!this.dataRows || !this.header || !this.footer)
+        if (!this.onGeneralPage || !this.dataRows || !this.header || !this.footer)
             return;
-        // safety incase columns are already added
-        const headerText = this.header.textContent || "";
-        if (headerText.includes(" Min ") && headerText.includes(" Max ")) {
-            return;
-        }
+        // delete old columns
+        this.parent
+            .querySelectorAll(`[data-column]`)
+            .forEach((node) => node.remove());
         Object.entries(this.dataRows).forEach(([playerId, row]) => {
             const player = this.roster.getPlayer(playerId);
             if (!player)
@@ -711,17 +717,21 @@ class RosterStatsVisualizer {
         this.minHeaderCell.className = "md:px-4 px-2 py-2 text-left sort-column";
         this.minHeaderCell.innerText = " Min ";
         this.minHeaderCell.style.textAlign = "center";
+        this.minHeaderCell.dataset.column = "min-ovr";
         this.maxHeaderCell = document.createElement("th");
         this.maxHeaderCell.className = "md:px-4 px-2 py-2 text-left sort-column";
         this.maxHeaderCell.innerText = " Max ";
         this.maxHeaderCell.style.textAlign = "center";
+        this.maxHeaderCell.dataset.column = "max-ovr";
         this.header.insertBefore(this.minHeaderCell, null);
         this.header.insertBefore(this.maxHeaderCell, null);
         const minFooterCell = document.createElement("td");
         minFooterCell.className = "md:px-4 px-2 py-2";
+        minFooterCell.dataset.column = "min-ovr";
         minFooterCell.appendChild(this.createRatingSpan(this.getRosterAvgOvr("Min")));
         const maxFooterCell = document.createElement("td");
         maxFooterCell.className = "md:px-4 px-2 py-2";
+        maxFooterCell.dataset.column = "max-ovr";
         maxFooterCell.appendChild(this.createRatingSpan(this.getRosterAvgOvr("Max")));
         this.footer.insertBefore(minFooterCell, null);
         this.footer.insertBefore(maxFooterCell, null);
@@ -833,6 +843,13 @@ __webpack_require__.r(__webpack_exports__);
                 (0,_pages_roster__WEBPACK_IMPORTED_MODULE_2__.handleRosterData)(data);
             },
         },
+        draftClass: {
+            pattern: /\/api\/league\/[^\/]+\/draft-class/,
+            handler: (data, url) => {
+                console.log(data);
+                console.log(url);
+            },
+        },
     };
     function findHandler(url) {
         for (const { pattern, handler } of Object.values(URL_HANDLERS)) {
@@ -850,6 +867,7 @@ __webpack_require__.r(__webpack_exports__);
             super.open(method, url, ...rest);
         }
         send(...args) {
+            const url = this.interceptedUrl ?? "";
             const handler = findHandler(this.interceptedUrl ?? "");
             if (handler) {
                 const originalOnReadyState = this.onreadystatechange;
@@ -857,7 +875,7 @@ __webpack_require__.r(__webpack_exports__);
                     if (this.readyState === 4 && this.status === 200) {
                         try {
                             const { data } = JSON.parse(this.responseText);
-                            handler(data);
+                            handler(data, url);
                         }
                         catch (e) {
                             console.error("Error parsing response:", e);
@@ -888,7 +906,7 @@ __webpack_require__.r(__webpack_exports__);
             try {
                 const clonedResponse = response.clone();
                 const data = await clonedResponse.json();
-                handler(data);
+                handler(data, url);
             }
             catch (e) {
                 console.error("Error processing fetch response:", e);
@@ -896,22 +914,6 @@ __webpack_require__.r(__webpack_exports__);
         }
         return response;
     };
-    /////
-    // const origAdd = EventTarget.prototype.addEventListener;
-    // EventTarget.prototype.addEventListener = function (type, listener, options) {
-    //   if (type === "click") {
-    //     // @ts-ignore
-    //     const wrapped = (e) => {
-    //       console.log("before");
-    //       // @ts-ignore
-    //       listener.call(this, e);
-    //       console.log("after");
-    //     };
-    //     origAdd.call(this, type, wrapped, options);
-    //   } else {
-    //     origAdd.call(this, type, listener, options);
-    //   }
-    // };
 })();
 
 })();

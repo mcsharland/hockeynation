@@ -227,7 +227,7 @@ class PlayerStatsVisualizer {
     this.updateHockeyPucks("Default");
   }
 
-  // Consider not adding / disabling twhen all of a player's stats are maxed
+  // Consider not adding / disabling when all of a player's stats are maxed
   private addDropdown(): void {
     const div = Array.from(document.querySelectorAll(".card-header")).filter(
       (d) => d?.textContent?.trim() === "Skills",
