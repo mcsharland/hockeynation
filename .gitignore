@@ -128,3 +128,4 @@ out
 .pnp.*
 
 .DS_Store
+.zed/

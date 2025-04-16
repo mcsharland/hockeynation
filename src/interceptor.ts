@@ -1,21 +1,23 @@
 import { handlePlayerData } from "./pages/player";
 import { initNavigationHandler } from "./navigation-handler";
 import { handleRosterData } from "./pages/roster";
+import { handleUserData, User } from "./user";
 
 (function () {
   initNavigationHandler(); // Initialize Observer from script context
+  window.userData = new User(); // Initialize User Object with default settings, probably not needed but fixes some load inconsistencies
 
   const URL_HANDLERS = {
     player: {
       pattern: /\/api\/player\/[^\/]+$/,
       handler: (data: any) => {
-        handlePlayerData(data);
+        handlePlayerData(data.data);
       },
     },
     roster: {
       pattern: /\/api\/team\/[^\/]+\/roster/,
       handler: (data: any) => {
-        handleRosterData(data);
+        handleRosterData(data.data);
       },
     },
     draftClass: {
@@ -23,6 +25,12 @@ import { handleRosterData } from "./pages/roster";
       handler: (data: any, url: string) => {
         console.log(data);
         console.log(url);
+      },
+    },
+    userInfo: {
+      pattern: /\/api\/user$/,
+      handler: (data: any) => {
+        handleUserData(data);
       },
     },
   };
@@ -53,7 +61,7 @@ import { handleRosterData } from "./pages/roster";
         this.onreadystatechange = function () {
           if (this.readyState === 4 && this.status === 200) {
             try {
-              const { data } = JSON.parse(this.responseText);
+              const data = JSON.parse(this.responseText);
               handler(data, url);
             } catch (e) {
               console.error("Error parsing response:", e);

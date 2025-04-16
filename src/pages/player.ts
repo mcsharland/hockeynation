@@ -163,6 +163,10 @@ export class Player {
     return this.maxStats;
   }
 
+  // TODO:
+  // Needs to be improved for scout players. Full hidden players need to not have a calculated OVR / be treated special so that roster page calculations work fine
+  // Look at playerdata.canScout & scoutedTimes
+
   public calculateOVR(stats: Stats): number {
     const statsValues = Object.values(stats);
     const sum = statsValues.reduce(
@@ -181,6 +185,7 @@ export class Player {
   }
 }
 
+// TODO: create user class to seed colors for OVR
 class PlayerStatsVisualizer {
   private playerStats: Player;
   private parentNode: HTMLElement;
@@ -270,6 +275,8 @@ class PlayerStatsVisualizer {
     div.appendChild(dropdown);
   }
 
+  // TODO: Check user class to determine if number should be rendered
+  // might be able to simplify this simply by checking if element to set the number exist
   private updateHockeyPucks(option: string): void {
     if (!this.statsRows) return;
 
@@ -320,6 +327,9 @@ class PlayerStatsVisualizer {
     // update OVR
     let ovr = this.playerStats.calculateOVR(statsToUse);
 
+    // TODO:
+    // This is the only time that isScout is used, and it is a fail safe for OVR calculations where stats are missing.
+    // The other thing that I can think of, is that MIN OVR should be calculate as the min of the resulting value and the default
     if (option !== "Default" || !this.playerStats.isScout) {
       this.updateOVR(ovr);
     } else if (this.baseOVR !== null) {
@@ -335,19 +345,16 @@ class PlayerStatsVisualizer {
     const polygonElement =
       this.ovrElement.parentElement?.querySelector("polygon");
     if (polygonElement) {
-      let fillColor = "";
-      if (ovr <= 39) {
-        fillColor = "#f56565";
-      } else if (ovr >= 40 && ovr <= 54) {
-        fillColor = "#ed8936";
-      } else if (ovr >= 55 && ovr <= 69) {
-        fillColor = "#1995AD";
-      } else if (ovr >= 70 && ovr <= 79) {
-        fillColor = "#10b981";
-      } else if (ovr >= 80) {
-        fillColor = "#383839";
+      if (window.userData) {
+        polygonElement.setAttribute(
+          "fill",
+          window.userData.getColorPair(ovr)[0],
+        );
+        this.ovrElement.setAttribute(
+          "fill",
+          window.userData.getColorPair(ovr)[1],
+        );
       }
-      polygonElement.setAttribute("fill", fillColor);
     }
   }
 }

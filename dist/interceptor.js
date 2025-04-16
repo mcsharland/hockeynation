@@ -287,6 +287,9 @@ class Player {
     getMaxStats() {
         return this.maxStats;
     }
+    // TODO:
+    // Needs to be improved for scout players. Full hidden players need to not have a calculated OVR / be treated special so that roster page calculations work fine
+    // Look at playerdata.canScout & scoutedTimes
     calculateOVR(stats) {
         const statsValues = Object.values(stats);
         const sum = statsValues.reduce((acc, stat) => acc + stat.rating, 0);
@@ -297,6 +300,7 @@ class Player {
         return Math.round(correctedAverage * 10);
     }
 }
+// TODO: create user class to seed colors for OVR
 class PlayerStatsVisualizer {
     playerStats;
     parentNode;
@@ -371,6 +375,8 @@ class PlayerStatsVisualizer {
         });
         div.appendChild(dropdown);
     }
+    // TODO: Check user class to determine if number should be rendered
+    // might be able to simplify this simply by checking if element to set the number exist
     updateHockeyPucks(option) {
         if (!this.statsRows)
             return;
@@ -414,6 +420,9 @@ class PlayerStatsVisualizer {
         });
         // update OVR
         let ovr = this.playerStats.calculateOVR(statsToUse);
+        // TODO:
+        // This is the only time that isScout is used, and it is a fail safe for OVR calculations where stats are missing.
+        // The other thing that I can think of, is that MIN OVR should be calculate as the min of the resulting value and the default
         if (option !== "Default" || !this.playerStats.isScout) {
             this.updateOVR(ovr);
         }
@@ -427,23 +436,10 @@ class PlayerStatsVisualizer {
         this.ovrElement.textContent = ovr.toString();
         const polygonElement = this.ovrElement.parentElement?.querySelector("polygon");
         if (polygonElement) {
-            let fillColor = "";
-            if (ovr <= 39) {
-                fillColor = "#f56565";
+            if (window.userData) {
+                polygonElement.setAttribute("fill", window.userData.getColorPair(ovr)[0]);
+                this.ovrElement.setAttribute("fill", window.userData.getColorPair(ovr)[1]);
             }
-            else if (ovr >= 40 && ovr <= 54) {
-                fillColor = "#ed8936";
-            }
-            else if (ovr >= 55 && ovr <= 69) {
-                fillColor = "#1995AD";
-            }
-            else if (ovr >= 70 && ovr <= 79) {
-                fillColor = "#10b981";
-            }
-            else if (ovr >= 80) {
-                fillColor = "#383839";
-            }
-            polygonElement.setAttribute("fill", fillColor);
         }
     }
 }
@@ -514,8 +510,8 @@ class RosterStatsVisualizer {
     minHeaderCell = null;
     maxHeaderCell = null;
     selectElement = null;
-    // private sortColumn: "min-ovr" | "max-ovr" | null = null;
-    // private sortAscending: boolean = true;
+    sortColumn = null;
+    sortAscending = true;
     constructor(roster, parentNode) {
         this.roster = roster;
         this.parent = parentNode;
@@ -564,13 +560,11 @@ class RosterStatsVisualizer {
         this.header = this.parent.querySelector(`table thead tr`);
         this.footer = this.parent.querySelector(`table tfoot tr`);
         this.tbody = this.parent.querySelector("table tbody");
-        // const headerElements = this.header?.querySelectorAll(`th`);
-        // headerElements?.forEach((node) =>
-        //   node.addEventListener("click", () => {
-        //     this.sortColumn = null;
-        //     this.sortAscending = false;
-        //   }),
-        // );
+        const headerElements = this.header?.querySelectorAll(`th`);
+        headerElements?.forEach((node) => node.addEventListener("click", () => {
+            this.sortColumn = null;
+            this.sortAscending = false;
+        }));
         const rows = this.parent.querySelectorAll(`tbody tr`);
         const dr = {};
         rows.forEach((row) => {
@@ -583,6 +577,7 @@ class RosterStatsVisualizer {
         });
         this.dataRows = dr;
     }
+    // needs to be fixed
     getRosterAvgOvr(ovrType) {
         const statFunction = {
             Default: (player) => player.getStats(),
@@ -606,23 +601,11 @@ class RosterStatsVisualizer {
         ratingSpan.classList.add("badge");
         ratingSpan.style.color = "#f8f8f9";
         ratingSpan.style.userSelect = "none";
-        let bgColor = "";
-        if (ovr <= 39) {
-            bgColor = "#f56565";
+        if (window.userData) {
+            const [bgColor, color] = window.userData.getColorPair(ovr);
+            ratingSpan.style.backgroundColor = bgColor;
+            ratingSpan.style.color = color;
         }
-        else if (ovr >= 40 && ovr <= 54) {
-            bgColor = "#ed8936";
-        }
-        else if (ovr >= 55 && ovr <= 69) {
-            bgColor = "#1995AD";
-        }
-        else if (ovr >= 70 && ovr <= 79) {
-            bgColor = "#10b981";
-        }
-        else if (ovr >= 80) {
-            bgColor = "#383839";
-        }
-        ratingSpan.style.backgroundColor = bgColor;
         ratingSpan.innerText = ovr.toString();
         return ratingSpan;
     }
@@ -757,6 +740,68 @@ function manipulateRosterPage(table) {
 }
 
 
+/***/ }),
+
+/***/ "./src/user.ts":
+/*!*********************!*\
+  !*** ./src/user.ts ***!
+  \*********************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   User: () => (/* binding */ User),
+/* harmony export */   handleUserData: () => (/* binding */ handleUserData)
+/* harmony export */ });
+class User {
+    "bg-color-rating-90plus" = "#383839";
+    "bg-color-rating-85plus" = "#383839";
+    "bg-color-rating-80plus" = "#383839";
+    "bg-color-rating-75plus" = "#10b981";
+    "bg-color-rating-70plus" = "#10b981";
+    "bg-color-rating-65plus" = "#1995AD";
+    "bg-color-rating-60plus" = "#1995AD";
+    "bg-color-rating-55plus" = "#1995AD";
+    "bg-color-rating-50plus" = "#ed8936";
+    "bg-color-rating-45plus" = "#ed8936";
+    "bg-color-rating-40plus" = "#ed8936";
+    "bg-color-rating-40less" = "#f56565";
+    "color-rating-90plus" = "#f8f8f9";
+    "color-rating-85plus" = "#f8f8f9";
+    "color-rating-80plus" = "#f8f8f9";
+    "color-rating-75plus" = "#f8f8f9";
+    "color-rating-70plus" = "#f8f8f9";
+    "color-rating-65plus" = "#f8f8f9";
+    "color-rating-60plus" = "#f8f8f9";
+    "color-rating-55plus" = "#f8f8f9";
+    "color-rating-50plus" = "#f8f8f9";
+    "color-rating-45plus" = "#f8f8f9";
+    "color-rating-40plus" = "#f8f8f9";
+    "color-rating-40less" = "#f8f8f9";
+    constructor(data) {
+        data && data?.settings && this.loadFromConfig(data.settings);
+    }
+    loadFromConfig(config) {
+        for (const { id, value } of config) {
+            if (id in this) {
+                this[id] = value;
+            }
+        }
+    }
+    getColorPair(rating) {
+        const thresholds = [90, 85, 80, 75, 70, 65, 60, 55, 50, 45, 40];
+        const matched = thresholds.find((t) => rating >= t);
+        const suffix = matched !== undefined ? `${matched}plus` : "40less";
+        const bgKey = `bg-color-rating-${suffix}`;
+        const colorKey = `color-rating-${suffix}`;
+        return [this[bgKey], this[colorKey]];
+    }
+}
+function handleUserData(data) {
+    window.userData = new User(data);
+}
+
+
 /***/ })
 
 /******/ 	});
@@ -825,22 +870,25 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _pages_player__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./pages/player */ "./src/pages/player.ts");
 /* harmony import */ var _navigation_handler__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./navigation-handler */ "./src/navigation-handler.ts");
 /* harmony import */ var _pages_roster__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./pages/roster */ "./src/pages/roster.ts");
+/* harmony import */ var _user__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./user */ "./src/user.ts");
+
 
 
 
 (function () {
     (0,_navigation_handler__WEBPACK_IMPORTED_MODULE_1__.initNavigationHandler)(); // Initialize Observer from script context
+    window.userData = new _user__WEBPACK_IMPORTED_MODULE_3__.User(); // Initialize User Object with default settings, probably not needed but fixes some load inconsistencies
     const URL_HANDLERS = {
         player: {
             pattern: /\/api\/player\/[^\/]+$/,
             handler: (data) => {
-                (0,_pages_player__WEBPACK_IMPORTED_MODULE_0__.handlePlayerData)(data);
+                (0,_pages_player__WEBPACK_IMPORTED_MODULE_0__.handlePlayerData)(data.data);
             },
         },
         roster: {
             pattern: /\/api\/team\/[^\/]+\/roster/,
             handler: (data) => {
-                (0,_pages_roster__WEBPACK_IMPORTED_MODULE_2__.handleRosterData)(data);
+                (0,_pages_roster__WEBPACK_IMPORTED_MODULE_2__.handleRosterData)(data.data);
             },
         },
         draftClass: {
@@ -848,6 +896,12 @@ __webpack_require__.r(__webpack_exports__);
             handler: (data, url) => {
                 console.log(data);
                 console.log(url);
+            },
+        },
+        userInfo: {
+            pattern: /\/api\/user$/,
+            handler: (data) => {
+                (0,_user__WEBPACK_IMPORTED_MODULE_3__.handleUserData)(data);
             },
         },
     };
@@ -874,7 +928,7 @@ __webpack_require__.r(__webpack_exports__);
                 this.onreadystatechange = function () {
                     if (this.readyState === 4 && this.status === 200) {
                         try {
-                            const { data } = JSON.parse(this.responseText);
+                            const data = JSON.parse(this.responseText);
                             handler(data, url);
                         }
                         catch (e) {

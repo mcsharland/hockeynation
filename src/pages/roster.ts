@@ -54,8 +54,8 @@ class RosterStatsVisualizer {
   private minHeaderCell: HTMLTableCellElement | null = null;
   private maxHeaderCell: HTMLTableCellElement | null = null;
   private selectElement: HTMLSelectElement | null = null;
-  // private sortColumn: "min-ovr" | "max-ovr" | null = null;
-  // private sortAscending: boolean = true;
+  private sortColumn: "min-ovr" | "max-ovr" | null = null;
+  private sortAscending: boolean = true;
 
   constructor(roster: Roster, parentNode: HTMLElement) {
     this.roster = roster;
@@ -115,13 +115,13 @@ class RosterStatsVisualizer {
     this.footer = this.parent.querySelector(`table tfoot tr`);
     this.tbody = this.parent.querySelector("table tbody");
 
-    // const headerElements = this.header?.querySelectorAll(`th`);
-    // headerElements?.forEach((node) =>
-    //   node.addEventListener("click", () => {
-    //     this.sortColumn = null;
-    //     this.sortAscending = false;
-    //   }),
-    // );
+    const headerElements = this.header?.querySelectorAll(`th`);
+    headerElements?.forEach((node) =>
+      node.addEventListener("click", () => {
+        this.sortColumn = null;
+        this.sortAscending = false;
+      }),
+    );
 
     const rows = this.parent.querySelectorAll(`tbody tr`);
     const dr = {} as DataRow;
@@ -139,6 +139,7 @@ class RosterStatsVisualizer {
     this.dataRows = dr;
   }
 
+  // needs to be fixed
   private getRosterAvgOvr(ovrType: OvrType): number {
     const statFunction = {
       Default: (player: Player) => player.getStats(),
@@ -166,19 +167,12 @@ class RosterStatsVisualizer {
     ratingSpan.classList.add("badge");
     ratingSpan.style.color = "#f8f8f9";
     ratingSpan.style.userSelect = "none";
-    let bgColor = "";
-    if (ovr <= 39) {
-      bgColor = "#f56565";
-    } else if (ovr >= 40 && ovr <= 54) {
-      bgColor = "#ed8936";
-    } else if (ovr >= 55 && ovr <= 69) {
-      bgColor = "#1995AD";
-    } else if (ovr >= 70 && ovr <= 79) {
-      bgColor = "#10b981";
-    } else if (ovr >= 80) {
-      bgColor = "#383839";
+
+    if (window.userData) {
+      const [bgColor, color] = window.userData.getColorPair(ovr);
+      ratingSpan.style.backgroundColor = bgColor;
+      ratingSpan.style.color = color;
     }
-    ratingSpan.style.backgroundColor = bgColor;
     ratingSpan.innerText = ovr.toString();
 
     return ratingSpan;
@@ -269,7 +263,6 @@ class RosterStatsVisualizer {
       return;
 
     // delete old columns
-
     this.parent
       .querySelectorAll(`[data-column]`)
       .forEach((node) => node.remove());
