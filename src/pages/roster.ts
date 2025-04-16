@@ -139,44 +139,60 @@ class RosterStatsVisualizer {
     this.dataRows = dr;
   }
 
-  // needs to be fixed
   private getRosterAvgOvr(ovrType: OvrType): number {
-    const statFunction = {
-      Default: (player: Player) => player.getStats(),
-      Min: (player: Player) => player.getMinStats(),
-      Max: (player: Player) => player.getMaxStats(),
+    const playerOvr = {
+      Default: (player: Player) => player.getOvr(),
+      Min: (player: Player) => player.getMinOvr(),
+      Max: (player: Player) => player.getMaxOvr(),
     };
     const players = this.roster.getAllPlayers();
-    return Math.round(
-      Object.values(players)
-        .map((player) => player.calculateOVR(statFunction[ovrType](player)))
-        .reduce((sum, value, _, array) => sum + value / array.length, 0),
-    );
+
+    const values = Object.values(players)
+      .filter((player) => !player.getIsScout() || player.getOvr())
+      .map((player) => playerOvr[ovrType](player));
+    console.log(values);
+
+    return values.length
+      ? Math.round(
+          values.reduce(
+            (sum, value, _, array) => sum + value / array.length,
+            0,
+          ),
+        )
+      : 0;
   }
 
-  private getRowPlayerName(row: HTMLTableRowElement): [string, string] {
-    const fullName = row
-      .querySelector(`a.player-link span`)
-      ?.textContent?.trim();
-    const [firstname = "", lastname = ""] = fullName?.split(" ") ?? [];
-    return [firstname, lastname];
-  }
-
-  private createRatingSpan(ovr: number): HTMLSpanElement {
+  private createRatingSpan(ovr: number, scout: boolean): HTMLSpanElement {
     const ratingSpan: HTMLSpanElement = document.createElement("span");
-    ratingSpan.classList.add("badge");
-    ratingSpan.style.color = "#f8f8f9";
-    ratingSpan.style.userSelect = "none";
+    if (scout && !ovr) {
+      ratingSpan.classList.add("question-mark");
+      ratingSpan.innerText = "?";
+      ratingSpan.style.color = "#bcbabe";
+    } else {
+      ratingSpan.classList.add("badge");
+      if (window.userData) {
+        ratingSpan.style.color = window.userData.getColorPair(ovr)[1];
+      }
+      ratingSpan.style.userSelect = "none";
 
-    if (window.userData) {
-      const [bgColor, color] = window.userData.getColorPair(ovr);
-      ratingSpan.style.backgroundColor = bgColor;
-      ratingSpan.style.color = color;
+      if (window.userData) {
+        const [bgColor, color] = window.userData.getColorPair(ovr);
+        ratingSpan.style.backgroundColor = bgColor;
+        ratingSpan.style.color = color;
+      }
+      ratingSpan.innerText = ovr.toString();
     }
-    ratingSpan.innerText = ovr.toString();
 
     return ratingSpan;
   }
+
+  // private getRowPlayerName(row: HTMLTableRowElement): [string, string] {
+  //   const fullName = row
+  //     .querySelector(`a.player-link span`)
+  //     ?.textContent?.trim();
+  //   const [firstname = "", lastname = ""] = fullName?.split(" ") ?? [];
+  //   return [firstname, lastname];
+  // }
 
   // private addSorting(): void {
   //   if (!this.minHeaderCell || !this.maxHeaderCell) return;
@@ -216,8 +232,8 @@ class RosterStatsVisualizer {
 
   //     const ovrValue = player
   //       ? this.sortColumn === "min-ovr"
-  //         ? player.calculateOVR(player.getMinStats())
-  //         : player.calculateOVR(player.getMaxStats())
+  //         ? player.getMinOvr()
+  //         : player.getMaxOvr()
   //       : 0;
 
   //     const [firstName, lastName] = this.getRowPlayerName(row);
@@ -276,7 +292,7 @@ class RosterStatsVisualizer {
       minDataCell.dataset.column = "min-ovr";
 
       minDataCell.appendChild(
-        this.createRatingSpan(player.calculateOVR(player.getMinStats())),
+        this.createRatingSpan(player.getMinOvr(), player.getIsScout()),
       );
 
       const maxDataCell = document.createElement("td");
@@ -284,7 +300,7 @@ class RosterStatsVisualizer {
       maxDataCell.dataset.column = "max-ovr";
 
       maxDataCell.appendChild(
-        this.createRatingSpan(player.calculateOVR(player.getMaxStats())),
+        this.createRatingSpan(player.getMaxOvr(), player.getIsScout()),
       );
 
       row.insertBefore(minDataCell, null);
@@ -311,7 +327,7 @@ class RosterStatsVisualizer {
     minFooterCell.dataset.column = "min-ovr";
 
     minFooterCell.appendChild(
-      this.createRatingSpan(this.getRosterAvgOvr("Min")),
+      this.createRatingSpan(this.getRosterAvgOvr("Min"), false),
     );
 
     const maxFooterCell = document.createElement("td");
@@ -319,7 +335,7 @@ class RosterStatsVisualizer {
     maxFooterCell.dataset.column = "max-ovr";
 
     maxFooterCell.appendChild(
-      this.createRatingSpan(this.getRosterAvgOvr("Max")),
+      this.createRatingSpan(this.getRosterAvgOvr("Max"), false),
     );
 
     this.footer.insertBefore(minFooterCell, null);

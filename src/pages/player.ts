@@ -24,10 +24,13 @@ interface PlayerStats {
 }
 
 export class Player {
-  public stats: Stats;
-  public minStats: Stats;
-  public maxStats: Stats;
-  public isScout: boolean;
+  private stats: Stats;
+  private minStats: Stats;
+  private maxStats: Stats;
+  private isScout: boolean;
+  private ovr: number;
+  private minOvr: number;
+  private maxOvr: number;
 
   constructor(data: any) {
     const player = this.parsePlayerData(data);
@@ -35,13 +38,16 @@ export class Player {
     this.isScout = player.scout;
     this.minStats = this.calcMinStats(this.stats);
     this.maxStats = this.calcMaxStats(this.stats);
+    this.ovr = data?.rating ?? 0;
+    this.minOvr = this.calculateOVR(this.minStats);
+    this.maxOvr = this.calculateOVR(this.maxStats);
   }
 
   private parsePlayerData(data: any): PlayerStats {
     const player = {} as PlayerStats;
     player.stats = {};
 
-    player.scout = data.skills.some((skill: any) => skill?.hidden ?? false);
+    player.scout = data.skills.every((skill: any) => skill?.hidden ?? false);
 
     for (const s of data.skills) {
       player.stats[s.id] = {
@@ -163,11 +169,23 @@ export class Player {
     return this.maxStats;
   }
 
-  // TODO:
-  // Needs to be improved for scout players. Full hidden players need to not have a calculated OVR / be treated special so that roster page calculations work fine
-  // Look at playerdata.canScout & scoutedTimes
+  public getIsScout(): boolean {
+    return this.isScout;
+  }
 
-  public calculateOVR(stats: Stats): number {
+  public getOvr(): number {
+    return this.ovr;
+  }
+  public getMaxOvr(): number {
+    return Math.max(this.maxOvr, this.ovr); // handles cases where ovr is known through scouting, but stats are unknown
+  }
+
+  public getMinOvr(): number {
+    return Math.max(this.minOvr, this.ovr);
+  }
+
+  private calculateOVR(stats: Stats): number {
+    if (this.isScout) return 0;
     const statsValues = Object.values(stats);
     const sum = statsValues.reduce(
       (acc: number, stat: Stat) => acc + stat.rating,
@@ -185,12 +203,10 @@ export class Player {
   }
 }
 
-// TODO: create user class to seed colors for OVR
 class PlayerStatsVisualizer {
   private playerStats: Player;
   private parentNode: HTMLElement;
   private ovrElement: HTMLElement | null = null;
-  private baseOVR: string | null = null;
   private statsTable: HTMLTableElement | null = null;
   private statsRows: NodeListOf<HTMLTableRowElement> | null = null;
 
@@ -207,7 +223,6 @@ class PlayerStatsVisualizer {
       return;
     }
 
-    // this.statsTable = ancestor as HTMLTableElement | null;
     this.statsTable = puck.closest(`tbody`) as HTMLTableElement | null;
     if (!this.statsTable) {
       return;
@@ -223,7 +238,6 @@ class PlayerStatsVisualizer {
     // get OVR element
     this.ovrElement =
       this.parentNode.querySelector<HTMLElement>(".polygon text");
-    this.baseOVR = this.ovrElement ? this.ovrElement.textContent : null;
 
     // add dropdown to skills header
     this.addDropdown();
@@ -275,17 +289,15 @@ class PlayerStatsVisualizer {
     div.appendChild(dropdown);
   }
 
-  // TODO: Check user class to determine if number should be rendered
-  // might be able to simplify this simply by checking if element to set the number exist
   private updateHockeyPucks(option: string): void {
     if (!this.statsRows) return;
 
     const statsToUse =
       option === "Min"
-        ? this.playerStats.minStats
+        ? this.playerStats.getMinStats()
         : option === "Max"
-          ? this.playerStats.maxStats
-          : this.playerStats.stats;
+          ? this.playerStats.getMaxStats()
+          : this.playerStats.getStats();
 
     this.statsRows.forEach((row) => {
       const statName =
@@ -295,7 +307,7 @@ class PlayerStatsVisualizer {
         pucksCell.querySelectorAll<SVGElement>("svg.fa-hockey-puck");
       const ratingCell = row.cells[2];
       const ratingSpan = ratingCell?.querySelector("span");
-      const baseStat = this.playerStats.stats[statName];
+      const baseStat = this.playerStats.getStats()[statName];
       const displayStat = statsToUse[statName];
 
       if (baseStat && displayStat) {
@@ -325,15 +337,17 @@ class PlayerStatsVisualizer {
     });
 
     // update OVR
-    let ovr = this.playerStats.calculateOVR(statsToUse);
+    const ovr =
+      option === "Min"
+        ? this.playerStats.getMinOvr()
+        : option === "Max"
+          ? this.playerStats.getMaxOvr()
+          : this.playerStats.getOvr();
 
-    // TODO:
-    // This is the only time that isScout is used, and it is a fail safe for OVR calculations where stats are missing.
-    // The other thing that I can think of, is that MIN OVR should be calculate as the min of the resulting value and the default
-    if (option !== "Default" || !this.playerStats.isScout) {
+    if (option !== "Default" || !this.playerStats.getIsScout()) {
       this.updateOVR(ovr);
-    } else if (this.baseOVR !== null) {
-      this.updateOVR(parseInt(this.baseOVR));
+    } else if (this.playerStats.getOvr() !== 0) {
+      this.updateOVR(this.playerStats.getOvr());
     }
   }
 

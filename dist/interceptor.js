@@ -181,17 +181,23 @@ class Player {
     minStats;
     maxStats;
     isScout;
+    ovr;
+    minOvr;
+    maxOvr;
     constructor(data) {
         const player = this.parsePlayerData(data);
         this.stats = player.stats;
         this.isScout = player.scout;
         this.minStats = this.calcMinStats(this.stats);
         this.maxStats = this.calcMaxStats(this.stats);
+        this.ovr = data?.rating ?? 0;
+        this.minOvr = this.calculateOVR(this.minStats);
+        this.maxOvr = this.calculateOVR(this.maxStats);
     }
     parsePlayerData(data) {
         const player = {};
         player.stats = {};
-        player.scout = data.skills.some((skill) => skill?.hidden ?? false);
+        player.scout = data.skills.every((skill) => skill?.hidden ?? false);
         for (const s of data.skills) {
             player.stats[s.id] = {
                 rating: parseInt(s?.lvl ?? 0),
@@ -287,10 +293,25 @@ class Player {
     getMaxStats() {
         return this.maxStats;
     }
+    getIsScout() {
+        return this.isScout;
+    }
     // TODO:
     // Needs to be improved for scout players. Full hidden players need to not have a calculated OVR / be treated special so that roster page calculations work fine
     // Look at playerdata.canScout & scoutedTimes
+    getOvr() {
+        return this.ovr;
+    }
+    getMaxOvr() {
+        return Math.max(this.maxOvr, this.ovr); // handles cases where ovr is known through scouting, but stats are unknown
+    }
+    getMinOvr() {
+        return Math.max(this.minOvr, this.ovr);
+    }
+    // probably make this private
     calculateOVR(stats) {
+        if (this.isScout)
+            return 0;
         const statsValues = Object.values(stats);
         const sum = statsValues.reduce((acc, stat) => acc + stat.rating, 0);
         const avg = sum / statsValues.length;
@@ -305,7 +326,6 @@ class PlayerStatsVisualizer {
     playerStats;
     parentNode;
     ovrElement = null;
-    baseOVR = null;
     statsTable = null;
     statsRows = null;
     constructor(playerStats, parentNode) {
@@ -318,7 +338,6 @@ class PlayerStatsVisualizer {
         if (!puck) {
             return;
         }
-        // this.statsTable = ancestor as HTMLTableElement | null;
         this.statsTable = puck.closest(`tbody`);
         if (!this.statsTable) {
             return;
@@ -332,7 +351,6 @@ class PlayerStatsVisualizer {
         // get OVR element
         this.ovrElement =
             this.parentNode.querySelector(".polygon text");
-        this.baseOVR = this.ovrElement ? this.ovrElement.textContent : null;
         // add dropdown to skills header
         this.addDropdown();
         // initialize display
@@ -381,17 +399,17 @@ class PlayerStatsVisualizer {
         if (!this.statsRows)
             return;
         const statsToUse = option === "Min"
-            ? this.playerStats.minStats
+            ? this.playerStats.getMinStats()
             : option === "Max"
-                ? this.playerStats.maxStats
-                : this.playerStats.stats;
+                ? this.playerStats.getMaxStats()
+                : this.playerStats.getStats();
         this.statsRows.forEach((row) => {
             const statName = _mappings_skill_mappings__WEBPACK_IMPORTED_MODULE_0__.SKILL_NAME_TO_ID[row.cells[0]?.textContent?.trim() || ""];
             const pucksCell = row.cells[1];
             const pucks = pucksCell.querySelectorAll("svg.fa-hockey-puck");
             const ratingCell = row.cells[2];
             const ratingSpan = ratingCell?.querySelector("span");
-            const baseStat = this.playerStats.stats[statName];
+            const baseStat = this.playerStats.getStats()[statName];
             const displayStat = statsToUse[statName];
             if (baseStat && displayStat) {
                 pucks.forEach((puck, index) => {
@@ -419,15 +437,22 @@ class PlayerStatsVisualizer {
             }
         });
         // update OVR
-        let ovr = this.playerStats.calculateOVR(statsToUse);
+        const ovr = option === "Min"
+            ? this.playerStats.getMinOvr()
+            : option === "Max"
+                ? this.playerStats.getMaxOvr()
+                : this.playerStats.getOvr();
         // TODO:
         // This is the only time that isScout is used, and it is a fail safe for OVR calculations where stats are missing.
         // The other thing that I can think of, is that MIN OVR should be calculate as the min of the resulting value and the default
-        if (option !== "Default" || !this.playerStats.isScout) {
+        // // the logic in the original stil calculated stats for scouts as long as the OVR element wasn't null
+        // i think that its more crucial to check if all values are hidden, since there no other reliable way to determine if someone
+        // is fully hidden from the user just looking at the player data, at least within the roster. More reliable to just check if all stats are hidden
+        if (option !== "Default" || !this.playerStats.getIsScout()) {
             this.updateOVR(ovr);
         }
-        else if (this.baseOVR !== null) {
-            this.updateOVR(parseInt(this.baseOVR));
+        else if (this.playerStats.getOvr() !== 0) {
+            this.updateOVR(this.playerStats.getOvr());
         }
     }
     updateOVR(ovr) {
@@ -577,38 +602,50 @@ class RosterStatsVisualizer {
         });
         this.dataRows = dr;
     }
-    // needs to be fixed
     getRosterAvgOvr(ovrType) {
-        const statFunction = {
-            Default: (player) => player.getStats(),
-            Min: (player) => player.getMinStats(),
-            Max: (player) => player.getMaxStats(),
+        const playerOvr = {
+            Default: (player) => player.getOvr(),
+            Min: (player) => player.getMinOvr(),
+            Max: (player) => player.getMaxOvr(),
         };
         const players = this.roster.getAllPlayers();
-        return Math.round(Object.values(players)
-            .map((player) => player.calculateOVR(statFunction[ovrType](player)))
-            .reduce((sum, value, _, array) => sum + value / array.length, 0));
+        const values = Object.values(players)
+            .filter((player) => !player.getIsScout() || player.getOvr())
+            .map((player) => playerOvr[ovrType](player));
+        console.log(values);
+        return values.length
+            ? Math.round(values.reduce((sum, value, _, array) => sum + value / array.length, 0))
+            : 0;
     }
-    getRowPlayerName(row) {
-        const fullName = row
-            .querySelector(`a.player-link span`)
-            ?.textContent?.trim();
-        const [firstname = "", lastname = ""] = fullName?.split(" ") ?? [];
-        return [firstname, lastname];
-    }
-    createRatingSpan(ovr) {
+    createRatingSpan(ovr, scout) {
         const ratingSpan = document.createElement("span");
-        ratingSpan.classList.add("badge");
-        ratingSpan.style.color = "#f8f8f9";
-        ratingSpan.style.userSelect = "none";
-        if (window.userData) {
-            const [bgColor, color] = window.userData.getColorPair(ovr);
-            ratingSpan.style.backgroundColor = bgColor;
-            ratingSpan.style.color = color;
+        if (scout && !ovr) {
+            ratingSpan.classList.add("question-mark");
+            ratingSpan.innerText = "?";
+            ratingSpan.style.color = "#bcbabe";
         }
-        ratingSpan.innerText = ovr.toString();
+        else {
+            ratingSpan.classList.add("badge");
+            if (window.userData) {
+                ratingSpan.style.color = window.userData.getColorPair(ovr)[1];
+            }
+            ratingSpan.style.userSelect = "none";
+            if (window.userData) {
+                const [bgColor, color] = window.userData.getColorPair(ovr);
+                ratingSpan.style.backgroundColor = bgColor;
+                ratingSpan.style.color = color;
+            }
+            ratingSpan.innerText = ovr.toString();
+        }
         return ratingSpan;
     }
+    // private getRowPlayerName(row: HTMLTableRowElement): [string, string] {
+    //   const fullName = row
+    //     .querySelector(`a.player-link span`)
+    //     ?.textContent?.trim();
+    //   const [firstname = "", lastname = ""] = fullName?.split(" ") ?? [];
+    //   return [firstname, lastname];
+    // }
     // private addSorting(): void {
     //   if (!this.minHeaderCell || !this.maxHeaderCell) return;
     //   // min ovr sorting
@@ -640,8 +677,8 @@ class RosterStatsVisualizer {
     //     const player = this.roster.getPlayer(playerId);
     //     const ovrValue = player
     //       ? this.sortColumn === "min-ovr"
-    //         ? player.calculateOVR(player.getMinStats())
-    //         : player.calculateOVR(player.getMaxStats())
+    //         ? player.getMinOvr()
+    //         : player.getMaxOvr()
     //       : 0;
     //     const [firstName, lastName] = this.getRowPlayerName(row);
     //     return {
@@ -688,11 +725,11 @@ class RosterStatsVisualizer {
             const minDataCell = document.createElement("td");
             minDataCell.className = "md:px-4 px-2 py-2 text-center";
             minDataCell.dataset.column = "min-ovr";
-            minDataCell.appendChild(this.createRatingSpan(player.calculateOVR(player.getMinStats())));
+            minDataCell.appendChild(this.createRatingSpan(player.getMinOvr(), player.getIsScout()));
             const maxDataCell = document.createElement("td");
             maxDataCell.className = "md:px-4 px-2 py-2 text-center";
             maxDataCell.dataset.column = "max-ovr";
-            maxDataCell.appendChild(this.createRatingSpan(player.calculateOVR(player.getMaxStats())));
+            maxDataCell.appendChild(this.createRatingSpan(player.getMaxOvr(), player.getIsScout()));
             row.insertBefore(minDataCell, null);
             row.insertBefore(maxDataCell, null);
         });
@@ -711,11 +748,11 @@ class RosterStatsVisualizer {
         const minFooterCell = document.createElement("td");
         minFooterCell.className = "md:px-4 px-2 py-2";
         minFooterCell.dataset.column = "min-ovr";
-        minFooterCell.appendChild(this.createRatingSpan(this.getRosterAvgOvr("Min")));
+        minFooterCell.appendChild(this.createRatingSpan(this.getRosterAvgOvr("Min"), false));
         const maxFooterCell = document.createElement("td");
         maxFooterCell.className = "md:px-4 px-2 py-2";
         maxFooterCell.dataset.column = "max-ovr";
-        maxFooterCell.appendChild(this.createRatingSpan(this.getRosterAvgOvr("Max")));
+        maxFooterCell.appendChild(this.createRatingSpan(this.getRosterAvgOvr("Max"), false));
         this.footer.insertBefore(minFooterCell, null);
         this.footer.insertBefore(maxFooterCell, null);
         // this.addSorting();
@@ -753,6 +790,11 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   User: () => (/* binding */ User),
 /* harmony export */   handleUserData: () => (/* binding */ handleUserData)
 /* harmony export */ });
+/*
+This could be improved by also intercepting calls to settings api, and updating colors in the class as the user updates them
+This is because the settings object isn't sent again after colors are updated, making class colors slightly outdated
+Is resolved on a refresh though
+*/
 class User {
     "bg-color-rating-90plus" = "#383839";
     "bg-color-rating-85plus" = "#383839";
