@@ -75,7 +75,7 @@ class RosterStatsVisualizer {
     this.onGeneralPage = this.generalButton.classList.contains("active");
 
     // this.skillsButton =
-    this.generalButton.addEventListener("click", async (event) => {
+    this.generalButton.addEventListener("click", (event) => {
       if (this.onGeneralPage) return;
       this.onGeneralPage = true;
 
@@ -150,7 +150,6 @@ class RosterStatsVisualizer {
     const values = Object.values(players)
       .filter((player) => !player.getIsScout() || player.getOvr())
       .map((player) => playerOvr[ovrType](player));
-    console.log(values);
 
     return values.length
       ? Math.round(
@@ -351,12 +350,12 @@ export function handleRosterData(data: any) {
   window.dispatchEvent(event);
 }
 
-export function manipulateRosterPage(table: HTMLElement) {
+export function manipulateRosterPage(el: HTMLElement) {
   if (window.rosterData) {
-    new RosterStatsVisualizer(window.rosterData, table);
+    new RosterStatsVisualizer(window.rosterData, el);
   } else {
     const handler = () => {
-      new RosterStatsVisualizer(window.rosterData!, table);
+      new RosterStatsVisualizer(window.rosterData!, el);
       window.removeEventListener("rosterDataReady", handler);
     };
     window.addEventListener("rosterDataReady", handler);

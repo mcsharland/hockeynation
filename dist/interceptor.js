@@ -44,8 +44,10 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   initNavigationHandler: () => (/* binding */ initNavigationHandler)
 /* harmony export */ });
 /* harmony import */ var _observer_handler__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./observer-handler */ "./src/observer-handler.ts");
-/* harmony import */ var _pages_player__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./pages/player */ "./src/pages/player.ts");
-/* harmony import */ var _pages_roster__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./pages/roster */ "./src/pages/roster.ts");
+/* harmony import */ var _pages_draft_class__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./pages/draft-class */ "./src/pages/draft-class.ts");
+/* harmony import */ var _pages_player__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./pages/player */ "./src/pages/player.ts");
+/* harmony import */ var _pages_roster__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./pages/roster */ "./src/pages/roster.ts");
+
 
 
 
@@ -53,15 +55,22 @@ const PAGE_HANDLERS = {
     player: {
         url: "https://hockey-nation.com/player",
         selector: "table tbody tr",
-        handler: (table) => {
-            (0,_pages_player__WEBPACK_IMPORTED_MODULE_1__.manipulatePlayerPage)(table);
+        handler: (el) => {
+            (0,_pages_player__WEBPACK_IMPORTED_MODULE_2__.manipulatePlayerPage)(el);
         },
     },
     roster: {
         url: "https://hockey-nation.com/club/roster",
         selector: "table tbody tr",
-        handler: (table) => {
-            (0,_pages_roster__WEBPACK_IMPORTED_MODULE_2__.manipulateRosterPage)(table);
+        handler: (el) => {
+            (0,_pages_roster__WEBPACK_IMPORTED_MODULE_3__.manipulateRosterPage)(el);
+        },
+    },
+    draftClass: {
+        url: "https://hockey-nation.com/office/draft-center",
+        selector: ".stats-container",
+        handler: (el) => {
+            (0,_pages_draft_class__WEBPACK_IMPORTED_MODULE_1__.manipulateDraftClassPage)(el);
         },
     },
 };
@@ -156,6 +165,161 @@ class ObserverManager {
             this.observer.disconnect();
             this.observer = null;
         }
+    }
+}
+
+
+/***/ }),
+
+/***/ "./src/pages/draft-class.ts":
+/*!**********************************!*\
+  !*** ./src/pages/draft-class.ts ***!
+  \**********************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   handleDraftClassData: () => (/* binding */ handleDraftClassData),
+/* harmony export */   manipulateDraftClassPage: () => (/* binding */ manipulateDraftClassPage)
+/* harmony export */ });
+/* harmony import */ var _roster__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./roster */ "./src/pages/roster.ts");
+
+class DraftClassVisualizer {
+    parent;
+    draftClass;
+    draftCards = null;
+    constructor(draftClass, el) {
+        this.draftClass = draftClass;
+        this.parent = el;
+        this.initialize();
+        window.addEventListener("draftClassDataUpdated", () => {
+            if (window.draftClassData) {
+                this.draftClass = window.draftClassData;
+            }
+        });
+    }
+    initialize() {
+        document
+            .querySelectorAll(`.btn-toggle`)[1]
+            .addEventListener("click", (event) => {
+            this.initializeReferences();
+        });
+        this.initializeReferences();
+        // select pagination buttons
+        const buttons = Array.from(this.parent.querySelectorAll("button")).filter((btn) => {
+            // select top buttons matching pattern
+            const hasMatchingSpan = Array.from(btn.querySelectorAll("span")).some((span) => /^(1|21|41|61|81)-\d+$/.test(span.textContent?.trim() ?? ""));
+            // select buttom buttons matching pattern because theyre different for some reason
+            const buttonText = btn.childNodes.length > 0
+                ? Array.from(btn.childNodes)
+                    .filter((node) => node.nodeType === Node.TEXT_NODE)
+                    .map((node) => node.textContent?.trim())
+                    .join("")
+                : "";
+            const hasMatchingDirectText = /^(1|21|41|61|81)-\d+$/.test(buttonText);
+            return hasMatchingSpan || hasMatchingDirectText;
+        });
+        buttons.forEach((button) => {
+            button.addEventListener("click", (event) => {
+                this.initializeReferences();
+            });
+        });
+        this.parent.querySelectorAll("select").forEach((menu) => {
+            menu.addEventListener("change", (event) => {
+                const observer = new MutationObserver((mutations) => {
+                    const hasRelevantChanges = mutations.some((mutation) => mutation.addedNodes.length > 0 &&
+                        Array.from(mutation.addedNodes).some((node) => node.nodeType === Node.ELEMENT_NODE &&
+                            node.querySelector('[id^="draftee-card"]')));
+                    if (hasRelevantChanges) {
+                        this.initializeReferences();
+                        // disconnect if changes found
+                        observer.disconnect();
+                    }
+                });
+                observer.observe(this.parent, {
+                    childList: true,
+                    subtree: true,
+                });
+                setTimeout(() => {
+                    observer.disconnect();
+                }, 3000);
+            });
+        });
+    }
+    initializeReferences() {
+        const rows = this.parent.querySelectorAll("[id^='draftee-card']");
+        const dc = {};
+        rows.forEach((row) => {
+            const card = row;
+            const badge = row.querySelector(".badge");
+            if (!badge)
+                return;
+            const playerId = row
+                .querySelector(`a[href^='/player/']`)
+                ?.getAttribute("href")
+                ?.split("/")
+                .pop();
+            if (!playerId)
+                return;
+            dc[playerId] = card;
+        });
+        this.draftCards = dc;
+        this.addBadges();
+    }
+    addBadges() {
+        if (!this.draftCards)
+            return;
+        Object.entries(this.draftCards).forEach(([playerId, card]) => {
+            if (card.getAttribute("data-ovr-badges-added") === "true")
+                return;
+            const badge = card.querySelector(`.badge`);
+            if (!badge)
+                return;
+            const player = this.draftClass.getPlayer(playerId);
+            if (!player)
+                return;
+            card.setAttribute("data-ovr-badges-added", "true");
+            badge.parentElement?.insertBefore(this.createOvrLabelSpan("MIN"), null);
+            badge.parentElement?.insertBefore(this.createRatingSpan(player.getMinOvr()), null);
+            badge.parentElement?.insertBefore(this.createOvrLabelSpan("MAX"), null);
+            badge.parentElement?.insertBefore(this.createRatingSpan(player.getMaxOvr()), null);
+        });
+    }
+    createOvrLabelSpan(text) {
+        const label = document.createElement("span");
+        label.classList.add("uppercase", "ml-3", "xs:inline-block", "hidden");
+        label.innerText = text;
+        return label;
+    }
+    createRatingSpan(ovr) {
+        const ratingSpan = document.createElement("span");
+        ratingSpan.classList.add("badge", "ml-1");
+        ratingSpan.style.userSelect = "none";
+        if (window.userData) {
+            ratingSpan.style.backgroundColor = window.userData.getColorPair(ovr)[0];
+            ratingSpan.style.color = window.userData.getColorPair(ovr)[1];
+        }
+        ratingSpan.innerText = ovr.toString();
+        return ratingSpan;
+    }
+}
+function handleDraftClassData(data) {
+    const isUpdate = !!window.draftClassData; // check if this is an update
+    window.draftClassData = new _roster__WEBPACK_IMPORTED_MODULE_0__.Roster({ ...data, players: data.draftees });
+    const eventName = isUpdate ? "draftClassDataUpdated" : "draftClassDataReady";
+    const event = new CustomEvent(eventName);
+    window.dispatchEvent(event);
+}
+function manipulateDraftClassPage(el) {
+    if (window.draftClassData) {
+        new DraftClassVisualizer(window.draftClassData, el);
+    }
+    else {
+        const handler = () => {
+            new DraftClassVisualizer(window.draftClassData, el);
+            window.removeEventListener("draftClassDataReady", handler);
+        };
+        window.addEventListener("draftClassDataReady", handler);
     }
 }
 
@@ -296,9 +460,6 @@ class Player {
     getIsScout() {
         return this.isScout;
     }
-    // TODO:
-    // Needs to be improved for scout players. Full hidden players need to not have a calculated OVR / be treated special so that roster page calculations work fine
-    // Look at playerdata.canScout & scoutedTimes
     getOvr() {
         return this.ovr;
     }
@@ -308,7 +469,6 @@ class Player {
     getMinOvr() {
         return Math.max(this.minOvr, this.ovr);
     }
-    // probably make this private
     calculateOVR(stats) {
         if (this.isScout)
             return 0;
@@ -321,7 +481,6 @@ class Player {
         return Math.round(correctedAverage * 10);
     }
 }
-// TODO: create user class to seed colors for OVR
 class PlayerStatsVisualizer {
     playerStats;
     parentNode;
@@ -393,8 +552,6 @@ class PlayerStatsVisualizer {
         });
         div.appendChild(dropdown);
     }
-    // TODO: Check user class to determine if number should be rendered
-    // might be able to simplify this simply by checking if element to set the number exist
     updateHockeyPucks(option) {
         if (!this.statsRows)
             return;
@@ -442,12 +599,6 @@ class PlayerStatsVisualizer {
             : option === "Max"
                 ? this.playerStats.getMaxOvr()
                 : this.playerStats.getOvr();
-        // TODO:
-        // This is the only time that isScout is used, and it is a fail safe for OVR calculations where stats are missing.
-        // The other thing that I can think of, is that MIN OVR should be calculate as the min of the resulting value and the default
-        // // the logic in the original stil calculated stats for scouts as long as the OVR element wasn't null
-        // i think that its more crucial to check if all values are hidden, since there no other reliable way to determine if someone
-        // is fully hidden from the user just looking at the player data, at least within the roster. More reliable to just check if all stats are hidden
         if (option !== "Default" || !this.playerStats.getIsScout()) {
             this.updateOVR(ovr);
         }
@@ -473,13 +624,13 @@ function handlePlayerData(data) {
     const event = new CustomEvent("playerDataReady");
     window.dispatchEvent(event);
 }
-function manipulatePlayerPage(table) {
+function manipulatePlayerPage(el) {
     if (window.playerData) {
-        new PlayerStatsVisualizer(window.playerData, table);
+        new PlayerStatsVisualizer(window.playerData, el);
     }
     else {
         const handler = () => {
-            new PlayerStatsVisualizer(window.playerData, table);
+            new PlayerStatsVisualizer(window.playerData, el);
             window.removeEventListener("playerDataReady", handler);
         };
         window.addEventListener("playerDataReady", handler);
@@ -551,7 +702,7 @@ class RosterStatsVisualizer {
         this.skillsButton = isGeneral ? tabButtons[1] : tabButtons[0];
         this.onGeneralPage = this.generalButton.classList.contains("active");
         // this.skillsButton =
-        this.generalButton.addEventListener("click", async (event) => {
+        this.generalButton.addEventListener("click", (event) => {
             if (this.onGeneralPage)
                 return;
             this.onGeneralPage = true;
@@ -612,7 +763,6 @@ class RosterStatsVisualizer {
         const values = Object.values(players)
             .filter((player) => !player.getIsScout() || player.getOvr())
             .map((player) => playerOvr[ovrType](player));
-        console.log(values);
         return values.length
             ? Math.round(values.reduce((sum, value, _, array) => sum + value / array.length, 0))
             : 0;
@@ -763,13 +913,13 @@ function handleRosterData(data) {
     const event = new CustomEvent("rosterDataReady");
     window.dispatchEvent(event);
 }
-function manipulateRosterPage(table) {
+function manipulateRosterPage(el) {
     if (window.rosterData) {
-        new RosterStatsVisualizer(window.rosterData, table);
+        new RosterStatsVisualizer(window.rosterData, el);
     }
     else {
         const handler = () => {
-            new RosterStatsVisualizer(window.rosterData, table);
+            new RosterStatsVisualizer(window.rosterData, el);
             window.removeEventListener("rosterDataReady", handler);
         };
         window.addEventListener("rosterDataReady", handler);
@@ -913,6 +1063,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _navigation_handler__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./navigation-handler */ "./src/navigation-handler.ts");
 /* harmony import */ var _pages_roster__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./pages/roster */ "./src/pages/roster.ts");
 /* harmony import */ var _user__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./user */ "./src/user.ts");
+/* harmony import */ var _pages_draft_class__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./pages/draft-class */ "./src/pages/draft-class.ts");
+
 
 
 
@@ -935,9 +1087,8 @@ __webpack_require__.r(__webpack_exports__);
         },
         draftClass: {
             pattern: /\/api\/league\/[^\/]+\/draft-class/,
-            handler: (data, url) => {
-                console.log(data);
-                console.log(url);
+            handler: (data) => {
+                (0,_pages_draft_class__WEBPACK_IMPORTED_MODULE_4__.handleDraftClassData)(data.data);
             },
         },
         userInfo: {
@@ -971,7 +1122,7 @@ __webpack_require__.r(__webpack_exports__);
                     if (this.readyState === 4 && this.status === 200) {
                         try {
                             const data = JSON.parse(this.responseText);
-                            handler(data, url);
+                            handler(data);
                         }
                         catch (e) {
                             console.error("Error parsing response:", e);
@@ -1002,7 +1153,7 @@ __webpack_require__.r(__webpack_exports__);
             try {
                 const clonedResponse = response.clone();
                 const data = await clonedResponse.json();
-                handler(data, url);
+                handler(data);
             }
             catch (e) {
                 console.error("Error processing fetch response:", e);

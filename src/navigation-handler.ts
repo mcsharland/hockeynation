@@ -1,4 +1,5 @@
 import { ObserverManager } from "./observer-handler";
+import { manipulateDraftClassPage } from "./pages/draft-class";
 import { manipulatePlayerPage } from "./pages/player";
 import { manipulateRosterPage } from "./pages/roster";
 
@@ -14,15 +15,22 @@ const PAGE_HANDLERS: Record<string, PageHandler> = {
   player: {
     url: "https://hockey-nation.com/player",
     selector: "table tbody tr",
-    handler: (table) => {
-      manipulatePlayerPage(table);
+    handler: (el) => {
+      manipulatePlayerPage(el);
     },
   },
   roster: {
     url: "https://hockey-nation.com/club/roster",
     selector: "table tbody tr",
-    handler: (table) => {
-      manipulateRosterPage(table);
+    handler: (el) => {
+      manipulateRosterPage(el);
+    },
+  },
+  draftClass: {
+    url: "https://hockey-nation.com/office/draft-center",
+    selector: ".stats-container",
+    handler: (el) => {
+      manipulateDraftClassPage(el);
     },
   },
 };

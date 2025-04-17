@@ -2,6 +2,7 @@ import { handlePlayerData } from "./pages/player";
 import { initNavigationHandler } from "./navigation-handler";
 import { handleRosterData } from "./pages/roster";
 import { handleUserData, User } from "./user";
+import { handleDraftClassData } from "./pages/draft-class";
 
 (function () {
   initNavigationHandler(); // Initialize Observer from script context
@@ -22,9 +23,8 @@ import { handleUserData, User } from "./user";
     },
     draftClass: {
       pattern: /\/api\/league\/[^\/]+\/draft-class/,
-      handler: (data: any, url: string) => {
-        console.log(data);
-        console.log(url);
+      handler: (data: any) => {
+        handleDraftClassData(data.data);
       },
     },
     userInfo: {
@@ -62,7 +62,7 @@ import { handleUserData, User } from "./user";
           if (this.readyState === 4 && this.status === 200) {
             try {
               const data = JSON.parse(this.responseText);
-              handler(data, url);
+              handler(data);
             } catch (e) {
               console.error("Error parsing response:", e);
             }
@@ -102,7 +102,7 @@ import { handleUserData, User } from "./user";
       try {
         const clonedResponse = response.clone();
         const data = await clonedResponse.json();
-        handler(data, url);
+        handler(data);
       } catch (e) {
         console.error("Error processing fetch response:", e);
       }

@@ -379,12 +379,12 @@ export function handlePlayerData(data: any) {
   window.dispatchEvent(event);
 }
 
-export function manipulatePlayerPage(table: HTMLElement) {
+export function manipulatePlayerPage(el: HTMLElement) {
   if (window.playerData) {
-    new PlayerStatsVisualizer(window.playerData, table);
+    new PlayerStatsVisualizer(window.playerData, el);
   } else {
     const handler = () => {
-      new PlayerStatsVisualizer(window.playerData!, table);
+      new PlayerStatsVisualizer(window.playerData!, el);
       window.removeEventListener("playerDataReady", handler);
     };
     window.addEventListener("playerDataReady", handler);
