@@ -10,27 +10,38 @@ interface DraftCards {
   [id: string]: HTMLElement;
 }
 
+let visualizerInstance: DraftClassVisualizer | null = null;
+
 class DraftClassVisualizer {
   private parent: HTMLElement;
-  private draftClass: Roster;
+  private draftClass: Roster | null = null;
   private draftCards: DraftCards | null = null;
 
-  constructor(draftClass: Roster, el: HTMLElement) {
-    this.draftClass = draftClass;
+  constructor(el: HTMLElement) {
     this.parent = el;
-    this.initialize();
+    window.addEventListener(
+      "draftClassDataUpdated",
+      this.onDataUpdated.bind(this),
+    );
 
-    window.addEventListener("draftClassDataUpdated", () => {
-      if (window.draftClassData) {
-        this.draftClass = window.draftClassData;
-      }
-    });
+    if (window.draftClassData) {
+      this.draftClass = window.draftClassData;
+      this.initializeReferences();
+    }
+    this.initialize();
+  }
+
+  private onDataUpdated(): void {
+    if (window.draftClassData) {
+      this.draftClass = window.draftClassData;
+      this.initializeReferences(); //reprocess with new data
+    }
   }
 
   private initialize(): void {
     document
       .querySelectorAll(`.btn-toggle`)[1]
-      .addEventListener("click", (event) => {
+      .addEventListener("click", () => {
         this.initializeReferences();
       });
 
@@ -61,13 +72,13 @@ class DraftClassVisualizer {
     );
 
     buttons.forEach((button) => {
-      button.addEventListener("click", (event) => {
+      button.addEventListener("click", () => {
         this.initializeReferences();
       });
     });
 
     this.parent.querySelectorAll("select").forEach((menu) => {
-      menu.addEventListener("change", (event) => {
+      menu.addEventListener("change", () => {
         const observer = new MutationObserver((mutations) => {
           const hasRelevantChanges = mutations.some(
             (mutation) =>
@@ -124,13 +135,13 @@ class DraftClassVisualizer {
   }
 
   private addBadges(): void {
-    if (!this.draftCards) return;
+    if (!this.draftCards || !this.draftClass) return;
 
     Object.entries(this.draftCards).forEach(([playerId, card]) => {
       if (card.getAttribute("data-ovr-badges-added") === "true") return;
       const badge = card.querySelector(`.badge`);
       if (!badge) return;
-      const player = this.draftClass.getPlayer(playerId);
+      const player = this.draftClass?.getPlayer(playerId);
       if (!player) return;
 
       card.setAttribute("data-ovr-badges-added", "true");
@@ -179,13 +190,17 @@ export function handleDraftClassData(data: any) {
 }
 
 export function manipulateDraftClassPage(el: HTMLElement) {
-  if (window.draftClassData) {
-    new DraftClassVisualizer(window.draftClassData, el);
-  } else {
-    const handler = () => {
-      new DraftClassVisualizer(window.draftClassData!, el);
-      window.removeEventListener("draftClassDataReady", handler);
-    };
-    window.addEventListener("draftClassDataReady", handler);
+  if (!visualizerInstance) {
+    // For initial data loading, check if data exists or wait for it
+    if (window.draftClassData) {
+      visualizerInstance = new DraftClassVisualizer(el);
+    } else {
+      // Wait for initial data before creating instance
+      const handler = () => {
+        visualizerInstance = new DraftClassVisualizer(el);
+        window.removeEventListener("draftClassDataReady", handler);
+      };
+      window.addEventListener("draftClassDataReady", handler);
+    }
   }
 }

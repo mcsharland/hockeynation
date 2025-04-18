@@ -41,26 +41,49 @@ export class Roster {
   }
 }
 
+let visualizerInstance: RosterStatsVisualizer | null = null;
+
 class RosterStatsVisualizer {
-  private roster: Roster;
+  private roster: Roster | null = null;
   private parent: HTMLElement;
   private header: HTMLTableRowElement | null = null;
   private footer: HTMLTableRowElement | null = null;
   private dataRows: DataRow | null = null;
-  private generalButton: HTMLButtonElement | null = null;
-  private skillsButton: HTMLButtonElement | null = null;
   private tbody: HTMLTableSectionElement | null = null;
   private onGeneralPage: boolean = true;
   private minHeaderCell: HTMLTableCellElement | null = null;
   private maxHeaderCell: HTMLTableCellElement | null = null;
-  private selectElement: HTMLSelectElement | null = null;
   private sortColumn: "min-ovr" | "max-ovr" | null = null;
   private sortAscending: boolean = true;
 
-  constructor(roster: Roster, parentNode: HTMLElement) {
-    this.roster = roster;
-    this.parent = parentNode;
+  constructor(el: HTMLElement) {
+    this.parent = el;
+
+    window.addEventListener(
+      "rosterDataUpdated",
+      this.onRosterUpdate.bind(this),
+    );
+
+    if (window.rosterData) {
+      this.roster = window.rosterData;
+      this.initializeTableReferences();
+    }
+
     this.initialize();
+  }
+
+  private onRosterUpdate(): void {
+    if (window.rosterData) {
+      this.roster = window.rosterData;
+      this.initializeTableReferences();
+      if (
+        this.onGeneralPage &&
+        this.dataRows &&
+        Object.keys(this.dataRows).length > 0
+      ) {
+        this.addNewColumns();
+      }
+    }
   }
 
   private initialize() {
@@ -70,12 +93,12 @@ class RosterStatsVisualizer {
     if (!tabButtons.length) return;
 
     const isGeneral = tabButtons[0]?.textContent?.trim() === "General";
-    this.generalButton = isGeneral ? tabButtons[0] : tabButtons[1];
-    this.skillsButton = isGeneral ? tabButtons[1] : tabButtons[0];
-    this.onGeneralPage = this.generalButton.classList.contains("active");
+    const generalButton = isGeneral ? tabButtons[0] : tabButtons[1];
+    const skillsButton = isGeneral ? tabButtons[1] : tabButtons[0];
+    this.onGeneralPage = generalButton.classList.contains("active");
 
     // this.skillsButton =
-    this.generalButton.addEventListener("click", (event) => {
+    generalButton.addEventListener("click", () => {
       if (this.onGeneralPage) return;
       this.onGeneralPage = true;
 
@@ -88,15 +111,15 @@ class RosterStatsVisualizer {
       // if (this.sortColumn) this.sortRows()
     });
 
-    this.skillsButton.addEventListener("click", (event) => {
+    skillsButton.addEventListener("click", () => {
       if (!this.onGeneralPage) return;
       this.onGeneralPage = false;
       this.initializeTableReferences();
       // if (this.sortColumn) this.sortRows();
     });
 
-    this.selectElement = this.parent.querySelector(`select[value]`);
-    this.selectElement?.addEventListener("input", () => {
+    const selectElement = this.parent.querySelector(`select[value]`);
+    selectElement?.addEventListener("input", () => {
       this.initializeTableReferences();
       this.addNewColumns();
     });
@@ -140,6 +163,7 @@ class RosterStatsVisualizer {
   }
 
   private getRosterAvgOvr(ovrType: OvrType): number {
+    if (!this.roster) return 0;
     const playerOvr = {
       Default: (player: Player) => player.getOvr(),
       Min: (player: Player) => player.getMinOvr(),
@@ -274,7 +298,13 @@ class RosterStatsVisualizer {
   // }
 
   private addNewColumns(): void {
-    if (!this.onGeneralPage || !this.dataRows || !this.header || !this.footer)
+    if (
+      !this.onGeneralPage ||
+      !this.dataRows ||
+      !this.header ||
+      !this.footer ||
+      !this.roster
+    )
       return;
 
     // delete old columns
@@ -283,7 +313,7 @@ class RosterStatsVisualizer {
       .forEach((node) => node.remove());
 
     Object.entries(this.dataRows).forEach(([playerId, row]) => {
-      const player = this.roster.getPlayer(playerId);
+      const player = this.roster?.getPlayer(playerId);
       if (!player) return;
 
       const minDataCell = document.createElement("td");
@@ -351,13 +381,15 @@ export function handleRosterData(data: any) {
 }
 
 export function manipulateRosterPage(el: HTMLElement) {
-  if (window.rosterData) {
-    new RosterStatsVisualizer(window.rosterData, el);
-  } else {
-    const handler = () => {
-      new RosterStatsVisualizer(window.rosterData!, el);
-      window.removeEventListener("rosterDataReady", handler);
-    };
-    window.addEventListener("rosterDataReady", handler);
+  if (!visualizerInstance) {
+    if (window.rosterData) {
+      visualizerInstance = new RosterStatsVisualizer(el);
+    } else {
+      const handler = () => {
+        visualizerInstance = new RosterStatsVisualizer(el);
+        window.removeEventListener("rosterDataReady", handler);
+      };
+      window.addEventListener("rosterDataReady", handler);
+    }
   }
 }

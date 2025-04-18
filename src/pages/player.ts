@@ -203,6 +203,7 @@ export class Player {
   }
 }
 
+let visualizerInstance: PlayerStatsVisualizer | null = null;
 class PlayerStatsVisualizer {
   private playerStats: Player;
   private parentNode: HTMLElement;
@@ -380,13 +381,15 @@ export function handlePlayerData(data: any) {
 }
 
 export function manipulatePlayerPage(el: HTMLElement) {
-  if (window.playerData) {
-    new PlayerStatsVisualizer(window.playerData, el);
-  } else {
-    const handler = () => {
-      new PlayerStatsVisualizer(window.playerData!, el);
-      window.removeEventListener("playerDataReady", handler);
-    };
-    window.addEventListener("playerDataReady", handler);
+  if (!visualizerInstance) {
+    if (window.playerData) {
+      visualizerInstance = new PlayerStatsVisualizer(window.playerData, el);
+    } else {
+      const handler = () => {
+        visualizerInstance = new PlayerStatsVisualizer(window.playerData!, el);
+        window.removeEventListener("playerDataReady", handler);
+      };
+      window.addEventListener("playerDataReady", handler);
+    }
   }
 }
