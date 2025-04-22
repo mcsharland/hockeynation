@@ -193,153 +193,210 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ });
 /* harmony import */ var _roster__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./roster */ "./src/pages/roster.ts");
 
-let visualizerInstance = null;
 class DraftClassVisualizer {
-    parent;
+    parent = null;
     draftClass = null;
     draftCards = null;
-    constructor(el) {
+    toggleButtonListener = null;
+    paginationButtonListeners = new Map();
+    selectMenuListeners = new Map();
+    mutationObserver = null;
+    observerTimeoutId = null;
+    constructor() { }
+    attach(el) {
+        this.detach(); // clean up any previous state/listeners
         this.parent = el;
-        window.addEventListener("draftClassDataUpdated", this.onDataUpdated.bind(this));
-        if (window.draftClassData) {
-            this.draftClass = window.draftClassData;
-            this.initializeReferences();
-        }
-        this.initialize();
-    }
-    onDataUpdated() {
-        if (window.draftClassData) {
-            this.draftClass = window.draftClassData;
-            this.initializeReferences(); //reprocess with new data
+        if (this.parent && this.draftClass) {
+            this.initializeDOMReferences(); // Find cards within the new parent
+            this.attachEventListeners(); // Add listeners within the new parent scope
+            this.addBadges(); // Add badges based on current data/DOM
         }
     }
-    initialize() {
-        document
-            .querySelectorAll(`.btn-toggle`)[1]
-            .addEventListener("click", () => {
-            this.initializeReferences();
+    detach() {
+        if (!this.parent)
+            return;
+        const toggleButton = document.querySelectorAll(`.btn-toggle`)[1];
+        if (toggleButton && this.toggleButtonListener) {
+            toggleButton.removeEventListener("click", this.toggleButtonListener);
+            this.toggleButtonListener = null;
+        }
+        // remove pagination listeners
+        this.paginationButtonListeners.forEach((listener, button) => {
+            button.removeEventListener("click", listener);
         });
-        this.initializeReferences();
-        // select pagination buttons
-        const buttons = Array.from(this.parent.querySelectorAll("button")).filter((btn) => {
-            // select top buttons matching pattern
-            const hasMatchingSpan = Array.from(btn.querySelectorAll("span")).some((span) => /^(1|21|41|61|81)-\d+$/.test(span.textContent?.trim() ?? ""));
-            // select buttom buttons matching pattern because theyre different for some reason
-            const buttonText = btn.childNodes.length > 0
-                ? Array.from(btn.childNodes)
-                    .filter((node) => node.nodeType === Node.TEXT_NODE)
-                    .map((node) => node.textContent?.trim())
-                    .join("")
-                : "";
-            const hasMatchingDirectText = /^(1|21|41|61|81)-\d+$/.test(buttonText);
-            return hasMatchingSpan || hasMatchingDirectText;
+        this.paginationButtonListeners.clear();
+        // remove select menu listeners and observer
+        this.selectMenuListeners.forEach((listener, select) => {
+            select.removeEventListener("change", listener);
         });
-        buttons.forEach((button) => {
-            button.addEventListener("click", () => {
-                this.initializeReferences();
-            });
-        });
-        this.parent.querySelectorAll("select").forEach((menu) => {
-            menu.addEventListener("change", () => {
-                const observer = new MutationObserver((mutations) => {
-                    const hasRelevantChanges = mutations.some((mutation) => mutation.addedNodes.length > 0 &&
-                        Array.from(mutation.addedNodes).some((node) => node.nodeType === Node.ELEMENT_NODE &&
-                            node.querySelector('[id^="draftee-card"]')));
-                    if (hasRelevantChanges) {
-                        this.initializeReferences();
-                        // disconnect if changes found
-                        observer.disconnect();
-                    }
-                });
-                observer.observe(this.parent, {
-                    childList: true,
-                    subtree: true,
-                });
-                setTimeout(() => {
-                    observer.disconnect();
-                }, 3000);
-            });
-        });
+        this.selectMenuListeners.clear();
+        this.disconnectObserver(); // disconnect observer if active
+        this.parent = null;
+        this.draftCards = null;
     }
-    initializeReferences() {
+    updateData(newData) {
+        this.draftClass = newData;
+        if (this.parent) {
+            this.initializeDOMReferences();
+            this.addBadges();
+        }
+    }
+    initializeDOMReferences() {
+        if (!this.parent)
+            return;
         const rows = this.parent.querySelectorAll("[id^='draftee-card']");
         const dc = {};
         rows.forEach((row) => {
             const card = row;
-            const badge = row.querySelector(".badge");
-            if (!badge)
+            const playerLink = card.querySelector(`a[href^='/player/']`);
+            const badge = card.querySelector(".badge"); // needed by addBadges later
+            if (!playerLink || !badge)
                 return;
-            const playerId = row
-                .querySelector(`a[href^='/player/']`)
-                ?.getAttribute("href")
-                ?.split("/")
-                .pop();
-            if (!playerId)
-                return;
-            dc[playerId] = card;
+            const playerId = playerLink.getAttribute("href")?.split("/").pop();
+            if (playerId) {
+                dc[playerId] = card;
+            }
         });
         this.draftCards = dc;
-        this.addBadges();
+    }
+    attachEventListeners() {
+        if (!this.parent)
+            return;
+        const toggleButton = document.querySelectorAll(`.btn-toggle`)[1];
+        if (toggleButton) {
+            this.toggleButtonListener = () => {
+                this.initializeDOMReferences();
+                this.addBadges();
+            };
+            toggleButton.addEventListener("click", this.toggleButtonListener);
+        }
+        this.paginationButtonListeners.clear(); // clear map before adding
+        const buttons = Array.from(this.parent.querySelectorAll("button")).filter((btn) => {
+            const hasMatchingSpan = Array.from(btn.querySelectorAll("span")).some((span) => /^(1|21|41|61|81)-\d+$/.test(span.textContent?.trim() ?? ""));
+            const buttonText = Array.from(btn.childNodes)
+                .filter((node) => node.nodeType === Node.TEXT_NODE)
+                .map((node) => node.textContent?.trim())
+                .join("");
+            const hasMatchingDirectText = /^(1|21|41|61|81)-\d+$/.test(buttonText);
+            return hasMatchingSpan || hasMatchingDirectText;
+        });
+        buttons.forEach((button) => {
+            const listener = () => {
+                this.initializeDOMReferences();
+                this.addBadges();
+            };
+            button.addEventListener("click", listener);
+            this.paginationButtonListeners.set(button, listener); // store for removal
+        });
+        this.selectMenuListeners.clear();
+        this.parent.querySelectorAll("select").forEach((menu) => {
+            const listener = () => {
+                this.disconnectObserver(); // disconnect previous observer
+                this.mutationObserver = new MutationObserver((mutations) => {
+                    const hasRelevantChanges = mutations.some((mutation) => mutation.addedNodes.length > 0 &&
+                        Array.from(mutation.addedNodes).some((node) => node.nodeType === Node.ELEMENT_NODE &&
+                            node.querySelector('[id^="draftee-card"]')));
+                    if (hasRelevantChanges) {
+                        this.initializeDOMReferences();
+                        this.addBadges();
+                        this.disconnectObserver();
+                    }
+                });
+                this.mutationObserver.observe(this.parent, {
+                    childList: true,
+                    subtree: true,
+                });
+                if (this.observerTimeoutId)
+                    clearTimeout(this.observerTimeoutId);
+                this.observerTimeoutId = window.setTimeout(() => {
+                    this.disconnectObserver();
+                }, 3000); // 3 seconds
+            };
+            menu.addEventListener("change", listener);
+            this.selectMenuListeners.set(menu, listener);
+        });
+    }
+    disconnectObserver() {
+        if (this.mutationObserver) {
+            this.mutationObserver.disconnect();
+            this.mutationObserver = null;
+        }
+        if (this.observerTimeoutId) {
+            clearTimeout(this.observerTimeoutId);
+            this.observerTimeoutId = null;
+        }
     }
     addBadges() {
-        if (!this.draftCards || !this.draftClass)
+        // Adds Min/Max badges to draft cards
+        if (!this.draftCards || !this.draftClass) {
+            console.warn("Cannot add badges: Missing draft cards or draft class data.");
             return;
+        }
+        console.log("Adding/updating badges...");
+        let badgesAddedCount = 0;
         Object.entries(this.draftCards).forEach(([playerId, card]) => {
+            // //safety
             if (card.getAttribute("data-ovr-badges-added") === "true")
                 return;
-            const badge = card.querySelector(`.badge`);
-            if (!badge)
+            const badgeContainer = card.querySelector(`.badge`)?.parentElement;
+            if (!badgeContainer) {
+                console.warn(`Badge container not found for player ${playerId}`);
                 return;
-            const player = this.draftClass?.getPlayer(playerId);
-            if (!player)
+            }
+            const player = this.draftClass.getPlayer(playerId); // draftClass checked above
+            if (!player) {
+                console.warn(`Player data not found for ${playerId} in draft class.`);
                 return;
+            }
+            badgeContainer
+                .querySelectorAll(".dynamic-ovr-label, .dynamic-ovr-badge")
+                .forEach((el) => el.remove());
+            // Add MIN
+            badgeContainer.appendChild(this.createOvrLabelSpan("MIN"));
+            badgeContainer.appendChild(this.createRatingSpan(player.getMinOvr()));
+            // Add MAX
+            badgeContainer.appendChild(this.createOvrLabelSpan("MAX"));
+            badgeContainer.appendChild(this.createRatingSpan(player.getMaxOvr()));
             card.setAttribute("data-ovr-badges-added", "true");
-            badge.parentElement?.insertBefore(this.createOvrLabelSpan("MIN"), null);
-            badge.parentElement?.insertBefore(this.createRatingSpan(player.getMinOvr()), null);
-            badge.parentElement?.insertBefore(this.createOvrLabelSpan("MAX"), null);
-            badge.parentElement?.insertBefore(this.createRatingSpan(player.getMaxOvr()), null);
+            badgesAddedCount++;
         });
     }
     createOvrLabelSpan(text) {
         const label = document.createElement("span");
-        label.classList.add("uppercase", "ml-3", "xs:inline-block", "hidden");
+        // add a class to make it easier to remove later
+        label.classList.add("dynamic-ovr-label", "uppercase", "ml-3", "xs:inline-block", "hidden");
         label.innerText = text;
         return label;
     }
     createRatingSpan(ovr) {
         const ratingSpan = document.createElement("span");
-        ratingSpan.classList.add("badge", "ml-1");
+        // add a class to make it easier to remove later
+        ratingSpan.classList.add("dynamic-ovr-badge", "badge", "ml-1");
         ratingSpan.style.userSelect = "none";
-        if (window.userData) {
-            ratingSpan.style.backgroundColor = window.userData.getColorPair(ovr)[0];
-            ratingSpan.style.color = window.userData.getColorPair(ovr)[1];
+        if (window.userData &&
+            typeof window.userData.getColorPair === "function" &&
+            ovr > 0) {
+            try {
+                const [bgColor, color] = window.userData.getColorPair(ovr);
+                ratingSpan.style.backgroundColor = bgColor;
+                ratingSpan.style.color = color;
+            }
+            catch (e) {
+                console.error("Error getting color pair for OVR:", ovr, e);
+            }
         }
-        ratingSpan.innerText = ovr.toString();
+        ratingSpan.innerText = ovr > 0 ? ovr.toString() : "?"; // Show ? if OVR is 0, shouldn't ever be needed
         return ratingSpan;
     }
 }
+const draftVisualizerInstance = new DraftClassVisualizer();
 function handleDraftClassData(data) {
-    const isUpdate = !!window.draftClassData; // check if this is an update
-    window.draftClassData = new _roster__WEBPACK_IMPORTED_MODULE_0__.Roster({ ...data, players: data.draftees });
-    const eventName = isUpdate ? "draftClassDataUpdated" : "draftClassDataReady";
-    const event = new CustomEvent(eventName);
-    window.dispatchEvent(event);
+    const rosterData = { ...data, players: data.draftees };
+    const newRoster = new _roster__WEBPACK_IMPORTED_MODULE_0__.Roster(rosterData);
+    draftVisualizerInstance.updateData(newRoster);
 }
 function manipulateDraftClassPage(el) {
-    if (!visualizerInstance) {
-        // For initial data loading, check if data exists or wait for it
-        if (window.draftClassData) {
-            visualizerInstance = new DraftClassVisualizer(el);
-        }
-        else {
-            // Wait for initial data before creating instance
-            const handler = () => {
-                visualizerInstance = new DraftClassVisualizer(el);
-                window.removeEventListener("draftClassDataReady", handler);
-            };
-            window.addEventListener("draftClassDataReady", handler);
-        }
-    }
+    draftVisualizerInstance.attach(el);
 }
 
 
@@ -640,7 +697,6 @@ class Player {
         return Math.round(correctedAverage * 10);
     }
 }
-let playerVisualizerInstance = null;
 class PlayerStatsVisualizer {
     playerStats = null;
     parentNode = null;
@@ -842,6 +898,7 @@ class PlayerStatsVisualizer {
         }
     }
 }
+const playerVisualizerInstance = new PlayerStatsVisualizer();
 function handlePlayerData(data) {
     window.playerData = new Player(data);
     const event = new CustomEvent("playerDataReady");
@@ -849,48 +906,18 @@ function handlePlayerData(data) {
 }
 function manipulatePlayerPage(el) {
     // ensure the singleton instance exists
-    if (!playerVisualizerInstance) {
-        playerVisualizerInstance = new PlayerStatsVisualizer();
-    }
     if (window.playerData) {
         playerVisualizerInstance.attach(el, window.playerData);
     }
     else {
         const handler = () => {
             // check instance again in case of race conditions? unlikely but possible
-            if (!playerVisualizerInstance) {
-                playerVisualizerInstance = new PlayerStatsVisualizer();
-            }
             playerVisualizerInstance.attach(el, window.playerData); // data ready
             window.removeEventListener("playerDataReady", handler);
         };
         window.addEventListener("playerDataReady", handler, { once: true });
     }
 }
-// export function handlePlayerData(data: any) {
-//   window.playerData = new Player(data);
-//   const event = new CustomEvent("playerDataReady");
-//   window.dispatchEvent(event);
-// }
-// export function manipulatePlayerPage(el: HTMLElement) {
-//   if (!playerVisualizerInstance) {
-//     if (window.playerData) {
-//       playerVisualizerInstance = new PlayerStatsVisualizer(
-//         window.playerData,
-//         el,
-//       );
-//     } else {
-//       const handler = () => {
-//         playerVisualizerInstance = new PlayerStatsVisualizer(
-//           window.playerData!,
-//           el,
-//         );
-//         window.removeEventListener("playerDataReady", handler);
-//       };
-//       window.addEventListener("playerDataReady", handler);
-//     }
-//   }
-// }
 
 
 /***/ }),

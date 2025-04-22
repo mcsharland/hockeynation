@@ -1,11 +1,5 @@
 import { Player } from "./player";
 
-declare global {
-  interface Window {
-    rosterData?: Roster | null;
-  }
-}
-
 interface Players {
   [id: string]: Player;
 }

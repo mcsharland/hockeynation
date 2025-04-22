@@ -203,8 +203,6 @@ export class Player {
   }
 }
 
-let playerVisualizerInstance: PlayerStatsVisualizer | null = null;
-
 class PlayerStatsVisualizer {
   private playerStats: Player | null = null;
   private parentNode: HTMLElement | null = null;
@@ -444,6 +442,8 @@ class PlayerStatsVisualizer {
   }
 }
 
+const playerVisualizerInstance = new PlayerStatsVisualizer();
+
 export function handlePlayerData(data: any) {
   window.playerData = new Player(data);
   const event = new CustomEvent("playerDataReady");
@@ -452,47 +452,14 @@ export function handlePlayerData(data: any) {
 
 export function manipulatePlayerPage(el: HTMLElement) {
   // ensure the singleton instance exists
-  if (!playerVisualizerInstance) {
-    playerVisualizerInstance = new PlayerStatsVisualizer();
-  }
-
   if (window.playerData) {
     playerVisualizerInstance.attach(el, window.playerData);
   } else {
     const handler = () => {
       // check instance again in case of race conditions? unlikely but possible
-      if (!playerVisualizerInstance) {
-        playerVisualizerInstance = new PlayerStatsVisualizer();
-      }
       playerVisualizerInstance.attach(el, window.playerData!); // data ready
       window.removeEventListener("playerDataReady", handler);
     };
     window.addEventListener("playerDataReady", handler, { once: true });
   }
 }
-
-// export function handlePlayerData(data: any) {
-//   window.playerData = new Player(data);
-//   const event = new CustomEvent("playerDataReady");
-//   window.dispatchEvent(event);
-// }
-
-// export function manipulatePlayerPage(el: HTMLElement) {
-//   if (!playerVisualizerInstance) {
-//     if (window.playerData) {
-//       playerVisualizerInstance = new PlayerStatsVisualizer(
-//         window.playerData,
-//         el,
-//       );
-//     } else {
-//       const handler = () => {
-//         playerVisualizerInstance = new PlayerStatsVisualizer(
-//           window.playerData!,
-//           el,
-//         );
-//         window.removeEventListener("playerDataReady", handler);
-//       };
-//       window.addEventListener("playerDataReady", handler);
-//     }
-//   }
-// }
