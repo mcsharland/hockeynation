@@ -1,11 +1,5 @@
 import { SKILL_NAME_TO_ID } from "../mappings/skill-mappings";
 
-declare global {
-  interface Window {
-    playerData?: Player | null;
-  }
-}
-
 type StatStrength = "strongest" | "weakest" | null;
 
 interface Stat {
@@ -205,7 +199,7 @@ export class Player {
 
 class PlayerStatsVisualizer {
   private playerStats: Player | null = null;
-  private parentNode: HTMLElement | null = null;
+  private parent: HTMLElement | null = null;
   private ovrElement: HTMLElement | null = null;
   private statsTable: HTMLTableElement | null = null;
   private statsRows: NodeListOf<HTMLTableRowElement> | null = null;
@@ -215,13 +209,12 @@ class PlayerStatsVisualizer {
 
   constructor() {}
 
-  public attach(el: HTMLElement, playerData: Player | null) {
+  public attach(el: HTMLElement) {
     this.detach(); // clean up previous state first
 
-    if (!playerData) return;
+    if (!this.playerStats) return;
 
-    this.parentNode = el;
-    this.playerStats = playerData;
+    this.parent = el;
 
     if (!this.initializeDOMReferences()) {
       this.detach(); // clean up if initialization failed
@@ -233,7 +226,7 @@ class PlayerStatsVisualizer {
   }
 
   public detach() {
-    if (!this.parentNode) return;
+    if (!this.parent) return;
 
     if (this.dropdownElement && this.dropdownListener) {
       this.dropdownElement.removeEventListener("change", this.dropdownListener);
@@ -242,8 +235,7 @@ class PlayerStatsVisualizer {
       this.dropdownElement.parentNode.removeChild(this.dropdownElement);
     }
 
-    this.parentNode = null;
-    this.playerStats = null;
+    this.parent = null;
     this.ovrElement = null;
     this.statsTable = null;
     this.statsRows = null;
@@ -253,13 +245,11 @@ class PlayerStatsVisualizer {
   }
 
   private initializeDOMReferences(): boolean {
-    if (!this.parentNode) return false;
+    if (!this.parent) return false;
 
-    this.ovrElement =
-      this.parentNode.querySelector<HTMLElement>(".polygon text");
+    this.ovrElement = this.parent.querySelector<HTMLElement>(".polygon text");
 
-    const puck =
-      this.parentNode.querySelector<SVGSVGElement>("svg.fa-hockey-puck");
+    const puck = this.parent.querySelector<SVGSVGElement>("svg.fa-hockey-puck");
 
     this.statsTable = puck
       ? (puck.closest(`tbody`) as HTMLTableElement | null)
@@ -272,14 +262,16 @@ class PlayerStatsVisualizer {
       }
     }
 
-    const headers = Array.from(
-      this.parentNode.querySelectorAll(".card-header"),
-    );
+    const headers = Array.from(this.parent.querySelectorAll(".card-header"));
     this.skillsHeaderDiv = headers.find(
       (d) => d?.textContent?.trim() === "Skills",
     ) as HTMLDivElement | null;
 
     return !!(this.ovrElement || this.statsTable);
+  }
+
+  public updatePlayer(player: Player | null) {
+    this.playerStats = player;
   }
 
   private attachUIAndListeners(): void {
@@ -445,21 +437,10 @@ class PlayerStatsVisualizer {
 const playerVisualizerInstance = new PlayerStatsVisualizer();
 
 export function handlePlayerData(data: any) {
-  window.playerData = new Player(data);
-  const event = new CustomEvent("playerDataReady");
-  window.dispatchEvent(event);
+  const player = new Player(data);
+  playerVisualizerInstance.updatePlayer(player);
 }
 
 export function manipulatePlayerPage(el: HTMLElement) {
-  // ensure the singleton instance exists
-  if (window.playerData) {
-    playerVisualizerInstance.attach(el, window.playerData);
-  } else {
-    const handler = () => {
-      // check instance again in case of race conditions? unlikely but possible
-      playerVisualizerInstance.attach(el, window.playerData!); // data ready
-      window.removeEventListener("playerDataReady", handler);
-    };
-    window.addEventListener("playerDataReady", handler, { once: true });
-  }
+  playerVisualizerInstance.attach(el);
 }

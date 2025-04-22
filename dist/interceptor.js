@@ -699,7 +699,7 @@ class Player {
 }
 class PlayerStatsVisualizer {
     playerStats = null;
-    parentNode = null;
+    parent = null;
     ovrElement = null;
     statsTable = null;
     statsRows = null;
@@ -707,12 +707,11 @@ class PlayerStatsVisualizer {
     dropdownElement = null;
     dropdownListener = null; // store listeners
     constructor() { }
-    attach(el, playerData) {
+    attach(el) {
         this.detach(); // clean up previous state first
-        if (!playerData)
+        if (!this.playerStats)
             return;
-        this.parentNode = el;
-        this.playerStats = playerData;
+        this.parent = el;
         if (!this.initializeDOMReferences()) {
             this.detach(); // clean up if initialization failed
             return;
@@ -721,7 +720,7 @@ class PlayerStatsVisualizer {
         this.updateHockeyPucks("Default");
     }
     detach() {
-        if (!this.parentNode)
+        if (!this.parent)
             return;
         if (this.dropdownElement && this.dropdownListener) {
             this.dropdownElement.removeEventListener("change", this.dropdownListener);
@@ -729,8 +728,7 @@ class PlayerStatsVisualizer {
         if (this.dropdownElement && this.dropdownElement.parentNode) {
             this.dropdownElement.parentNode.removeChild(this.dropdownElement);
         }
-        this.parentNode = null;
-        this.playerStats = null;
+        this.parent = null;
         this.ovrElement = null;
         this.statsTable = null;
         this.statsRows = null;
@@ -739,11 +737,10 @@ class PlayerStatsVisualizer {
         this.dropdownListener = null;
     }
     initializeDOMReferences() {
-        if (!this.parentNode)
+        if (!this.parent)
             return false;
-        this.ovrElement =
-            this.parentNode.querySelector(".polygon text");
-        const puck = this.parentNode.querySelector("svg.fa-hockey-puck");
+        this.ovrElement = this.parent.querySelector(".polygon text");
+        const puck = this.parent.querySelector("svg.fa-hockey-puck");
         this.statsTable = puck
             ? puck.closest(`tbody`)
             : null;
@@ -754,9 +751,12 @@ class PlayerStatsVisualizer {
                 return false; // critical
             }
         }
-        const headers = Array.from(this.parentNode.querySelectorAll(".card-header"));
+        const headers = Array.from(this.parent.querySelectorAll(".card-header"));
         this.skillsHeaderDiv = headers.find((d) => d?.textContent?.trim() === "Skills");
         return !!(this.ovrElement || this.statsTable);
+    }
+    updatePlayer(player) {
+        this.playerStats = player;
     }
     attachUIAndListeners() {
         if (!this.skillsHeaderDiv)
@@ -900,23 +900,11 @@ class PlayerStatsVisualizer {
 }
 const playerVisualizerInstance = new PlayerStatsVisualizer();
 function handlePlayerData(data) {
-    window.playerData = new Player(data);
-    const event = new CustomEvent("playerDataReady");
-    window.dispatchEvent(event);
+    const player = new Player(data);
+    playerVisualizerInstance.updatePlayer(player);
 }
 function manipulatePlayerPage(el) {
-    // ensure the singleton instance exists
-    if (window.playerData) {
-        playerVisualizerInstance.attach(el, window.playerData);
-    }
-    else {
-        const handler = () => {
-            // check instance again in case of race conditions? unlikely but possible
-            playerVisualizerInstance.attach(el, window.playerData); // data ready
-            window.removeEventListener("playerDataReady", handler);
-        };
-        window.addEventListener("playerDataReady", handler, { once: true });
-    }
+    playerVisualizerInstance.attach(el);
 }
 
 
