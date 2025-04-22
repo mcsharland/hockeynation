@@ -45,8 +45,10 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ });
 /* harmony import */ var _observer_handler__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./observer-handler */ "./src/observer-handler.ts");
 /* harmony import */ var _pages_draft_class__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./pages/draft-class */ "./src/pages/draft-class.ts");
-/* harmony import */ var _pages_player__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./pages/player */ "./src/pages/player.ts");
-/* harmony import */ var _pages_roster__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./pages/roster */ "./src/pages/roster.ts");
+/* harmony import */ var _pages_draft_ranking__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./pages/draft-ranking */ "./src/pages/draft-ranking.ts");
+/* harmony import */ var _pages_player__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./pages/player */ "./src/pages/player.ts");
+/* harmony import */ var _pages_roster__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./pages/roster */ "./src/pages/roster.ts");
+
 
 
 
@@ -56,14 +58,14 @@ const PAGE_HANDLERS = {
         url: "https://hockey-nation.com/player",
         selector: "table tbody tr",
         handler: (el) => {
-            (0,_pages_player__WEBPACK_IMPORTED_MODULE_2__.manipulatePlayerPage)(el);
+            (0,_pages_player__WEBPACK_IMPORTED_MODULE_3__.manipulatePlayerPage)(el);
         },
     },
     roster: {
         url: "https://hockey-nation.com/club/roster",
         selector: "table tbody tr",
         handler: (el) => {
-            (0,_pages_roster__WEBPACK_IMPORTED_MODULE_3__.manipulateRosterPage)(el);
+            (0,_pages_roster__WEBPACK_IMPORTED_MODULE_4__.manipulateRosterPage)(el);
         },
     },
     draftClass: {
@@ -71,6 +73,13 @@ const PAGE_HANDLERS = {
         selector: ".stats-container",
         handler: (el) => {
             (0,_pages_draft_class__WEBPACK_IMPORTED_MODULE_1__.manipulateDraftClassPage)(el);
+        },
+    },
+    draftRanking: {
+        url: "https://hockey-nation.com/draft-ranking",
+        selector: "table tbody tr",
+        handler: (el) => {
+            (0,_pages_draft_ranking__WEBPACK_IMPORTED_MODULE_2__.manipulateDraftRankingPage)(el);
         },
     },
 };
@@ -184,24 +193,30 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ });
 /* harmony import */ var _roster__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./roster */ "./src/pages/roster.ts");
 
+let visualizerInstance = null;
 class DraftClassVisualizer {
     parent;
-    draftClass;
+    draftClass = null;
     draftCards = null;
-    constructor(draftClass, el) {
-        this.draftClass = draftClass;
+    constructor(el) {
         this.parent = el;
+        window.addEventListener("draftClassDataUpdated", this.onDataUpdated.bind(this));
+        if (window.draftClassData) {
+            this.draftClass = window.draftClassData;
+            this.initializeReferences();
+        }
         this.initialize();
-        window.addEventListener("draftClassDataUpdated", () => {
-            if (window.draftClassData) {
-                this.draftClass = window.draftClassData;
-            }
-        });
+    }
+    onDataUpdated() {
+        if (window.draftClassData) {
+            this.draftClass = window.draftClassData;
+            this.initializeReferences(); //reprocess with new data
+        }
     }
     initialize() {
         document
             .querySelectorAll(`.btn-toggle`)[1]
-            .addEventListener("click", (event) => {
+            .addEventListener("click", () => {
             this.initializeReferences();
         });
         this.initializeReferences();
@@ -220,12 +235,12 @@ class DraftClassVisualizer {
             return hasMatchingSpan || hasMatchingDirectText;
         });
         buttons.forEach((button) => {
-            button.addEventListener("click", (event) => {
+            button.addEventListener("click", () => {
                 this.initializeReferences();
             });
         });
         this.parent.querySelectorAll("select").forEach((menu) => {
-            menu.addEventListener("change", (event) => {
+            menu.addEventListener("change", () => {
                 const observer = new MutationObserver((mutations) => {
                     const hasRelevantChanges = mutations.some((mutation) => mutation.addedNodes.length > 0 &&
                         Array.from(mutation.addedNodes).some((node) => node.nodeType === Node.ELEMENT_NODE &&
@@ -267,7 +282,7 @@ class DraftClassVisualizer {
         this.addBadges();
     }
     addBadges() {
-        if (!this.draftCards)
+        if (!this.draftCards || !this.draftClass)
             return;
         Object.entries(this.draftCards).forEach(([playerId, card]) => {
             if (card.getAttribute("data-ovr-badges-added") === "true")
@@ -275,7 +290,7 @@ class DraftClassVisualizer {
             const badge = card.querySelector(`.badge`);
             if (!badge)
                 return;
-            const player = this.draftClass.getPlayer(playerId);
+            const player = this.draftClass?.getPlayer(playerId);
             if (!player)
                 return;
             card.setAttribute("data-ovr-badges-added", "true");
@@ -311,15 +326,159 @@ function handleDraftClassData(data) {
     window.dispatchEvent(event);
 }
 function manipulateDraftClassPage(el) {
-    if (window.draftClassData) {
-        new DraftClassVisualizer(window.draftClassData, el);
+    if (!visualizerInstance) {
+        // For initial data loading, check if data exists or wait for it
+        if (window.draftClassData) {
+            visualizerInstance = new DraftClassVisualizer(el);
+        }
+        else {
+            // Wait for initial data before creating instance
+            const handler = () => {
+                visualizerInstance = new DraftClassVisualizer(el);
+                window.removeEventListener("draftClassDataReady", handler);
+            };
+            window.addEventListener("draftClassDataReady", handler);
+        }
     }
-    else {
-        const handler = () => {
-            new DraftClassVisualizer(window.draftClassData, el);
-            window.removeEventListener("draftClassDataReady", handler);
-        };
-        window.addEventListener("draftClassDataReady", handler);
+}
+
+
+/***/ }),
+
+/***/ "./src/pages/draft-ranking.ts":
+/*!************************************!*\
+  !*** ./src/pages/draft-ranking.ts ***!
+  \************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   handleDraftRankingData: () => (/* binding */ handleDraftRankingData),
+/* harmony export */   manipulateDraftRankingPage: () => (/* binding */ manipulateDraftRankingPage)
+/* harmony export */ });
+/* harmony import */ var _roster__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./roster */ "./src/pages/roster.ts");
+
+let visualizerInstance = null;
+class DraftRankingVisualizer {
+    parent;
+    draftRanking = null;
+    draftCards = null;
+    ovrTab = null;
+    tableHR = null;
+    constructor(el) {
+        this.parent = el;
+        window.addEventListener("draftRankingDataUpdated", this.onDataUpdated.bind(this));
+        if (window.draftRankingData) {
+            this.draftRanking = window.draftRankingData;
+            this.initialize();
+        }
+    }
+    onDataUpdated() {
+        if (window.draftRankingData) {
+            this.draftRanking = window.draftRankingData;
+            this.initializeReferences();
+        }
+    }
+    initialize() {
+        this.initializeReferences();
+    }
+    initializeReferences() {
+        if (!this.draftRanking)
+            return;
+        this.tableHR = this.parent.querySelector(`table thead tr`);
+        if (!this.tableHR)
+            return;
+        this.ovrTab =
+            Array.from(this.tableHR.querySelectorAll(`th span`)).filter((span) => span.textContent?.trim() === "OVR")?.[0]?.parentElement ?? null;
+        if (!this.ovrTab)
+            return;
+        const rows = this.parent.querySelectorAll(`table tbody tr`);
+        const dc = {};
+        rows.forEach((row) => {
+            const tableRow = row;
+            const playerLink = tableRow.querySelectorAll(`a`)[1];
+            if (playerLink?.getAttribute("href")) {
+                const playerId = playerLink.getAttribute("href").split("/").pop() || "";
+                dc[playerId] = tableRow;
+            }
+        });
+        this.draftCards = dc;
+        console.log(this.draftCards);
+        this.addRows();
+    }
+    addRows() {
+        if (!this.tableHR || !this.ovrTab || !this.draftCards)
+            return;
+        const tabElement = this.ovrTab;
+        const headerRow = tabElement.parentElement;
+        if (!headerRow)
+            return;
+        const ovrIdx = Array.from(headerRow.children).indexOf(tabElement);
+        const minHeader = this.createOvrLabelSpan("MIN");
+        const maxHeader = this.createOvrLabelSpan("MAX");
+        this.tableHR.insertBefore(maxHeader, this.ovrTab.nextSibling);
+        this.tableHR.insertBefore(minHeader, this.ovrTab.nextSibling);
+        Object.entries(this.draftCards).forEach(([playerId, row]) => {
+            const player = this.draftRanking?.getPlayer(playerId);
+            if (!player)
+                return;
+            const minDataCell = document.createElement("td");
+            minDataCell.className = "px-4 text-center";
+            minDataCell.appendChild(this.createRatingSpan(player.getMinOvr()));
+            const maxDataCell = document.createElement("td");
+            maxDataCell.className = "px-4 text-center";
+            maxDataCell.appendChild(this.createRatingSpan(player.getMaxOvr()));
+            row.insertBefore(maxDataCell, row.children[ovrIdx]);
+            row.insertBefore(minDataCell, row.children[ovrIdx]);
+        });
+    }
+    createOvrLabelSpan(text) {
+        const header = document.createElement("th");
+        header.classList.add("px-4", "py-2");
+        header.innerHTML = `<span>${text}</span>`;
+        return header;
+    }
+    // modify to include empty fields
+    createRatingSpan(ovr) {
+        const ratingSpan = document.createElement("span");
+        if (!ovr) {
+            ratingSpan.innerText = "-";
+            ratingSpan.style.color = "#555456";
+            ratingSpan.style.textAlign = "center";
+        }
+        else {
+            ratingSpan.classList.add("badge");
+            ratingSpan.style.userSelect = "none";
+            if (window.userData) {
+                ratingSpan.style.backgroundColor = window.userData.getColorPair(ovr)[0];
+                ratingSpan.style.color = window.userData.getColorPair(ovr)[1];
+            }
+            ratingSpan.innerText = ovr.toString();
+        }
+        return ratingSpan;
+    }
+}
+function handleDraftRankingData(data) {
+    const isUpdate = !!window.draftRankingData;
+    window.draftRankingData = new _roster__WEBPACK_IMPORTED_MODULE_0__.Roster({ players: data });
+    const eventName = isUpdate
+        ? "draftRankingDataUpdated"
+        : "draftRankingDataReady";
+    const event = new CustomEvent(eventName);
+    window.dispatchEvent(event);
+}
+function manipulateDraftRankingPage(el) {
+    if (!visualizerInstance) {
+        if (window.draftRankingData) {
+            visualizerInstance = new DraftRankingVisualizer(el);
+        }
+        else {
+            const handler = () => {
+                visualizerInstance = new DraftRankingVisualizer(el);
+                window.removeEventListener("draftRankingDataReady", handler);
+            };
+            window.addEventListener("draftRankingDataReady", handler);
+        }
     }
 }
 
@@ -481,6 +640,7 @@ class Player {
         return Math.round(correctedAverage * 10);
     }
 }
+let visualizerInstance = null;
 class PlayerStatsVisualizer {
     playerStats;
     parentNode;
@@ -625,15 +785,17 @@ function handlePlayerData(data) {
     window.dispatchEvent(event);
 }
 function manipulatePlayerPage(el) {
-    if (window.playerData) {
-        new PlayerStatsVisualizer(window.playerData, el);
-    }
-    else {
-        const handler = () => {
-            new PlayerStatsVisualizer(window.playerData, el);
-            window.removeEventListener("playerDataReady", handler);
-        };
-        window.addEventListener("playerDataReady", handler);
+    if (!visualizerInstance) {
+        if (window.playerData) {
+            visualizerInstance = new PlayerStatsVisualizer(window.playerData, el);
+        }
+        else {
+            const handler = () => {
+                visualizerInstance = new PlayerStatsVisualizer(window.playerData, el);
+                window.removeEventListener("playerDataReady", handler);
+            };
+            window.addEventListener("playerDataReady", handler);
+        }
     }
 }
 
@@ -674,200 +836,201 @@ class Roster {
     }
 }
 class RosterStatsVisualizer {
-    roster;
-    parent;
+    roster = null;
+    parent = null;
     header = null;
     footer = null;
     dataRows = null;
-    generalButton = null;
-    skillsButton = null;
     tbody = null;
     onGeneralPage = true;
     minHeaderCell = null;
     maxHeaderCell = null;
-    selectElement = null;
     sortColumn = null;
     sortAscending = true;
-    constructor(roster, parentNode) {
-        this.roster = roster;
-        this.parent = parentNode;
-        this.initialize();
-    }
-    initialize() {
-        const tabButtons = this.parent.querySelectorAll(`.btn-toggle`);
-        if (!tabButtons.length)
-            return;
-        const isGeneral = tabButtons[0]?.textContent?.trim() === "General";
-        this.generalButton = isGeneral ? tabButtons[0] : tabButtons[1];
-        this.skillsButton = isGeneral ? tabButtons[1] : tabButtons[0];
-        this.onGeneralPage = this.generalButton.classList.contains("active");
-        // this.skillsButton =
-        this.generalButton.addEventListener("click", (event) => {
-            if (this.onGeneralPage)
-                return;
-            this.onGeneralPage = true;
-            // re-initialize the table references since dom has changed
+    // store bound listeners for easier removal
+    generalButtonClickListener = null;
+    skillsButtonClickListener = null;
+    selectChangeListener = null;
+    headerClickListeners = new Map();
+    constructor() { }
+    attach(el) {
+        this.detach();
+        this.parent = el;
+        if (this.parent && this.roster) {
+            this.initializeVisualizerState();
             this.initializeTableReferences();
-            if (this.dataRows && Object.keys(this.dataRows).length > 0) {
-                this.addNewColumns();
-            }
-            // if (this.sortColumn) this.sortRows()
-        });
-        this.skillsButton.addEventListener("click", (event) => {
-            if (!this.onGeneralPage)
-                return;
-            this.onGeneralPage = false;
-            this.initializeTableReferences();
+            this.attachEventListeners();
+            this.renderColumns();
             // if (this.sortColumn) this.sortRows();
-        });
-        this.selectElement = this.parent.querySelector(`select[value]`);
-        this.selectElement?.addEventListener("input", () => {
-            this.initializeTableReferences();
-            this.addNewColumns();
-        });
-        // initialize table references and add columns on first load
-        this.initializeTableReferences();
-        if (this.dataRows && Object.keys(this.dataRows).length > 0) {
-            this.addNewColumns();
-        }
-    }
-    initializeTableReferences() {
-        // reset references to get the latest dom nodes
-        this.header = this.parent.querySelector(`table thead tr`);
-        this.footer = this.parent.querySelector(`table tfoot tr`);
-        this.tbody = this.parent.querySelector("table tbody");
-        const headerElements = this.header?.querySelectorAll(`th`);
-        headerElements?.forEach((node) => node.addEventListener("click", () => {
-            this.sortColumn = null;
-            this.sortAscending = false;
-        }));
-        const rows = this.parent.querySelectorAll(`tbody tr`);
-        const dr = {};
-        rows.forEach((row) => {
-            const tableRow = row;
-            const playerLink = tableRow.querySelector("a.player-link");
-            if (playerLink?.getAttribute("href")) {
-                const playerId = playerLink.getAttribute("href").split("/").pop() || "";
-                dr[playerId] = tableRow;
-            }
-        });
-        this.dataRows = dr;
-    }
-    getRosterAvgOvr(ovrType) {
-        const playerOvr = {
-            Default: (player) => player.getOvr(),
-            Min: (player) => player.getMinOvr(),
-            Max: (player) => player.getMaxOvr(),
-        };
-        const players = this.roster.getAllPlayers();
-        const values = Object.values(players)
-            .filter((player) => !player.getIsScout() || player.getOvr())
-            .map((player) => playerOvr[ovrType](player));
-        return values.length
-            ? Math.round(values.reduce((sum, value, _, array) => sum + value / array.length, 0))
-            : 0;
-    }
-    createRatingSpan(ovr, scout) {
-        const ratingSpan = document.createElement("span");
-        if (scout && !ovr) {
-            ratingSpan.classList.add("question-mark");
-            ratingSpan.innerText = "?";
-            ratingSpan.style.color = "#bcbabe";
         }
         else {
-            ratingSpan.classList.add("badge");
-            if (window.userData) {
-                ratingSpan.style.color = window.userData.getColorPair(ovr)[1];
-            }
-            ratingSpan.style.userSelect = "none";
-            if (window.userData) {
-                const [bgColor, color] = window.userData.getColorPair(ovr);
-                ratingSpan.style.backgroundColor = bgColor;
-                ratingSpan.style.color = color;
-            }
-            ratingSpan.innerText = ovr.toString();
+            console.warn("Visualizer attached but parent element or roster data is missing.");
+            // cleanup if attachment is incomplete
+            this.detach();
         }
-        return ratingSpan;
     }
-    // private getRowPlayerName(row: HTMLTableRowElement): [string, string] {
-    //   const fullName = row
-    //     .querySelector(`a.player-link span`)
-    //     ?.textContent?.trim();
-    //   const [firstname = "", lastname = ""] = fullName?.split(" ") ?? [];
-    //   return [firstname, lastname];
-    // }
-    // private addSorting(): void {
-    //   if (!this.minHeaderCell || !this.maxHeaderCell) return;
-    //   // min ovr sorting
-    //   this.minHeaderCell.addEventListener("click", () => {
-    //     if (this.sortColumn === "min-ovr") {
-    //       // if already sorting by this column, toggle direction
-    //       this.sortAscending = !this.sortAscending;
-    //     } else {
-    //       this.sortColumn = "min-ovr";
-    //       this.sortAscending = false; // default descending
-    //     }
-    //     this.sortRows();
-    //   });
-    //   // max ovr sorting
-    //   this.maxHeaderCell.addEventListener("click", () => {
-    //     if (this.sortColumn === "max-ovr") {
-    //       this.sortAscending = !this.sortAscending;
-    //     } else {
-    //       this.sortColumn = "max-ovr";
-    //       this.sortAscending = false;
-    //     }
-    //     this.sortRows();
-    //   });
-    // }
-    // private sortRows(): void {
-    //   if (!this.dataRows || !this.sortColumn || !this.tbody) return;
-    //   const tbody = this.tbody;
-    //   const rows = Object.entries(this.dataRows).map(([playerId, row]) => {
-    //     const player = this.roster.getPlayer(playerId);
-    //     const ovrValue = player
-    //       ? this.sortColumn === "min-ovr"
-    //         ? player.getMinOvr()
-    //         : player.getMaxOvr()
-    //       : 0;
-    //     const [firstName, lastName] = this.getRowPlayerName(row);
-    //     return {
-    //       row,
-    //       ovrValue,
-    //       firstName,
-    //       lastName,
-    //       playerId,
-    //     };
-    //   });
-    //   const collator = new Intl.Collator(undefined, {
-    //     usage: "sort",
-    //     sensitivity: "base",
-    //   });
-    //   rows.sort((a, b) => {
-    //     if (a.ovrValue !== b.ovrValue) {
-    //       return this.sortAscending
-    //         ? a.ovrValue - b.ovrValue
-    //         : b.ovrValue - a.ovrValue;
-    //     }
-    //     const lastNameCompare = collator.compare(a.lastName, b.lastName);
-    //     if (lastNameCompare !== 0) {
-    //       return this.sortAscending ? lastNameCompare : -lastNameCompare;
-    //     }
-    //     return this.sortAscending
-    //       ? collator.compare(a.firstName, b.firstName)
-    //       : collator.compare(b.firstName, a.firstName);
-    //   });
-    //   rows.forEach((item) => {
-    //     tbody.appendChild(item.row);
-    //   });
-    // }
-    addNewColumns() {
-        if (!this.onGeneralPage || !this.dataRows || !this.header || !this.footer)
+    detach() {
+        if (!this.parent)
             return;
-        // delete old columns
+        const tabButtons = this.parent.querySelectorAll(`.btn-toggle`);
+        if (tabButtons.length >= 2) {
+            const isGeneral = tabButtons[0]?.textContent?.trim() === "General";
+            const generalButton = isGeneral ? tabButtons[0] : tabButtons[1];
+            const skillsButton = isGeneral ? tabButtons[1] : tabButtons[0];
+            if (this.generalButtonClickListener && generalButton)
+                generalButton.removeEventListener("click", this.generalButtonClickListener);
+            if (this.skillsButtonClickListener && skillsButton)
+                skillsButton.removeEventListener("click", this.skillsButtonClickListener);
+        }
+        const selectElement = this.parent.querySelector(`select[value]`);
+        if (this.selectChangeListener && selectElement)
+            selectElement.removeEventListener("input", this.selectChangeListener);
+        this.headerClickListeners.forEach((listener, th) => {
+            th.removeEventListener("click", listener);
+        });
+        this.headerClickListeners.clear();
         this.parent
             .querySelectorAll(`[data-column]`)
             .forEach((node) => node.remove());
+        this.parent = null;
+        this.header = null;
+        this.footer = null;
+        this.dataRows = null;
+        this.tbody = null;
+        this.minHeaderCell = null;
+        this.maxHeaderCell = null;
+        this.generalButtonClickListener = null;
+        this.skillsButtonClickListener = null;
+        this.selectChangeListener = null;
+    }
+    updateRoster(newRoster) {
+        this.roster = newRoster;
+        if (this.parent && this.roster) {
+            this.initializeTableReferences();
+            this.renderColumns();
+            // if (this.sortColumn) this.sortRows();
+        }
+    }
+    initializeVisualizerState() {
+        if (!this.parent)
+            return;
+        const tabButtons = this.parent.querySelectorAll(`.btn-toggle`);
+        if (!tabButtons.length || tabButtons.length < 2) {
+            this.onGeneralPage = true;
+            return;
+        }
+        const isGeneral = tabButtons[0]?.textContent?.trim() === "General";
+        const generalButton = isGeneral ? tabButtons[0] : tabButtons[1];
+        this.onGeneralPage = generalButton?.classList.contains("active") ?? true;
+    }
+    initializeTableReferences() {
+        if (!this.parent)
+            return;
+        this.header = this.parent.querySelector(`table thead tr`);
+        this.footer = this.parent.querySelector(`table tfoot tr`);
+        this.tbody = this.parent.querySelector("table tbody");
+        this.dataRows = {}; // reset row references
+        if (!this.tbody)
+            return;
+        const rows = this.tbody.querySelectorAll(`tr`);
+        rows.forEach((row) => {
+            const tableRow = row;
+            const playerLink = tableRow.querySelector("a.player-link");
+            const href = playerLink?.getAttribute("href");
+            if (href) {
+                const playerId = href.split("/").pop() || "";
+                if (playerId) {
+                    this.dataRows[playerId] = tableRow;
+                }
+            }
+        });
+    }
+    attachEventListeners() {
+        if (!this.parent)
+            return;
+        const tabButtons = this.parent.querySelectorAll(`.btn-toggle`);
+        if (tabButtons.length === 2) {
+            const isGeneral = tabButtons[0]?.textContent?.trim() === "General";
+            const generalButton = isGeneral ? tabButtons[0] : tabButtons[1];
+            const skillsButton = isGeneral ? tabButtons[1] : tabButtons[0];
+            // store the bound function to remove it later
+            this.generalButtonClickListener = () => {
+                if (this.onGeneralPage)
+                    return;
+                this.onGeneralPage = true;
+                // re-initialize references and render columns for the new state
+                this.initializeTableReferences();
+                this.renderColumns();
+                // if (this.sortColumn) this.sortRows();
+            };
+            if (generalButton)
+                generalButton.addEventListener("click", this.generalButtonClickListener);
+            this.skillsButtonClickListener = () => {
+                console.log("Skills button clicked");
+                if (!this.onGeneralPage)
+                    return;
+                this.onGeneralPage = false;
+                this.initializeTableReferences();
+                this.renderColumns(); // remove columns as we are not on general page
+                // if (this.sortColumn) this.sortRows();
+            };
+            if (skillsButton)
+                skillsButton.addEventListener("click", this.skillsButtonClickListener);
+        }
+        else {
+            console.warn("Could not find two tab buttons for listener attachment.");
+        }
+        const selectElement = this.parent.querySelector(`select[value]`);
+        if (selectElement) {
+            this.selectChangeListener = () => {
+                this.initializeTableReferences();
+                this.renderColumns();
+                // if (this.sortColumn) this.sortRows();
+            };
+            selectElement.addEventListener("input", this.selectChangeListener);
+        }
+        else {
+            console.warn("Could not find select element for listener attachment.");
+        }
+        // clear any stale listeners first (though detach should handle this)
+        this.headerClickListeners.forEach((listener, th) => th.removeEventListener("click", listener));
+        this.headerClickListeners.clear();
+        // add listeners to existing TH elements (not the dynamic min/max ones yet)
+        this.header?.querySelectorAll(`th`).forEach((th) => {
+            // safety check
+            if (!th.hasAttribute("data-column")) {
+                const listener = () => {
+                    this.sortColumn = null;
+                    this.sortAscending = false;
+                    // Potentially update header styles (remove arrows) if sort indicators are used
+                    // Potentially re-sort rows to default if needed
+                };
+                th.addEventListener("click", listener);
+                this.headerClickListeners.set(th, listener); // stored for removal
+            }
+        });
+        // NOTE: Listeners for dynamically added Min/Max header cells
+        // should be added within `renderColumns` after the cells are created.
+    }
+    renderColumns() {
+        if (!this.parent ||
+            !this.roster ||
+            !this.dataRows ||
+            !this.header ||
+            !this.footer) {
+            console.warn("Cannot render columns: Missing parent, roster, or table elements.");
+            return;
+        }
+        // remove previously added dynamic columns and their header/footer cells
+        this.parent
+            .querySelectorAll(`[data-column]`)
+            .forEach((node) => node.remove());
+        // TODO: Remove sorting listeners specifically attached to old min/max headers if sorting is added
+        this.minHeaderCell = null; // reset references
+        this.maxHeaderCell = null;
+        // add columns ONLY if on the General Page ---
+        if (!this.onGeneralPage)
+            return;
         Object.entries(this.dataRows).forEach(([playerId, row]) => {
             const player = this.roster.getPlayer(playerId);
             if (!player)
@@ -880,50 +1043,92 @@ class RosterStatsVisualizer {
             maxDataCell.className = "md:px-4 px-2 py-2 text-center";
             maxDataCell.dataset.column = "max-ovr";
             maxDataCell.appendChild(this.createRatingSpan(player.getMaxOvr(), player.getIsScout()));
-            row.insertBefore(minDataCell, null);
-            row.insertBefore(maxDataCell, null);
+            // append to the end of the row
+            row.appendChild(minDataCell);
+            row.appendChild(maxDataCell);
         });
+        //header
         this.minHeaderCell = document.createElement("th");
-        this.minHeaderCell.className = "md:px-4 px-2 py-2 text-left sort-column";
+        this.minHeaderCell.className = "md:px-4 px-2 py-2 text-center sort-column";
         this.minHeaderCell.innerText = " Min ";
-        this.minHeaderCell.style.textAlign = "center";
         this.minHeaderCell.dataset.column = "min-ovr";
+        // TODO: Add click listener here for sorting if implemented
+        // this.minHeaderCell.addEventListener('click', this.handleMinSortClick);
+        this.header.appendChild(this.minHeaderCell);
         this.maxHeaderCell = document.createElement("th");
-        this.maxHeaderCell.className = "md:px-4 px-2 py-2 text-left sort-column";
+        this.maxHeaderCell.className = "md:px-4 px-2 py-2 text-center sort-column";
         this.maxHeaderCell.innerText = " Max ";
-        this.maxHeaderCell.style.textAlign = "center";
         this.maxHeaderCell.dataset.column = "max-ovr";
-        this.header.insertBefore(this.minHeaderCell, null);
-        this.header.insertBefore(this.maxHeaderCell, null);
+        // TODO: Add click listener here for sorting if implemented
+        // this.maxHeaderCell.addEventListener('click', this.handleMaxSortClick);
+        this.header.appendChild(this.maxHeaderCell);
+        // footer
         const minFooterCell = document.createElement("td");
-        minFooterCell.className = "md:px-4 px-2 py-2";
+        minFooterCell.className = "md:px-4 px-2 py-2 text-center";
         minFooterCell.dataset.column = "min-ovr";
         minFooterCell.appendChild(this.createRatingSpan(this.getRosterAvgOvr("Min"), false));
         const maxFooterCell = document.createElement("td");
-        maxFooterCell.className = "md:px-4 px-2 py-2";
+        maxFooterCell.className = "md:px-4 px-2 py-2 text-center";
         maxFooterCell.dataset.column = "max-ovr";
         maxFooterCell.appendChild(this.createRatingSpan(this.getRosterAvgOvr("Max"), false));
-        this.footer.insertBefore(minFooterCell, null);
-        this.footer.insertBefore(maxFooterCell, null);
-        // this.addSorting();
+        this.footer.appendChild(minFooterCell);
+        this.footer.appendChild(maxFooterCell);
+        console.log("Min/Max columns added.");
+    }
+    getRosterAvgOvr(ovrType) {
+        if (!this.roster)
+            return 0;
+        const playerOvr = {
+            Default: (player) => player.getOvr(),
+            Min: (player) => player.getMinOvr(),
+            Max: (player) => player.getMaxOvr(),
+        };
+        const players = this.roster.getAllPlayers();
+        if (!players)
+            return 0;
+        const values = Object.values(players)
+            .filter((player) => player && (!player.getIsScout() || player.getOvr() > 0)) // ensure player exists & filter scouts without OVR
+            .map((player) => playerOvr[ovrType](player));
+        return values.length
+            ? Math.round(values.reduce((sum, value, _, array) => sum + value / array.length, 0))
+            : 0;
+    }
+    createRatingSpan(ovr, scout) {
+        const ratingSpan = document.createElement("span");
+        if (scout && (!ovr || ovr <= 0)) {
+            // treat 0 OVR for scout same as unknown
+            ratingSpan.classList.add("question-mark");
+            ratingSpan.innerText = "?";
+            ratingSpan.style.color = "#bcbabe";
+            ratingSpan.style.textAlign = "center";
+        }
+        else {
+            ratingSpan.classList.add("badge");
+            ratingSpan.style.userSelect = "none";
+            ratingSpan.innerText = ovr.toString();
+            if (window.userData &&
+                typeof window.userData.getColorPair === "function") {
+                try {
+                    const [bgColor, color] = window.userData.getColorPair(ovr);
+                    ratingSpan.style.backgroundColor = bgColor;
+                    ratingSpan.style.color = color;
+                }
+                catch (e) {
+                    console.error("Error getting color pair for OVR:", ovr, e);
+                }
+            }
+        }
+        return ratingSpan;
     }
 }
+const visualizerInstance = new RosterStatsVisualizer();
 function handleRosterData(data) {
-    window.rosterData = new Roster(data);
-    const event = new CustomEvent("rosterDataReady");
-    window.dispatchEvent(event);
+    const newRoster = new Roster(data);
+    // notify the visualizer instance about the new data
+    visualizerInstance.updateRoster(newRoster);
 }
 function manipulateRosterPage(el) {
-    if (window.rosterData) {
-        new RosterStatsVisualizer(window.rosterData, el);
-    }
-    else {
-        const handler = () => {
-            new RosterStatsVisualizer(window.rosterData, el);
-            window.removeEventListener("rosterDataReady", handler);
-        };
-        window.addEventListener("rosterDataReady", handler);
-    }
+    visualizerInstance.attach(el);
 }
 
 
@@ -1064,6 +1269,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _pages_roster__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./pages/roster */ "./src/pages/roster.ts");
 /* harmony import */ var _user__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./user */ "./src/user.ts");
 /* harmony import */ var _pages_draft_class__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./pages/draft-class */ "./src/pages/draft-class.ts");
+/* harmony import */ var _pages_draft_ranking__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./pages/draft-ranking */ "./src/pages/draft-ranking.ts");
+
 
 
 
@@ -1095,6 +1302,12 @@ __webpack_require__.r(__webpack_exports__);
             pattern: /\/api\/user$/,
             handler: (data) => {
                 (0,_user__WEBPACK_IMPORTED_MODULE_3__.handleUserData)(data);
+            },
+        },
+        draftRanking: {
+            pattern: /\/api\/draft\/[^\/]+\/rankings/,
+            handler: (data) => {
+                (0,_pages_draft_ranking__WEBPACK_IMPORTED_MODULE_5__.handleDraftRankingData)(data.data);
             },
         },
     };

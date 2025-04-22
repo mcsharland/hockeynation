@@ -41,11 +41,9 @@ export class Roster {
   }
 }
 
-let visualizerInstance: RosterStatsVisualizer | null = null;
-
 class RosterStatsVisualizer {
   private roster: Roster | null = null;
-  private parent: HTMLElement;
+  private parent: HTMLElement | null = null;
   private header: HTMLTableRowElement | null = null;
   private footer: HTMLTableRowElement | null = null;
   private dataRows: DataRow | null = null;
@@ -56,110 +54,290 @@ class RosterStatsVisualizer {
   private sortColumn: "min-ovr" | "max-ovr" | null = null;
   private sortAscending: boolean = true;
 
-  constructor(el: HTMLElement) {
+  // store bound listeners for easier removal
+  private generalButtonClickListener: (() => void) | null = null;
+  private skillsButtonClickListener: (() => void) | null = null;
+  private selectChangeListener: (() => void) | null = null;
+  private headerClickListeners: Map<HTMLElement, () => void> = new Map();
+
+  constructor() {}
+
+  public attach(el: HTMLElement) {
+    this.detach();
+
     this.parent = el;
 
-    window.addEventListener(
-      "rosterDataUpdated",
-      this.onRosterUpdate.bind(this),
-    );
-
-    if (window.rosterData) {
-      this.roster = window.rosterData;
+    if (this.parent && this.roster) {
+      this.initializeVisualizerState();
       this.initializeTableReferences();
-    }
-
-    this.initialize();
-  }
-
-  private onRosterUpdate(): void {
-    if (window.rosterData) {
-      this.roster = window.rosterData;
-      this.initializeTableReferences();
-      if (
-        this.onGeneralPage &&
-        this.dataRows &&
-        Object.keys(this.dataRows).length > 0
-      ) {
-        this.addNewColumns();
-      }
+      this.attachEventListeners();
+      this.renderColumns();
+      // if (this.sortColumn) this.sortRows();
+    } else {
+      console.warn(
+        "Visualizer attached but parent element or roster data is missing.",
+      );
+      // cleanup if attachment is incomplete
+      this.detach();
     }
   }
 
-  private initialize() {
-    const tabButtons = this.parent.querySelectorAll(
-      `.btn-toggle`,
-    ) as NodeListOf<HTMLButtonElement>;
-    if (!tabButtons.length) return;
+  public detach() {
+    if (!this.parent) return;
+
+    const tabButtons =
+      this.parent.querySelectorAll<HTMLButtonElement>(`.btn-toggle`);
+    if (tabButtons.length >= 2) {
+      const isGeneral = tabButtons[0]?.textContent?.trim() === "General";
+      const generalButton = isGeneral ? tabButtons[0] : tabButtons[1];
+      const skillsButton = isGeneral ? tabButtons[1] : tabButtons[0];
+      if (this.generalButtonClickListener && generalButton)
+        generalButton.removeEventListener(
+          "click",
+          this.generalButtonClickListener,
+        );
+      if (this.skillsButtonClickListener && skillsButton)
+        skillsButton.removeEventListener(
+          "click",
+          this.skillsButtonClickListener,
+        );
+    }
+
+    const selectElement = this.parent.querySelector(`select[value]`);
+    if (this.selectChangeListener && selectElement)
+      selectElement.removeEventListener("input", this.selectChangeListener);
+
+    this.headerClickListeners.forEach((listener, th) => {
+      th.removeEventListener("click", listener);
+    });
+    this.headerClickListeners.clear();
+
+    this.parent
+      .querySelectorAll(`[data-column]`)
+      .forEach((node) => node.remove());
+
+    this.parent = null;
+    this.header = null;
+    this.footer = null;
+    this.dataRows = null;
+    this.tbody = null;
+    this.minHeaderCell = null;
+    this.maxHeaderCell = null;
+
+    this.generalButtonClickListener = null;
+    this.skillsButtonClickListener = null;
+    this.selectChangeListener = null;
+  }
+
+  public updateRoster(newRoster: Roster | null) {
+    this.roster = newRoster;
+    if (this.parent && this.roster) {
+      this.initializeTableReferences();
+      this.renderColumns();
+      // if (this.sortColumn) this.sortRows();
+    }
+  }
+
+  private initializeVisualizerState() {
+    if (!this.parent) return;
+    const tabButtons =
+      this.parent.querySelectorAll<HTMLButtonElement>(`.btn-toggle`);
+    if (!tabButtons.length || tabButtons.length < 2) {
+      this.onGeneralPage = true;
+      return;
+    }
 
     const isGeneral = tabButtons[0]?.textContent?.trim() === "General";
     const generalButton = isGeneral ? tabButtons[0] : tabButtons[1];
-    const skillsButton = isGeneral ? tabButtons[1] : tabButtons[0];
-    this.onGeneralPage = generalButton.classList.contains("active");
 
-    // this.skillsButton =
-    generalButton.addEventListener("click", () => {
-      if (this.onGeneralPage) return;
-      this.onGeneralPage = true;
-
-      // re-initialize the table references since dom has changed
-      this.initializeTableReferences();
-
-      if (this.dataRows && Object.keys(this.dataRows).length > 0) {
-        this.addNewColumns();
-      }
-      // if (this.sortColumn) this.sortRows()
-    });
-
-    skillsButton.addEventListener("click", () => {
-      if (!this.onGeneralPage) return;
-      this.onGeneralPage = false;
-      this.initializeTableReferences();
-      // if (this.sortColumn) this.sortRows();
-    });
-
-    const selectElement = this.parent.querySelector(`select[value]`);
-    selectElement?.addEventListener("input", () => {
-      this.initializeTableReferences();
-      this.addNewColumns();
-    });
-
-    // initialize table references and add columns on first load
-    this.initializeTableReferences();
-    if (this.dataRows && Object.keys(this.dataRows).length > 0) {
-      this.addNewColumns();
-    }
+    this.onGeneralPage = generalButton?.classList.contains("active") ?? true;
   }
 
   private initializeTableReferences() {
-    // reset references to get the latest dom nodes
+    if (!this.parent) return;
 
     this.header = this.parent.querySelector(`table thead tr`);
     this.footer = this.parent.querySelector(`table tfoot tr`);
     this.tbody = this.parent.querySelector("table tbody");
 
-    const headerElements = this.header?.querySelectorAll(`th`);
-    headerElements?.forEach((node) =>
-      node.addEventListener("click", () => {
-        this.sortColumn = null;
-        this.sortAscending = false;
-      }),
-    );
+    this.dataRows = {} as DataRow; // reset row references
+    if (!this.tbody) return;
 
-    const rows = this.parent.querySelectorAll(`tbody tr`);
-    const dr = {} as DataRow;
-
+    const rows = this.tbody.querySelectorAll(`tr`);
     rows.forEach((row) => {
       const tableRow = row as HTMLTableRowElement;
       const playerLink = tableRow.querySelector("a.player-link");
-      if (playerLink?.getAttribute("href")) {
-        const playerId =
-          playerLink.getAttribute("href")!.split("/").pop() || "";
-        dr[playerId] = tableRow;
+      const href = playerLink?.getAttribute("href");
+      if (href) {
+        const playerId = href.split("/").pop() || "";
+        if (playerId) {
+          this.dataRows![playerId] = tableRow;
+        }
+      }
+    });
+  }
+
+  private attachEventListeners() {
+    if (!this.parent) return;
+
+    const tabButtons =
+      this.parent.querySelectorAll<HTMLButtonElement>(`.btn-toggle`);
+    if (tabButtons.length === 2) {
+      const isGeneral = tabButtons[0]?.textContent?.trim() === "General";
+      const generalButton = isGeneral ? tabButtons[0] : tabButtons[1];
+      const skillsButton = isGeneral ? tabButtons[1] : tabButtons[0];
+
+      // store the bound function to remove it later
+      this.generalButtonClickListener = () => {
+        if (this.onGeneralPage) return;
+        this.onGeneralPage = true;
+
+        // re-initialize references and render columns for the new state
+        this.initializeTableReferences();
+        this.renderColumns();
+        // if (this.sortColumn) this.sortRows();
+      };
+
+      if (generalButton)
+        generalButton.addEventListener(
+          "click",
+          this.generalButtonClickListener,
+        );
+
+      this.skillsButtonClickListener = () => {
+        console.log("Skills button clicked");
+        if (!this.onGeneralPage) return;
+        this.onGeneralPage = false;
+        this.initializeTableReferences();
+        this.renderColumns(); // remove columns as we are not on general page
+        // if (this.sortColumn) this.sortRows();
+      };
+      if (skillsButton)
+        skillsButton.addEventListener("click", this.skillsButtonClickListener);
+    } else {
+      console.warn("Could not find two tab buttons for listener attachment.");
+    }
+
+    const selectElement = this.parent.querySelector(`select[value]`);
+    if (selectElement) {
+      this.selectChangeListener = () => {
+        this.initializeTableReferences();
+        this.renderColumns();
+        // if (this.sortColumn) this.sortRows();
+      };
+      selectElement.addEventListener("input", this.selectChangeListener);
+    } else {
+      console.warn("Could not find select element for listener attachment.");
+    }
+
+    // clear any stale listeners first (though detach should handle this)
+    this.headerClickListeners.forEach((listener, th) =>
+      th.removeEventListener("click", listener),
+    );
+    this.headerClickListeners.clear();
+
+    // add listeners to existing TH elements (not the dynamic min/max ones yet)
+    this.header?.querySelectorAll(`th`).forEach((th) => {
+      // safety check
+      if (!th.hasAttribute("data-column")) {
+        const listener = () => {
+          this.sortColumn = null;
+          this.sortAscending = false;
+          // Potentially update header styles (remove arrows) if sort indicators are used
+          // Potentially re-sort rows to default if needed
+        };
+        th.addEventListener("click", listener);
+        this.headerClickListeners.set(th, listener); // stored for removal
       }
     });
 
-    this.dataRows = dr;
+    // NOTE: Listeners for dynamically added Min/Max header cells
+    // should be added within `renderColumns` after the cells are created.
+  }
+
+  private renderColumns(): void {
+    if (
+      !this.parent ||
+      !this.roster ||
+      !this.dataRows ||
+      !this.header ||
+      !this.footer
+    ) {
+      console.warn(
+        "Cannot render columns: Missing parent, roster, or table elements.",
+      );
+      return;
+    }
+
+    // remove previously added dynamic columns and their header/footer cells
+    this.parent
+      .querySelectorAll(`[data-column]`)
+      .forEach((node) => node.remove());
+    // TODO: Remove sorting listeners specifically attached to old min/max headers if sorting is added
+    this.minHeaderCell = null; // reset references
+    this.maxHeaderCell = null;
+
+    // add columns ONLY if on the General Page ---
+    if (!this.onGeneralPage) return;
+
+    Object.entries(this.dataRows).forEach(([playerId, row]) => {
+      const player = this.roster!.getPlayer(playerId);
+      if (!player) return;
+
+      const minDataCell = document.createElement("td");
+      minDataCell.className = "md:px-4 px-2 py-2 text-center";
+      minDataCell.dataset.column = "min-ovr";
+      minDataCell.appendChild(
+        this.createRatingSpan(player.getMinOvr(), player.getIsScout()),
+      );
+
+      const maxDataCell = document.createElement("td");
+      maxDataCell.className = "md:px-4 px-2 py-2 text-center";
+      maxDataCell.dataset.column = "max-ovr";
+      maxDataCell.appendChild(
+        this.createRatingSpan(player.getMaxOvr(), player.getIsScout()),
+      );
+
+      // append to the end of the row
+      row.appendChild(minDataCell);
+      row.appendChild(maxDataCell);
+    });
+
+    //header
+    this.minHeaderCell = document.createElement("th");
+    this.minHeaderCell.className = "md:px-4 px-2 py-2 text-center sort-column";
+    this.minHeaderCell.innerText = " Min ";
+    this.minHeaderCell.dataset.column = "min-ovr";
+    // TODO: Add click listener here for sorting if implemented
+    // this.minHeaderCell.addEventListener('click', this.handleMinSortClick);
+    this.header.appendChild(this.minHeaderCell);
+
+    this.maxHeaderCell = document.createElement("th");
+    this.maxHeaderCell.className = "md:px-4 px-2 py-2 text-center sort-column";
+    this.maxHeaderCell.innerText = " Max ";
+    this.maxHeaderCell.dataset.column = "max-ovr";
+    // TODO: Add click listener here for sorting if implemented
+    // this.maxHeaderCell.addEventListener('click', this.handleMaxSortClick);
+    this.header.appendChild(this.maxHeaderCell);
+
+    // footer
+    const minFooterCell = document.createElement("td");
+    minFooterCell.className = "md:px-4 px-2 py-2 text-center";
+    minFooterCell.dataset.column = "min-ovr";
+    minFooterCell.appendChild(
+      this.createRatingSpan(this.getRosterAvgOvr("Min"), false),
+    );
+
+    const maxFooterCell = document.createElement("td");
+    maxFooterCell.className = "md:px-4 px-2 py-2 text-center";
+    maxFooterCell.dataset.column = "max-ovr";
+    maxFooterCell.appendChild(
+      this.createRatingSpan(this.getRosterAvgOvr("Max"), false),
+    );
+
+    this.footer.appendChild(minFooterCell);
+    this.footer.appendChild(maxFooterCell);
+    console.log("Min/Max columns added.");
   }
 
   private getRosterAvgOvr(ovrType: OvrType): number {
@@ -170,9 +348,12 @@ class RosterStatsVisualizer {
       Max: (player: Player) => player.getMaxOvr(),
     };
     const players = this.roster.getAllPlayers();
+    if (!players) return 0;
 
     const values = Object.values(players)
-      .filter((player) => !player.getIsScout() || player.getOvr())
+      .filter(
+        (player) => player && (!player.getIsScout() || player.getOvr() > 0),
+      ) // ensure player exists & filter scouts without OVR
       .map((player) => playerOvr[ovrType](player));
 
     return values.length
@@ -187,28 +368,32 @@ class RosterStatsVisualizer {
 
   private createRatingSpan(ovr: number, scout: boolean): HTMLSpanElement {
     const ratingSpan: HTMLSpanElement = document.createElement("span");
-    if (scout && !ovr) {
+    if (scout && (!ovr || ovr <= 0)) {
+      // treat 0 OVR for scout same as unknown
       ratingSpan.classList.add("question-mark");
       ratingSpan.innerText = "?";
       ratingSpan.style.color = "#bcbabe";
+      ratingSpan.style.textAlign = "center";
     } else {
       ratingSpan.classList.add("badge");
-      if (window.userData) {
-        ratingSpan.style.color = window.userData.getColorPair(ovr)[1];
-      }
       ratingSpan.style.userSelect = "none";
-
-      if (window.userData) {
-        const [bgColor, color] = window.userData.getColorPair(ovr);
-        ratingSpan.style.backgroundColor = bgColor;
-        ratingSpan.style.color = color;
-      }
       ratingSpan.innerText = ovr.toString();
-    }
 
+      if (
+        window.userData &&
+        typeof window.userData.getColorPair === "function"
+      ) {
+        try {
+          const [bgColor, color] = window.userData.getColorPair(ovr);
+          ratingSpan.style.backgroundColor = bgColor;
+          ratingSpan.style.color = color;
+        } catch (e) {
+          console.error("Error getting color pair for OVR:", ovr, e);
+        }
+      }
+    }
     return ratingSpan;
   }
-
   // private getRowPlayerName(row: HTMLTableRowElement): [string, string] {
   //   const fullName = row
   //     .querySelector(`a.player-link span`)
@@ -297,99 +482,22 @@ class RosterStatsVisualizer {
   //   });
   // }
 
-  private addNewColumns(): void {
-    if (
-      !this.onGeneralPage ||
-      !this.dataRows ||
-      !this.header ||
-      !this.footer ||
-      !this.roster
-    )
-      return;
-
-    // delete old columns
-    this.parent
-      .querySelectorAll(`[data-column]`)
-      .forEach((node) => node.remove());
-
-    Object.entries(this.dataRows).forEach(([playerId, row]) => {
-      const player = this.roster?.getPlayer(playerId);
-      if (!player) return;
-
-      const minDataCell = document.createElement("td");
-      minDataCell.className = "md:px-4 px-2 py-2 text-center";
-      minDataCell.dataset.column = "min-ovr";
-
-      minDataCell.appendChild(
-        this.createRatingSpan(player.getMinOvr(), player.getIsScout()),
-      );
-
-      const maxDataCell = document.createElement("td");
-      maxDataCell.className = "md:px-4 px-2 py-2 text-center";
-      maxDataCell.dataset.column = "max-ovr";
-
-      maxDataCell.appendChild(
-        this.createRatingSpan(player.getMaxOvr(), player.getIsScout()),
-      );
-
-      row.insertBefore(minDataCell, null);
-      row.insertBefore(maxDataCell, null);
-    });
-
-    this.minHeaderCell = document.createElement("th");
-    this.minHeaderCell.className = "md:px-4 px-2 py-2 text-left sort-column";
-    this.minHeaderCell.innerText = " Min ";
-    this.minHeaderCell.style.textAlign = "center";
-    this.minHeaderCell.dataset.column = "min-ovr";
-
-    this.maxHeaderCell = document.createElement("th");
-    this.maxHeaderCell.className = "md:px-4 px-2 py-2 text-left sort-column";
-    this.maxHeaderCell.innerText = " Max ";
-    this.maxHeaderCell.style.textAlign = "center";
-    this.maxHeaderCell.dataset.column = "max-ovr";
-
-    this.header.insertBefore(this.minHeaderCell, null);
-    this.header.insertBefore(this.maxHeaderCell, null);
-
-    const minFooterCell = document.createElement("td");
-    minFooterCell.className = "md:px-4 px-2 py-2";
-    minFooterCell.dataset.column = "min-ovr";
-
-    minFooterCell.appendChild(
-      this.createRatingSpan(this.getRosterAvgOvr("Min"), false),
-    );
-
-    const maxFooterCell = document.createElement("td");
-    maxFooterCell.className = "md:px-4 px-2 py-2";
-    maxFooterCell.dataset.column = "max-ovr";
-
-    maxFooterCell.appendChild(
-      this.createRatingSpan(this.getRosterAvgOvr("Max"), false),
-    );
-
-    this.footer.insertBefore(minFooterCell, null);
-    this.footer.insertBefore(maxFooterCell, null);
-
-    // this.addSorting();
-  }
+  // --- Sorting Logic (Placeholder - Needs implementation) ---
+  // private addSortingListenersToMinMaxHeaders(): void { ... }
+  // private handleMinSortClick = () => { ... } // Use arrow fn or .bind(this)
+  // private handleMaxSortClick = () => { ... }
+  // private sortRows(): void { ... }
+  // private getRowPlayerName(row: HTMLTableRowElement): [string, string] { ... }
 }
 
+const visualizerInstance = new RosterStatsVisualizer();
+
 export function handleRosterData(data: any) {
-  window.rosterData = new Roster(data);
-  const event = new CustomEvent("rosterDataReady");
-  window.dispatchEvent(event);
+  const newRoster = new Roster(data);
+  // notify the visualizer instance about the new data
+  visualizerInstance.updateRoster(newRoster);
 }
 
 export function manipulateRosterPage(el: HTMLElement) {
-  if (!visualizerInstance) {
-    if (window.rosterData) {
-      visualizerInstance = new RosterStatsVisualizer(el);
-    } else {
-      const handler = () => {
-        visualizerInstance = new RosterStatsVisualizer(el);
-        window.removeEventListener("rosterDataReady", handler);
-      };
-      window.addEventListener("rosterDataReady", handler);
-    }
-  }
+  visualizerInstance.attach(el);
 }

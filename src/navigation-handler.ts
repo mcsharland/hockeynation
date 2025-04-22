@@ -1,5 +1,6 @@
 import { ObserverManager } from "./observer-handler";
 import { manipulateDraftClassPage } from "./pages/draft-class";
+import { manipulateDraftRankingPage } from "./pages/draft-ranking";
 import { manipulatePlayerPage } from "./pages/player";
 import { manipulateRosterPage } from "./pages/roster";
 
@@ -31,6 +32,13 @@ const PAGE_HANDLERS: Record<string, PageHandler> = {
     selector: ".stats-container",
     handler: (el) => {
       manipulateDraftClassPage(el);
+    },
+  },
+  draftRanking: {
+    url: "https://hockey-nation.com/draft-ranking",
+    selector: "table tbody tr",
+    handler: (el) => {
+      manipulateDraftRankingPage(el);
     },
   },
 };

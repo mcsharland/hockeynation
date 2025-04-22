@@ -3,6 +3,7 @@ import { initNavigationHandler } from "./navigation-handler";
 import { handleRosterData } from "./pages/roster";
 import { handleUserData, User } from "./user";
 import { handleDraftClassData } from "./pages/draft-class";
+import { handleDraftRankingData } from "./pages/draft-ranking";
 
 (function () {
   initNavigationHandler(); // Initialize Observer from script context
@@ -31,6 +32,12 @@ import { handleDraftClassData } from "./pages/draft-class";
       pattern: /\/api\/user$/,
       handler: (data: any) => {
         handleUserData(data);
+      },
+    },
+    draftRanking: {
+      pattern: /\/api\/draft\/[^\/]+\/rankings/,
+      handler: (data: any) => {
+        handleDraftRankingData(data.data);
       },
     },
   };
