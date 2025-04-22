@@ -640,95 +640,133 @@ class Player {
         return Math.round(correctedAverage * 10);
     }
 }
-let visualizerInstance = null;
+let playerVisualizerInstance = null;
 class PlayerStatsVisualizer {
-    playerStats;
-    parentNode;
+    playerStats = null;
+    parentNode = null;
     ovrElement = null;
     statsTable = null;
     statsRows = null;
-    constructor(playerStats, parentNode) {
-        this.playerStats = playerStats;
-        this.parentNode = parentNode;
-        this.initialize();
-    }
-    initialize() {
-        const puck = this.parentNode.querySelector("svg.fa-hockey-puck");
-        if (!puck) {
+    skillsHeaderDiv = null;
+    dropdownElement = null;
+    dropdownListener = null; // store listeners
+    constructor() { }
+    attach(el, playerData) {
+        this.detach(); // clean up previous state first
+        if (!playerData)
+            return;
+        this.parentNode = el;
+        this.playerStats = playerData;
+        if (!this.initializeDOMReferences()) {
+            this.detach(); // clean up if initialization failed
             return;
         }
-        this.statsTable = puck.closest(`tbody`);
-        if (!this.statsTable) {
-            return;
-        }
-        // get stats rows
-        this.statsRows =
-            this.statsTable.querySelectorAll("tr");
-        if (!this.statsRows.length) {
-            return;
-        }
-        // get OVR element
-        this.ovrElement =
-            this.parentNode.querySelector(".polygon text");
-        // add dropdown to skills header
-        this.addDropdown();
-        // initialize display
+        this.attachUIAndListeners();
         this.updateHockeyPucks("Default");
     }
-    // Consider not adding / disabling when all of a player's stats are maxed
-    addDropdown() {
-        const div = Array.from(document.querySelectorAll(".card-header")).filter((d) => d?.textContent?.trim() === "Skills")?.[0];
-        if (div === undefined)
+    detach() {
+        if (!this.parentNode)
             return;
-        if (div.querySelector(".stats-dropdown"))
+        if (this.dropdownElement && this.dropdownListener) {
+            this.dropdownElement.removeEventListener("change", this.dropdownListener);
+        }
+        if (this.dropdownElement && this.dropdownElement.parentNode) {
+            this.dropdownElement.parentNode.removeChild(this.dropdownElement);
+        }
+        this.parentNode = null;
+        this.playerStats = null;
+        this.ovrElement = null;
+        this.statsTable = null;
+        this.statsRows = null;
+        this.skillsHeaderDiv = null;
+        this.dropdownElement = null;
+        this.dropdownListener = null;
+    }
+    initializeDOMReferences() {
+        if (!this.parentNode)
+            return false;
+        this.ovrElement =
+            this.parentNode.querySelector(".polygon text");
+        const puck = this.parentNode.querySelector("svg.fa-hockey-puck");
+        this.statsTable = puck
+            ? puck.closest(`tbody`)
+            : null;
+        if (this.statsTable) {
+            this.statsRows =
+                this.statsTable.querySelectorAll("tr");
+            if (!this.statsRows || this.statsRows.length === 0) {
+                return false; // critical
+            }
+        }
+        const headers = Array.from(this.parentNode.querySelectorAll(".card-header"));
+        this.skillsHeaderDiv = headers.find((d) => d?.textContent?.trim() === "Skills");
+        return !!(this.ovrElement || this.statsTable);
+    }
+    attachUIAndListeners() {
+        if (!this.skillsHeaderDiv)
             return;
-        const dropdown = document.createElement("select");
-        dropdown.classList.add("stats-dropdown");
-        dropdown.style.marginLeft = "auto";
-        dropdown.style.fontSize = "12px";
-        dropdown.style.padding = "2px";
-        dropdown.style.border = "none";
-        dropdown.style.backgroundColor = "#fff";
-        dropdown.style.color = "#000";
-        dropdown.style.width = "85px";
-        dropdown.style.height = "18px";
-        dropdown.style.lineHeight = "18px";
-        dropdown.style.paddingTop = "0px";
-        dropdown.style.paddingBottom = "0px";
-        dropdown.style.paddingRight = "21px";
-        dropdown.style.borderRadius = "2px";
-        dropdown.addEventListener("change", (event) => {
+        if (this.skillsHeaderDiv.querySelector(".stats-dropdown-player"))
+            return; // safety
+        this.dropdownElement = document.createElement("select");
+        this.dropdownElement.classList.add("stats-dropdown-player");
+        this.dropdownElement.style.marginLeft = "auto";
+        this.dropdownElement.style.fontSize = "12px";
+        this.dropdownElement.style.padding = "2px";
+        this.dropdownElement.style.border = "none";
+        this.dropdownElement.style.backgroundColor = "#fff";
+        this.dropdownElement.style.color = "#000";
+        this.dropdownElement.style.width = "85px";
+        this.dropdownElement.style.height = "18px";
+        this.dropdownElement.style.lineHeight = "18px";
+        this.dropdownElement.style.paddingTop = "0px";
+        this.dropdownElement.style.paddingBottom = "0px";
+        this.dropdownElement.style.paddingRight = "21px";
+        this.dropdownElement.style.borderRadius = "2px";
+        // store the listener function
+        this.dropdownListener = (event) => {
             const selectElement = event.target;
             const selectedOption = selectElement.value;
             this.updateHockeyPucks(selectedOption);
-        });
+        };
+        this.dropdownElement.addEventListener("change", this.dropdownListener);
         const options = ["Default", "Min", "Max"];
         options.forEach((option) => {
             const optionElement = document.createElement("option");
             optionElement.value = option;
             optionElement.textContent = option;
             optionElement.style.textAlign = "center";
-            dropdown.appendChild(optionElement);
+            this.dropdownElement.appendChild(optionElement);
         });
-        div.appendChild(dropdown);
+        this.skillsHeaderDiv.appendChild(this.dropdownElement);
     }
     updateHockeyPucks(option) {
-        if (!this.statsRows)
+        if (!this.statsRows || !this.playerStats)
             return;
         const statsToUse = option === "Min"
             ? this.playerStats.getMinStats()
             : option === "Max"
                 ? this.playerStats.getMaxStats()
                 : this.playerStats.getStats();
+        if (!statsToUse)
+            return;
         this.statsRows.forEach((row) => {
-            const statName = _mappings_skill_mappings__WEBPACK_IMPORTED_MODULE_0__.SKILL_NAME_TO_ID[row.cells[0]?.textContent?.trim() || ""];
+            const skillNameText = row.cells[0]?.textContent?.trim();
+            if (!skillNameText)
+                return;
+            const statName = _mappings_skill_mappings__WEBPACK_IMPORTED_MODULE_0__.SKILL_NAME_TO_ID[skillNameText];
+            if (!statName)
+                return;
             const pucksCell = row.cells[1];
-            const pucks = pucksCell.querySelectorAll("svg.fa-hockey-puck");
             const ratingCell = row.cells[2];
-            const ratingSpan = ratingCell?.querySelector("span");
-            const baseStat = this.playerStats.getStats()[statName];
+            if (!pucksCell || !ratingCell)
+                return;
+            const pucks = pucksCell.querySelectorAll("svg.fa-hockey-puck");
+            const ratingSpan = ratingCell.querySelector("span");
+            // need base stats for comparison
+            const baseStats = this.playerStats.getStats(); // playerStats is checked above
+            const baseStat = baseStats ? baseStats[statName] : null;
             const displayStat = statsToUse[statName];
-            if (baseStat && displayStat) {
+            if (baseStat && displayStat && pucks.length > 0) {
                 pucks.forEach((puck, index) => {
                     puck.classList.remove("text-blue-400");
                     if (index < displayStat.rating) {
@@ -747,34 +785,59 @@ class PlayerStatsVisualizer {
                         puck.classList.remove("max-level");
                     }
                 });
-                // update the rating value in the span element
                 if (ratingSpan) {
                     ratingSpan.textContent = `(${displayStat.rating})`;
                 }
             }
         });
-        // update OVR
+        if (!this.playerStats)
+            return;
         const ovr = option === "Min"
             ? this.playerStats.getMinOvr()
             : option === "Max"
                 ? this.playerStats.getMaxOvr()
                 : this.playerStats.getOvr();
-        if (option !== "Default" || !this.playerStats.getIsScout()) {
-            this.updateOVR(ovr);
+        // confirm scout logic later
+        let ovrToShow = ovr;
+        if (option === "Default" &&
+            this.playerStats.getIsScout() &&
+            this.playerStats.getOvr() > 0) {
+            ovrToShow = this.playerStats.getOvr();
         }
-        else if (this.playerStats.getOvr() !== 0) {
+        // only update if we have a valid number (Min/Max calc returns 0 for scouts)
+        // or if it's default view for a scout with known OVR
+        if (ovrToShow > 0 ||
+            (option === "Default" &&
+                this.playerStats.getIsScout() &&
+                this.playerStats.getOvr() > 0)) {
+            this.updateOVR(ovrToShow);
+        }
+        else if (option !== "Default" && this.playerStats.getIsScout()) {
+            // Handle displaying Min/Max for a scout where calculation is 0
+            this.updateOVR(this.playerStats.getOvr()); // show default OVR as fallback?
+        }
+        else {
+            // fallback to default OVR if other conditions aren't met
             this.updateOVR(this.playerStats.getOvr());
         }
     }
     updateOVR(ovr) {
         if (!this.ovrElement)
             return;
-        this.ovrElement.textContent = ovr.toString();
+        this.ovrElement.textContent = ovr > 0 ? ovr.toString() : "?"; // Show ? if OVR is 0, though in practice this should never happen
         const polygonElement = this.ovrElement.parentElement?.querySelector("polygon");
-        if (polygonElement) {
-            if (window.userData) {
-                polygonElement.setAttribute("fill", window.userData.getColorPair(ovr)[0]);
-                this.ovrElement.setAttribute("fill", window.userData.getColorPair(ovr)[1]);
+        if (polygonElement && ovr > 0) {
+            // only color if OVR > 0
+            if (window.userData &&
+                typeof window.userData.getColorPair === "function") {
+                try {
+                    const [bgColor, color] = window.userData.getColorPair(ovr);
+                    polygonElement.setAttribute("fill", bgColor);
+                    this.ovrElement.setAttribute("fill", color);
+                }
+                catch (e) {
+                    console.error("Failed to get color pair for OVR:", ovr, e);
+                }
             }
         }
     }
@@ -785,19 +848,49 @@ function handlePlayerData(data) {
     window.dispatchEvent(event);
 }
 function manipulatePlayerPage(el) {
-    if (!visualizerInstance) {
-        if (window.playerData) {
-            visualizerInstance = new PlayerStatsVisualizer(window.playerData, el);
-        }
-        else {
-            const handler = () => {
-                visualizerInstance = new PlayerStatsVisualizer(window.playerData, el);
-                window.removeEventListener("playerDataReady", handler);
-            };
-            window.addEventListener("playerDataReady", handler);
-        }
+    // ensure the singleton instance exists
+    if (!playerVisualizerInstance) {
+        playerVisualizerInstance = new PlayerStatsVisualizer();
+    }
+    if (window.playerData) {
+        playerVisualizerInstance.attach(el, window.playerData);
+    }
+    else {
+        const handler = () => {
+            // check instance again in case of race conditions? unlikely but possible
+            if (!playerVisualizerInstance) {
+                playerVisualizerInstance = new PlayerStatsVisualizer();
+            }
+            playerVisualizerInstance.attach(el, window.playerData); // data ready
+            window.removeEventListener("playerDataReady", handler);
+        };
+        window.addEventListener("playerDataReady", handler, { once: true });
     }
 }
+// export function handlePlayerData(data: any) {
+//   window.playerData = new Player(data);
+//   const event = new CustomEvent("playerDataReady");
+//   window.dispatchEvent(event);
+// }
+// export function manipulatePlayerPage(el: HTMLElement) {
+//   if (!playerVisualizerInstance) {
+//     if (window.playerData) {
+//       playerVisualizerInstance = new PlayerStatsVisualizer(
+//         window.playerData,
+//         el,
+//       );
+//     } else {
+//       const handler = () => {
+//         playerVisualizerInstance = new PlayerStatsVisualizer(
+//           window.playerData!,
+//           el,
+//         );
+//         window.removeEventListener("playerDataReady", handler);
+//       };
+//       window.addEventListener("playerDataReady", handler);
+//     }
+//   }
+// }
 
 
 /***/ }),
@@ -864,7 +957,6 @@ class RosterStatsVisualizer {
             // if (this.sortColumn) this.sortRows();
         }
         else {
-            console.warn("Visualizer attached but parent element or roster data is missing.");
             // cleanup if attachment is incomplete
             this.detach();
         }
@@ -966,7 +1058,6 @@ class RosterStatsVisualizer {
             if (generalButton)
                 generalButton.addEventListener("click", this.generalButtonClickListener);
             this.skillsButtonClickListener = () => {
-                console.log("Skills button clicked");
                 if (!this.onGeneralPage)
                     return;
                 this.onGeneralPage = false;
@@ -977,9 +1068,6 @@ class RosterStatsVisualizer {
             if (skillsButton)
                 skillsButton.addEventListener("click", this.skillsButtonClickListener);
         }
-        else {
-            console.warn("Could not find two tab buttons for listener attachment.");
-        }
         const selectElement = this.parent.querySelector(`select[value]`);
         if (selectElement) {
             this.selectChangeListener = () => {
@@ -988,9 +1076,6 @@ class RosterStatsVisualizer {
                 // if (this.sortColumn) this.sortRows();
             };
             selectElement.addEventListener("input", this.selectChangeListener);
-        }
-        else {
-            console.warn("Could not find select element for listener attachment.");
         }
         // clear any stale listeners first (though detach should handle this)
         this.headerClickListeners.forEach((listener, th) => th.removeEventListener("click", listener));
@@ -1018,7 +1103,6 @@ class RosterStatsVisualizer {
             !this.dataRows ||
             !this.header ||
             !this.footer) {
-            console.warn("Cannot render columns: Missing parent, roster, or table elements.");
             return;
         }
         // remove previously added dynamic columns and their header/footer cells
@@ -1073,7 +1157,6 @@ class RosterStatsVisualizer {
         maxFooterCell.appendChild(this.createRatingSpan(this.getRosterAvgOvr("Max"), false));
         this.footer.appendChild(minFooterCell);
         this.footer.appendChild(maxFooterCell);
-        console.log("Min/Max columns added.");
     }
     getRosterAvgOvr(ovrType) {
         if (!this.roster)
@@ -1121,14 +1204,14 @@ class RosterStatsVisualizer {
         return ratingSpan;
     }
 }
-const visualizerInstance = new RosterStatsVisualizer();
+const rosterVisualizerInstance = new RosterStatsVisualizer();
 function handleRosterData(data) {
     const newRoster = new Roster(data);
     // notify the visualizer instance about the new data
-    visualizerInstance.updateRoster(newRoster);
+    rosterVisualizerInstance.updateRoster(newRoster);
 }
 function manipulateRosterPage(el) {
-    visualizerInstance.attach(el);
+    rosterVisualizerInstance.attach(el);
 }
 
 

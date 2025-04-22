@@ -74,9 +74,6 @@ class RosterStatsVisualizer {
       this.renderColumns();
       // if (this.sortColumn) this.sortRows();
     } else {
-      console.warn(
-        "Visualizer attached but parent element or roster data is missing.",
-      );
       // cleanup if attachment is incomplete
       this.detach();
     }
@@ -205,7 +202,6 @@ class RosterStatsVisualizer {
         );
 
       this.skillsButtonClickListener = () => {
-        console.log("Skills button clicked");
         if (!this.onGeneralPage) return;
         this.onGeneralPage = false;
         this.initializeTableReferences();
@@ -214,8 +210,6 @@ class RosterStatsVisualizer {
       };
       if (skillsButton)
         skillsButton.addEventListener("click", this.skillsButtonClickListener);
-    } else {
-      console.warn("Could not find two tab buttons for listener attachment.");
     }
 
     const selectElement = this.parent.querySelector(`select[value]`);
@@ -226,8 +220,6 @@ class RosterStatsVisualizer {
         // if (this.sortColumn) this.sortRows();
       };
       selectElement.addEventListener("input", this.selectChangeListener);
-    } else {
-      console.warn("Could not find select element for listener attachment.");
     }
 
     // clear any stale listeners first (though detach should handle this)
@@ -263,9 +255,6 @@ class RosterStatsVisualizer {
       !this.header ||
       !this.footer
     ) {
-      console.warn(
-        "Cannot render columns: Missing parent, roster, or table elements.",
-      );
       return;
     }
 
@@ -337,7 +326,6 @@ class RosterStatsVisualizer {
 
     this.footer.appendChild(minFooterCell);
     this.footer.appendChild(maxFooterCell);
-    console.log("Min/Max columns added.");
   }
 
   private getRosterAvgOvr(ovrType: OvrType): number {
@@ -490,14 +478,14 @@ class RosterStatsVisualizer {
   // private getRowPlayerName(row: HTMLTableRowElement): [string, string] { ... }
 }
 
-const visualizerInstance = new RosterStatsVisualizer();
+const rosterVisualizerInstance = new RosterStatsVisualizer();
 
 export function handleRosterData(data: any) {
   const newRoster = new Roster(data);
   // notify the visualizer instance about the new data
-  visualizerInstance.updateRoster(newRoster);
+  rosterVisualizerInstance.updateRoster(newRoster);
 }
 
 export function manipulateRosterPage(el: HTMLElement) {
-  visualizerInstance.attach(el);
+  rosterVisualizerInstance.attach(el);
 }
