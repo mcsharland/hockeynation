@@ -182,30 +182,17 @@ class DraftClassVisualizer {
 
   private addBadges(): void {
     // Adds Min/Max badges to draft cards
-    if (!this.draftCards || !this.draftClass) {
-      console.warn(
-        "Cannot add badges: Missing draft cards or draft class data.",
-      );
-      return;
-    }
-    console.log("Adding/updating badges...");
-    let badgesAddedCount = 0;
+    if (!this.draftCards || !this.draftClass) return;
 
     Object.entries(this.draftCards).forEach(([playerId, card]) => {
       // //safety
       if (card.getAttribute("data-ovr-badges-added") === "true") return;
 
       const badgeContainer = card.querySelector(`.badge`)?.parentElement;
-      if (!badgeContainer) {
-        console.warn(`Badge container not found for player ${playerId}`);
-        return;
-      }
+      if (!badgeContainer) return;
 
       const player = this.draftClass!.getPlayer(playerId); // draftClass checked above
-      if (!player) {
-        console.warn(`Player data not found for ${playerId} in draft class.`);
-        return;
-      }
+      if (!player) return;
 
       badgeContainer
         .querySelectorAll(".dynamic-ovr-label, .dynamic-ovr-badge")
@@ -220,7 +207,6 @@ class DraftClassVisualizer {
       badgeContainer.appendChild(this.createRatingSpan(player.getMaxOvr()));
 
       card.setAttribute("data-ovr-badges-added", "true");
-      badgesAddedCount++;
     });
   }
 

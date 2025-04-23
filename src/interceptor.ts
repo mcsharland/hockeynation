@@ -3,7 +3,10 @@ import { initNavigationHandler } from "./navigation-handler";
 import { handleRosterData } from "./pages/roster";
 import { handleUserData, User } from "./user";
 import { handleDraftClassData } from "./pages/draft-class";
-import { handleDraftRankingData } from "./pages/draft-ranking";
+import {
+  handleDraftRankingData,
+  handleDraftPickData,
+} from "./pages/draft-ranking";
 
 (function () {
   initNavigationHandler(); // Initialize Observer from script context
@@ -40,6 +43,12 @@ import { handleDraftRankingData } from "./pages/draft-ranking";
         handleDraftRankingData(data.data);
       },
     },
+    draftPicks: {
+      pattern: /\/api\/draft\/[^\/]+\/picks/,
+      handler: (data: any) => {
+        handleDraftPickData(data.data);
+      },
+    },
   };
 
   function findHandler(url: string) {
@@ -71,7 +80,7 @@ import { handleDraftRankingData } from "./pages/draft-ranking";
               const data = JSON.parse(this.responseText);
               handler(data);
             } catch (e) {
-              console.error("Error parsing response:", e);
+              // most likely a null response body
             }
           }
 

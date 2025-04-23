@@ -328,26 +328,18 @@ class DraftClassVisualizer {
     }
     addBadges() {
         // Adds Min/Max badges to draft cards
-        if (!this.draftCards || !this.draftClass) {
-            console.warn("Cannot add badges: Missing draft cards or draft class data.");
+        if (!this.draftCards || !this.draftClass)
             return;
-        }
-        console.log("Adding/updating badges...");
-        let badgesAddedCount = 0;
         Object.entries(this.draftCards).forEach(([playerId, card]) => {
             // //safety
             if (card.getAttribute("data-ovr-badges-added") === "true")
                 return;
             const badgeContainer = card.querySelector(`.badge`)?.parentElement;
-            if (!badgeContainer) {
-                console.warn(`Badge container not found for player ${playerId}`);
+            if (!badgeContainer)
                 return;
-            }
             const player = this.draftClass.getPlayer(playerId); // draftClass checked above
-            if (!player) {
-                console.warn(`Player data not found for ${playerId} in draft class.`);
+            if (!player)
                 return;
-            }
             badgeContainer
                 .querySelectorAll(".dynamic-ovr-label, .dynamic-ovr-badge")
                 .forEach((el) => el.remove());
@@ -358,7 +350,6 @@ class DraftClassVisualizer {
             badgeContainer.appendChild(this.createOvrLabelSpan("MAX"));
             badgeContainer.appendChild(this.createRatingSpan(player.getMaxOvr()));
             card.setAttribute("data-ovr-badges-added", "true");
-            badgesAddedCount++;
         });
     }
     createOvrLabelSpan(text) {
@@ -410,62 +401,144 @@ function manipulateDraftClassPage(el) {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   handleDraftPickData: () => (/* binding */ handleDraftPickData),
 /* harmony export */   handleDraftRankingData: () => (/* binding */ handleDraftRankingData),
 /* harmony export */   manipulateDraftRankingPage: () => (/* binding */ manipulateDraftRankingPage)
 /* harmony export */ });
 /* harmony import */ var _roster__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./roster */ "./src/pages/roster.ts");
 
-let visualizerInstance = null;
+const DR_HIGHLIGHT_CLASS = "draft-ranking-highlight";
+const DR_GHOST = "draft-ranking-ghost";
 class DraftRankingVisualizer {
-    parent;
+    parent = null;
     draftRanking = null;
     draftCards = null;
     ovrTab = null;
     tableHR = null;
-    constructor(el) {
+    picks = null;
+    tbody = null;
+    dragStartListener = null;
+    dragEndListener = null;
+    mutationObserver = null;
+    observerTimeoutId = null;
+    constructor() { }
+    attach(el) {
+        this.detach();
         this.parent = el;
-        window.addEventListener("draftRankingDataUpdated", this.onDataUpdated.bind(this));
-        if (window.draftRankingData) {
-            this.draftRanking = window.draftRankingData;
-            this.initialize();
+        if (this.parent && this.draftRanking) {
+            this.initializeTableReferences();
+            this.attachEventListeners();
+            this.renderColumns();
+            this.applyColumnHighlights();
+        }
+        else {
+            this.detach();
         }
     }
-    onDataUpdated() {
-        if (window.draftRankingData) {
-            this.draftRanking = window.draftRankingData;
-            this.initializeReferences();
-        }
-    }
-    initialize() {
-        this.initializeReferences();
-    }
-    initializeReferences() {
-        if (!this.draftRanking)
+    detach() {
+        if (!this.parent)
             return;
+    }
+    updateRanking(newRanking) {
+        this.draftRanking = newRanking;
+        if (this.parent && this.draftRanking) {
+            this.initializeTableReferences();
+            this.renderColumns();
+            this.applyColumnHighlights();
+        }
+    }
+    updatePicks(picks) {
+        this.picks = picks;
+    }
+    initializeTableReferences() {
+        if (!this.parent)
+            return;
+        this.tbody = this.parent.querySelector(`table`);
         this.tableHR = this.parent.querySelector(`table thead tr`);
-        if (!this.tableHR)
+        if (!this.tbody || !this.tableHR)
             return;
         this.ovrTab =
             Array.from(this.tableHR.querySelectorAll(`th span`)).filter((span) => span.textContent?.trim() === "OVR")?.[0]?.parentElement ?? null;
-        if (!this.ovrTab)
-            return;
-        const rows = this.parent.querySelectorAll(`table tbody tr`);
-        const dc = {};
+        this.draftCards = {}; // reset reference
+        const rows = this.tbody.querySelectorAll(`table tbody tr`);
         rows.forEach((row) => {
             const tableRow = row;
             const playerLink = tableRow.querySelectorAll(`a`)[1];
-            if (playerLink?.getAttribute("href")) {
-                const playerId = playerLink.getAttribute("href").split("/").pop() || "";
-                dc[playerId] = tableRow;
+            const href = playerLink?.getAttribute("href");
+            if (href) {
+                const playerId = href.split("/").pop() || "";
+                if (playerId) {
+                    this.draftCards[playerId] = tableRow;
+                }
             }
         });
-        this.draftCards = dc;
-        console.log(this.draftCards);
-        this.addRows();
     }
-    addRows() {
-        if (!this.tableHR || !this.ovrTab || !this.draftCards)
+    // probably use a whole class function to remove all and re-assign highlights after drops
+    attachEventListeners() {
+        if (!this.parent || !this.tbody)
             return;
+        this.dragStartListener = (event) => {
+            const row = event.target;
+            Array.from(row.children).forEach((el) => {
+                el.classList.remove(DR_HIGHLIGHT_CLASS);
+                if (el.hasAttribute("data-column"))
+                    el.classList.add(DR_GHOST);
+            });
+        };
+        this.dragEndListener = (event) => {
+            const row = event.target;
+            Array.from(row.children).forEach((el) => {
+                if (el.hasAttribute("data-column")) {
+                    el.classList.remove(DR_GHOST);
+                    el.classList.add(DR_HIGHLIGHT_CLASS);
+                }
+            });
+            this.disconnectObserver();
+            this.mutationObserver = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (mutation.type === "attributes" &&
+                        mutation.attributeName === "class") {
+                        this.applyColumnHighlights();
+                        this.disconnectObserver();
+                    }
+                });
+            });
+            this.mutationObserver.observe(row, {
+                childList: true,
+                attributes: true,
+            });
+            if (this.observerTimeoutId)
+                clearTimeout(this.observerTimeoutId);
+            this.observerTimeoutId = window.setTimeout(() => {
+                this.disconnectObserver();
+            }, 3000);
+        };
+        this.tbody.addEventListener("dragstart", this.dragStartListener);
+        this.tbody.addEventListener("dragend", this.dragEndListener, {
+            capture: true,
+        });
+    }
+    disconnectObserver() {
+        if (this.mutationObserver) {
+            this.mutationObserver.disconnect();
+            this.mutationObserver = null;
+        }
+        if (this.observerTimeoutId) {
+            clearTimeout(this.observerTimeoutId);
+            this.observerTimeoutId = null;
+        }
+    }
+    renderColumns() {
+        if (!this.parent ||
+            !this.draftRanking ||
+            !this.tableHR ||
+            !this.ovrTab ||
+            !this.draftCards)
+            return;
+        // remove previously added columns and their headers
+        this.parent
+            .querySelectorAll(`[data-column]`)
+            .forEach((node) => node.remove());
         const tabElement = this.ovrTab;
         const headerRow = tabElement.parentElement;
         if (!headerRow)
@@ -476,29 +549,41 @@ class DraftRankingVisualizer {
         this.tableHR.insertBefore(maxHeader, this.ovrTab.nextSibling);
         this.tableHR.insertBefore(minHeader, this.ovrTab.nextSibling);
         Object.entries(this.draftCards).forEach(([playerId, row]) => {
-            const player = this.draftRanking?.getPlayer(playerId);
+            const player = this.draftRanking.getPlayer(playerId);
             if (!player)
                 return;
             const minDataCell = document.createElement("td");
             minDataCell.className = "px-4 text-center";
-            minDataCell.appendChild(this.createRatingSpan(player.getMinOvr()));
+            minDataCell.dataset.column = "min-ovr";
             const maxDataCell = document.createElement("td");
             maxDataCell.className = "px-4 text-center";
-            maxDataCell.appendChild(this.createRatingSpan(player.getMaxOvr()));
+            maxDataCell.dataset.column = "max-ovr";
+            minDataCell.appendChild(this.createRatingSpan(player.getMinOvr(), player.getIsScout()));
+            maxDataCell.appendChild(this.createRatingSpan(player.getMaxOvr(), player.getIsScout()));
             row.insertBefore(maxDataCell, row.children[ovrIdx]);
             row.insertBefore(minDataCell, row.children[ovrIdx]);
+        });
+    }
+    applyColumnHighlights() {
+        if (!this.parent || !this.picks)
+            return;
+        this.parent.querySelectorAll(`[data-column]`).forEach((node) => {
+            node.classList.remove(DR_HIGHLIGHT_CLASS);
+            if (this.picks?.includes(node.parentElement?.rowIndex))
+                node.classList.add(DR_HIGHLIGHT_CLASS);
         });
     }
     createOvrLabelSpan(text) {
         const header = document.createElement("th");
         header.classList.add("px-4", "py-2");
+        header.dataset.column = `${text.toLowerCase()}-ovr`;
         header.innerHTML = `<span>${text}</span>`;
         return header;
     }
     // modify to include empty fields
-    createRatingSpan(ovr) {
+    createRatingSpan(ovr, scout) {
         const ratingSpan = document.createElement("span");
-        if (!ovr) {
+        if (scout && (!ovr || ovr <= 0)) {
             ratingSpan.innerText = "-";
             ratingSpan.style.color = "#555456";
             ratingSpan.style.textAlign = "center";
@@ -506,37 +591,33 @@ class DraftRankingVisualizer {
         else {
             ratingSpan.classList.add("badge");
             ratingSpan.style.userSelect = "none";
-            if (window.userData) {
-                ratingSpan.style.backgroundColor = window.userData.getColorPair(ovr)[0];
-                ratingSpan.style.color = window.userData.getColorPair(ovr)[1];
-            }
             ratingSpan.innerText = ovr.toString();
+            if (window.userData &&
+                typeof window.userData.getColorPair === "function") {
+                try {
+                    const [bgColor, color] = window.userData.getColorPair(ovr);
+                    ratingSpan.style.backgroundColor = bgColor;
+                    ratingSpan.style.color = color;
+                }
+                catch (e) {
+                    console.error("Error getting color pair for OVR:", ovr, e);
+                }
+            }
         }
         return ratingSpan;
     }
 }
+const drVisualizerInstance = new DraftRankingVisualizer();
 function handleDraftRankingData(data) {
-    const isUpdate = !!window.draftRankingData;
-    window.draftRankingData = new _roster__WEBPACK_IMPORTED_MODULE_0__.Roster({ players: data });
-    const eventName = isUpdate
-        ? "draftRankingDataUpdated"
-        : "draftRankingDataReady";
-    const event = new CustomEvent(eventName);
-    window.dispatchEvent(event);
+    const newDraftRanking = new _roster__WEBPACK_IMPORTED_MODULE_0__.Roster({ players: data });
+    drVisualizerInstance.updateRanking(newDraftRanking);
+}
+function handleDraftPickData(data) {
+    const picks = data.map((pick) => pick.rank);
+    drVisualizerInstance.updatePicks(picks);
 }
 function manipulateDraftRankingPage(el) {
-    if (!visualizerInstance) {
-        if (window.draftRankingData) {
-            visualizerInstance = new DraftRankingVisualizer(el);
-        }
-        else {
-            const handler = () => {
-                visualizerInstance = new DraftRankingVisualizer(el);
-                window.removeEventListener("draftRankingDataReady", handler);
-            };
-            window.addEventListener("draftRankingDataReady", handler);
-        }
-    }
+    drVisualizerInstance.attach(el);
 }
 
 
@@ -1408,6 +1489,12 @@ __webpack_require__.r(__webpack_exports__);
                 (0,_pages_draft_ranking__WEBPACK_IMPORTED_MODULE_5__.handleDraftRankingData)(data.data);
             },
         },
+        draftPicks: {
+            pattern: /\/api\/draft\/[^\/]+\/picks/,
+            handler: (data) => {
+                (0,_pages_draft_ranking__WEBPACK_IMPORTED_MODULE_5__.handleDraftPickData)(data.data);
+            },
+        },
     };
     function findHandler(url) {
         for (const { pattern, handler } of Object.values(URL_HANDLERS)) {
@@ -1436,7 +1523,7 @@ __webpack_require__.r(__webpack_exports__);
                             handler(data);
                         }
                         catch (e) {
-                            console.error("Error parsing response:", e);
+                            // most likely a null response body
                         }
                     }
                     if (originalOnReadyState) {
