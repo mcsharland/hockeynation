@@ -408,6 +408,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _roster__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./roster */ "./src/pages/roster.ts");
 
 const DR_HIGHLIGHT_CLASS = "draft-ranking-highlight";
+const DR_GHOST_TRIM = "draft-ranking-ghost-trim";
 const DR_GHOST = "draft-ranking-ghost";
 class DraftRankingVisualizer {
     parent = null;
@@ -419,8 +420,10 @@ class DraftRankingVisualizer {
     tbody = null;
     dragStartListener = null;
     dragEndListener = null;
-    mutationObserver = null;
-    observerTimeoutId = null;
+    highlightMutationObserver = null;
+    highlightObserverTimeoutId = null;
+    highlightLast = false;
+    rowMutationObserver = null;
     constructor() { }
     attach(el) {
         this.detach();
@@ -428,6 +431,7 @@ class DraftRankingVisualizer {
         if (this.parent && this.draftRanking) {
             this.initializeTableReferences();
             this.attachEventListeners();
+            this.attachRowObserver();
             this.renderColumns();
             this.applyColumnHighlights();
         }
@@ -438,6 +442,20 @@ class DraftRankingVisualizer {
     detach() {
         if (!this.parent)
             return;
+        if (this.tbody) {
+            if (this.dragStartListener)
+                this.tbody.removeEventListener("dragstart", this.dragStartListener);
+            if (this.dragEndListener)
+                this.tbody.removeEventListener("dragend", this.dragEndListener);
+        }
+        if (this.rowMutationObserver)
+            this.rowMutationObserver.disconnect();
+        // this.disconnectHighlightObserver();
+        this.parent = null;
+        this.draftCards = null;
+        this.ovrTab = null;
+        this.tableHR = null;
+        this.tbody = null;
     }
     updateRanking(newRanking) {
         this.draftRanking = newRanking;
@@ -473,44 +491,64 @@ class DraftRankingVisualizer {
             }
         });
     }
-    // probably use a whole class function to remove all and re-assign highlights after drops
     attachEventListeners() {
         if (!this.parent || !this.tbody)
             return;
+        // only do this if its in the picks
         this.dragStartListener = (event) => {
             const row = event.target;
+            this.highlightLast = this.picks?.includes(row.rowIndex) ?? false;
             Array.from(row.children).forEach((el) => {
                 el.classList.remove(DR_HIGHLIGHT_CLASS);
                 if (el.hasAttribute("data-column"))
-                    el.classList.add(DR_GHOST);
+                    el.classList.add(this.highlightLast ? DR_GHOST_TRIM : DR_GHOST);
             });
         };
+        // needs to improve logic to when elements doesn't update a pick
         this.dragEndListener = (event) => {
             const row = event.target;
             Array.from(row.children).forEach((el) => {
                 if (el.hasAttribute("data-column")) {
+                    if (this.highlightLast)
+                        el.classList.add(DR_HIGHLIGHT_CLASS);
                     el.classList.remove(DR_GHOST);
-                    el.classList.add(DR_HIGHLIGHT_CLASS);
+                    el.classList.remove(DR_GHOST_TRIM);
                 }
             });
-            this.disconnectObserver();
-            this.mutationObserver = new MutationObserver((mutations) => {
+            this.highlightLast = false;
+            this.disconnectHighlightObserver();
+            // is this the most unnecessary thing in the world? yes
+            // does it ensure that there is no visual discrepancy to the user? also yes
+            this.highlightMutationObserver = new MutationObserver((mutations) => {
                 mutations.forEach((mutation) => {
-                    if (mutation.type === "attributes" &&
-                        mutation.attributeName === "class") {
-                        this.applyColumnHighlights();
-                        this.disconnectObserver();
+                    if (mutation.type === "childList") {
+                        mutation.addedNodes.forEach((node) => {
+                            if (node.nodeType === Node.TEXT_NODE) {
+                                console.log("here");
+                                this.applyColumnHighlights();
+                                this.disconnectHighlightObserver();
+                            }
+                        });
                     }
+                    // if (
+                    //   mutation.type === "attributes" &&
+                    //   mutation.attributeName === "class"
+                    // ) {
+                    //   console.log("here2");
+                    //   this.applyColumnHighlights();
+                    //   this.disconnectHighlightObserver();
+                    // }
                 });
             });
-            this.mutationObserver.observe(row, {
+            this.highlightMutationObserver.observe(row, {
                 childList: true,
+                subtree: true,
                 attributes: true,
             });
-            if (this.observerTimeoutId)
-                clearTimeout(this.observerTimeoutId);
-            this.observerTimeoutId = window.setTimeout(() => {
-                this.disconnectObserver();
+            if (this.highlightObserverTimeoutId)
+                clearTimeout(this.highlightObserverTimeoutId);
+            this.highlightObserverTimeoutId = window.setTimeout(() => {
+                this.disconnectHighlightObserver();
             }, 3000);
         };
         this.tbody.addEventListener("dragstart", this.dragStartListener);
@@ -518,27 +556,66 @@ class DraftRankingVisualizer {
             capture: true,
         });
     }
-    disconnectObserver() {
-        if (this.mutationObserver) {
-            this.mutationObserver.disconnect();
-            this.mutationObserver = null;
+    disconnectHighlightObserver() {
+        if (this.highlightMutationObserver) {
+            this.highlightMutationObserver.disconnect();
+            this.highlightMutationObserver = null;
         }
-        if (this.observerTimeoutId) {
-            clearTimeout(this.observerTimeoutId);
-            this.observerTimeoutId = null;
+        if (this.highlightObserverTimeoutId) {
+            clearTimeout(this.highlightObserverTimeoutId);
+            this.highlightObserverTimeoutId = null;
         }
+    }
+    attachRowObserver() {
+        if (!this.tableHR)
+            return;
+        this.rowMutationObserver = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === "childList") {
+                    mutation.addedNodes.forEach((node) => {
+                        if (node instanceof HTMLTableCellElement && node.tagName === "TH") {
+                            const span = node.querySelector("span");
+                            if (span?.textContent?.trim() === "OVR") {
+                                console.log("attempting to add columns");
+                                this.initializeTableReferences();
+                                this.renderColumns();
+                                this.applyColumnHighlights();
+                            }
+                        }
+                    });
+                    mutation.removedNodes.forEach((node) => {
+                        if (node instanceof HTMLTableCellElement && node.tagName === "TH") {
+                            const span = node.querySelector("span");
+                            if (span?.textContent?.trim() === "OVR") {
+                                console.log("attempting to remove columns");
+                                this.removeColumns();
+                            }
+                        }
+                    });
+                }
+            });
+        });
+        this.rowMutationObserver.observe(this.tableHR, {
+            childList: true,
+        });
+    }
+    removeColumns() {
+        if (!this.parent)
+            return;
+        this.parent
+            .querySelectorAll(`[data-column]`)
+            .forEach((node) => node.remove());
     }
     renderColumns() {
         if (!this.parent ||
             !this.draftRanking ||
             !this.tableHR ||
             !this.ovrTab ||
-            !this.draftCards)
+            !this.draftCards) {
             return;
+        }
         // remove previously added columns and their headers
-        this.parent
-            .querySelectorAll(`[data-column]`)
-            .forEach((node) => node.remove());
+        this.removeColumns();
         const tabElement = this.ovrTab;
         const headerRow = tabElement.parentElement;
         if (!headerRow)
@@ -560,8 +637,8 @@ class DraftRankingVisualizer {
             maxDataCell.dataset.column = "max-ovr";
             minDataCell.appendChild(this.createRatingSpan(player.getMinOvr(), player.getIsScout()));
             maxDataCell.appendChild(this.createRatingSpan(player.getMaxOvr(), player.getIsScout()));
-            row.insertBefore(maxDataCell, row.children[ovrIdx]);
-            row.insertBefore(minDataCell, row.children[ovrIdx]);
+            row.insertBefore(maxDataCell, row.children[ovrIdx].nextSibling);
+            row.insertBefore(minDataCell, row.children[ovrIdx].nextSibling);
         });
     }
     applyColumnHighlights() {
