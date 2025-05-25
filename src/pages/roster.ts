@@ -10,6 +10,8 @@ interface DataRow {
 
 type OvrType = "Default" | "Min" | "Max";
 
+type ScoutLevel = 0 | 1 | 2;
+
 export class Roster {
   private players: Players;
 
@@ -271,14 +273,14 @@ class RosterStatsVisualizer {
       minDataCell.className = "md:px-4 px-2 py-2 text-center";
       minDataCell.dataset.column = "min-ovr";
       minDataCell.appendChild(
-        this.createRatingSpan(player.getMinOvr(), player.getIsScout()),
+        this.createRatingSpan(player.getMinOvr(), player.getScoutLevel()),
       );
 
       const maxDataCell = document.createElement("td");
       maxDataCell.className = "md:px-4 px-2 py-2 text-center";
       maxDataCell.dataset.column = "max-ovr";
       maxDataCell.appendChild(
-        this.createRatingSpan(player.getMaxOvr(), player.getIsScout()),
+        this.createRatingSpan(player.getMaxOvr(), player.getScoutLevel()),
       );
 
       // append to the end of the row
@@ -308,14 +310,14 @@ class RosterStatsVisualizer {
     minFooterCell.className = "md:px-4 px-2 py-2 text-center";
     minFooterCell.dataset.column = "min-ovr";
     minFooterCell.appendChild(
-      this.createRatingSpan(this.getRosterAvgOvr("Min"), false),
+      this.createRatingSpan(this.getRosterAvgOvr("Min"), 0),
     );
 
     const maxFooterCell = document.createElement("td");
     maxFooterCell.className = "md:px-4 px-2 py-2 text-center";
     maxFooterCell.dataset.column = "max-ovr";
     maxFooterCell.appendChild(
-      this.createRatingSpan(this.getRosterAvgOvr("Max"), false),
+      this.createRatingSpan(this.getRosterAvgOvr("Max"), 0),
     );
 
     this.footer.appendChild(minFooterCell);
@@ -334,7 +336,8 @@ class RosterStatsVisualizer {
 
     const values = Object.values(players)
       .filter(
-        (player) => player && (!player.getIsScout() || player.getOvr() > 0),
+        (player) =>
+          player && !(player.getScoutLevel() === 1) && player.getOvr() > 0,
       ) // ensure player exists & filter scouts without OVR
       .map((player) => playerOvr[ovrType](player));
 
@@ -348,9 +351,9 @@ class RosterStatsVisualizer {
       : 0;
   }
 
-  private createRatingSpan(ovr: number, scout: boolean): HTMLSpanElement {
+  private createRatingSpan(ovr: number, scout: ScoutLevel): HTMLSpanElement {
     const ratingSpan: HTMLSpanElement = document.createElement("span");
-    if (scout && (!ovr || ovr <= 0)) {
+    if (scout === 1 || !ovr || ovr <= 0) {
       // treat 0 OVR for scout same as unknown
       ratingSpan.classList.add("question-mark");
       ratingSpan.innerText = "?";
@@ -359,7 +362,7 @@ class RosterStatsVisualizer {
     } else {
       ratingSpan.classList.add("badge");
       ratingSpan.style.userSelect = "none";
-      ratingSpan.innerText = ovr.toString();
+      ratingSpan.innerText = ovr.toString() + (scout === 2 ? "*" : "");
 
       if (
         window.userData &&

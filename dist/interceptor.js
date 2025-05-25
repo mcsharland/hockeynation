@@ -345,10 +345,10 @@ class DraftClassVisualizer {
                 .forEach((el) => el.remove());
             // Add MIN
             badgeContainer.appendChild(this.createOvrLabelSpan("MIN"));
-            badgeContainer.appendChild(this.createRatingSpan(player.getMinOvr()));
+            badgeContainer.appendChild(this.createRatingSpan(player.getMinOvr(), player.getScoutLevel()));
             // Add MAX
             badgeContainer.appendChild(this.createOvrLabelSpan("MAX"));
-            badgeContainer.appendChild(this.createRatingSpan(player.getMaxOvr()));
+            badgeContainer.appendChild(this.createRatingSpan(player.getMaxOvr(), player.getScoutLevel()));
             card.setAttribute("data-ovr-badges-added", "true");
         });
     }
@@ -359,24 +359,32 @@ class DraftClassVisualizer {
         label.innerText = text;
         return label;
     }
-    createRatingSpan(ovr) {
+    createRatingSpan(ovr, scout) {
         const ratingSpan = document.createElement("span");
-        // add a class to make it easier to remove later
-        ratingSpan.classList.add("dynamic-ovr-badge", "badge", "ml-1");
-        ratingSpan.style.userSelect = "none";
-        if (window.userData &&
-            typeof window.userData.getColorPair === "function" &&
-            ovr > 0) {
-            try {
-                const [bgColor, color] = window.userData.getColorPair(ovr);
-                ratingSpan.style.backgroundColor = bgColor;
-                ratingSpan.style.color = color;
-            }
-            catch (e) {
-                console.error("Error getting color pair for OVR:", ovr, e);
+        if (scout === 1 || !ovr || ovr <= 0) {
+            ratingSpan.innerText = "N/A";
+            ratingSpan.style.color = "#FF2C2C";
+            ratingSpan.style.textAlign = "center";
+            ratingSpan.style.padding = ".25rem .375rem";
+            ratingSpan.style.fontWeight = "600";
+        }
+        else {
+            ratingSpan.classList.add("dynamic-ovr-badge", "badge", "ml-1");
+            ratingSpan.style.userSelect = "none";
+            ratingSpan.innerText = ovr.toString() + (scout === 2 ? "*" : "");
+            if (window.userData &&
+                typeof window.userData.getColorPair === "function" &&
+                ovr > 0) {
+                try {
+                    const [bgColor, color] = window.userData.getColorPair(ovr);
+                    ratingSpan.style.backgroundColor = bgColor;
+                    ratingSpan.style.color = color;
+                }
+                catch (e) {
+                    console.error("Error getting color pair for OVR:", ovr, e);
+                }
             }
         }
-        ratingSpan.innerText = ovr > 0 ? ovr.toString() : "?"; // Show ? if OVR is 0, shouldn't ever be needed
         return ratingSpan;
     }
 }
@@ -635,8 +643,8 @@ class DraftRankingVisualizer {
             const maxDataCell = document.createElement("td");
             maxDataCell.className = "px-4 text-center";
             maxDataCell.dataset.column = "max-ovr";
-            minDataCell.appendChild(this.createRatingSpan(player.getMinOvr(), player.getIsScout()));
-            maxDataCell.appendChild(this.createRatingSpan(player.getMaxOvr(), player.getIsScout()));
+            minDataCell.appendChild(this.createRatingSpan(player.getMinOvr(), player.getScoutLevel()));
+            maxDataCell.appendChild(this.createRatingSpan(player.getMaxOvr(), player.getScoutLevel()));
             row.insertBefore(maxDataCell, row.children[ovrIdx].nextSibling);
             row.insertBefore(minDataCell, row.children[ovrIdx].nextSibling);
         });
@@ -660,7 +668,7 @@ class DraftRankingVisualizer {
     // modify to include empty fields
     createRatingSpan(ovr, scout) {
         const ratingSpan = document.createElement("span");
-        if (scout && (!ovr || ovr <= 0)) {
+        if (scout === 1 || !ovr || ovr <= 0) {
             ratingSpan.innerText = "-";
             ratingSpan.style.color = "#555456";
             ratingSpan.style.textAlign = "center";
@@ -668,7 +676,7 @@ class DraftRankingVisualizer {
         else {
             ratingSpan.classList.add("badge");
             ratingSpan.style.userSelect = "none";
-            ratingSpan.innerText = ovr.toString();
+            ratingSpan.innerText = ovr.toString() + (scout === 2 ? "*" : "");
             if (window.userData &&
                 typeof window.userData.getColorPair === "function") {
                 try {
@@ -718,14 +726,14 @@ class Player {
     stats;
     minStats;
     maxStats;
-    isScout;
+    scoutLevel;
     ovr;
     minOvr;
     maxOvr;
     constructor(data) {
         const player = this.parsePlayerData(data);
         this.stats = player.stats;
-        this.isScout = player.scout;
+        this.scoutLevel = player.scout;
         this.minStats = this.calcMinStats(this.stats);
         this.maxStats = this.calcMaxStats(this.stats);
         this.ovr = data?.rating ?? 0;
@@ -735,7 +743,9 @@ class Player {
     parsePlayerData(data) {
         const player = {};
         player.stats = {};
-        player.scout = data.skills.every((skill) => skill?.hidden ?? false);
+        const allHidden = data.skills.every((skill) => skill?.hidden ?? false);
+        const someHidden = data.skills.some((skill) => skill?.hidden ?? false);
+        player.scout = allHidden ? 1 : someHidden ? 2 : 0;
         for (const s of data.skills) {
             player.stats[s.id] = {
                 rating: parseInt(s?.lvl ?? 0),
@@ -831,8 +841,8 @@ class Player {
     getMaxStats() {
         return this.maxStats;
     }
-    getIsScout() {
-        return this.isScout;
+    getScoutLevel() {
+        return this.scoutLevel;
     }
     getOvr() {
         return this.ovr;
@@ -844,7 +854,7 @@ class Player {
         return Math.max(this.minOvr, this.ovr);
     }
     calculateOVR(stats) {
-        if (this.isScout)
+        if (this.scoutLevel === 1)
             return 0;
         const statsValues = Object.values(stats);
         const sum = statsValues.reduce((acc, stat) => acc + stat.rating, 0);
@@ -864,6 +874,7 @@ class PlayerStatsVisualizer {
     skillsHeaderDiv = null;
     dropdownElement = null;
     dropdownListener = null; // store listeners
+    disabled = false;
     constructor() { }
     attach(el) {
         this.detach(); // clean up previous state first
@@ -911,7 +922,7 @@ class PlayerStatsVisualizer {
         }
         const headers = Array.from(this.parent.querySelectorAll(".card-header"));
         this.skillsHeaderDiv = headers.find((d) => d?.textContent?.trim() === "Skills");
-        return !!(this.ovrElement || this.statsTable);
+        return !!(this.ovrElement && this.statsTable);
     }
     updatePlayer(player) {
         this.playerStats = player;
@@ -1011,29 +1022,11 @@ class PlayerStatsVisualizer {
             : option === "Max"
                 ? this.playerStats.getMaxOvr()
                 : this.playerStats.getOvr();
-        // confirm scout logic later
-        let ovrToShow = ovr;
-        if (option === "Default" &&
-            this.playerStats.getIsScout() &&
-            this.playerStats.getOvr() > 0) {
-            ovrToShow = this.playerStats.getOvr();
-        }
-        // only update if we have a valid number (Min/Max calc returns 0 for scouts)
-        // or if it's default view for a scout with known OVR
-        if (ovrToShow > 0 ||
-            (option === "Default" &&
-                this.playerStats.getIsScout() &&
-                this.playerStats.getOvr() > 0)) {
-            this.updateOVR(ovrToShow);
-        }
-        else if (option !== "Default" && this.playerStats.getIsScout()) {
-            // Handle displaying Min/Max for a scout where calculation is 0
-            this.updateOVR(this.playerStats.getOvr()); // show default OVR as fallback?
-        }
-        else {
-            // fallback to default OVR if other conditions aren't met
-            this.updateOVR(this.playerStats.getOvr());
-        }
+        const isDefaultScoutWithOvr = option === "Default" &&
+            this.playerStats.getScoutLevel() === 1 &&
+            this.playerStats.getOvr() > 0;
+        const ovrToShow = isDefaultScoutWithOvr ? this.playerStats.getOvr() : ovr;
+        this.updateOVR(ovrToShow);
     }
     updateOVR(ovr) {
         if (!this.ovrElement)
@@ -1295,11 +1288,11 @@ class RosterStatsVisualizer {
             const minDataCell = document.createElement("td");
             minDataCell.className = "md:px-4 px-2 py-2 text-center";
             minDataCell.dataset.column = "min-ovr";
-            minDataCell.appendChild(this.createRatingSpan(player.getMinOvr(), player.getIsScout()));
+            minDataCell.appendChild(this.createRatingSpan(player.getMinOvr(), player.getScoutLevel()));
             const maxDataCell = document.createElement("td");
             maxDataCell.className = "md:px-4 px-2 py-2 text-center";
             maxDataCell.dataset.column = "max-ovr";
-            maxDataCell.appendChild(this.createRatingSpan(player.getMaxOvr(), player.getIsScout()));
+            maxDataCell.appendChild(this.createRatingSpan(player.getMaxOvr(), player.getScoutLevel()));
             // append to the end of the row
             row.appendChild(minDataCell);
             row.appendChild(maxDataCell);
@@ -1323,11 +1316,11 @@ class RosterStatsVisualizer {
         const minFooterCell = document.createElement("td");
         minFooterCell.className = "md:px-4 px-2 py-2 text-center";
         minFooterCell.dataset.column = "min-ovr";
-        minFooterCell.appendChild(this.createRatingSpan(this.getRosterAvgOvr("Min"), false));
+        minFooterCell.appendChild(this.createRatingSpan(this.getRosterAvgOvr("Min"), 0));
         const maxFooterCell = document.createElement("td");
         maxFooterCell.className = "md:px-4 px-2 py-2 text-center";
         maxFooterCell.dataset.column = "max-ovr";
-        maxFooterCell.appendChild(this.createRatingSpan(this.getRosterAvgOvr("Max"), false));
+        maxFooterCell.appendChild(this.createRatingSpan(this.getRosterAvgOvr("Max"), 0));
         this.footer.appendChild(minFooterCell);
         this.footer.appendChild(maxFooterCell);
     }
@@ -1343,7 +1336,7 @@ class RosterStatsVisualizer {
         if (!players)
             return 0;
         const values = Object.values(players)
-            .filter((player) => player && (!player.getIsScout() || player.getOvr() > 0)) // ensure player exists & filter scouts without OVR
+            .filter((player) => player && !(player.getScoutLevel() === 1) && player.getOvr() > 0) // ensure player exists & filter scouts without OVR
             .map((player) => playerOvr[ovrType](player));
         return values.length
             ? Math.round(values.reduce((sum, value, _, array) => sum + value / array.length, 0))
@@ -1351,7 +1344,7 @@ class RosterStatsVisualizer {
     }
     createRatingSpan(ovr, scout) {
         const ratingSpan = document.createElement("span");
-        if (scout && (!ovr || ovr <= 0)) {
+        if (scout === 1 || !ovr || ovr <= 0) {
             // treat 0 OVR for scout same as unknown
             ratingSpan.classList.add("question-mark");
             ratingSpan.innerText = "?";
@@ -1361,7 +1354,7 @@ class RosterStatsVisualizer {
         else {
             ratingSpan.classList.add("badge");
             ratingSpan.style.userSelect = "none";
-            ratingSpan.innerText = ovr.toString();
+            ratingSpan.innerText = ovr.toString() + (scout === 2 ? "*" : "");
             if (window.userData &&
                 typeof window.userData.getColorPair === "function") {
                 try {

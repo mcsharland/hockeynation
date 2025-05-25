@@ -14,14 +14,16 @@ interface Stats {
 
 interface PlayerStats {
   stats: Stats;
-  scout: boolean;
+  scout: ScoutLevel;
 }
+
+type ScoutLevel = 0 | 1 | 2;
 
 export class Player {
   private stats: Stats;
   private minStats: Stats;
   private maxStats: Stats;
-  private isScout: boolean;
+  private scoutLevel: ScoutLevel;
   private ovr: number;
   private minOvr: number;
   private maxOvr: number;
@@ -29,7 +31,7 @@ export class Player {
   constructor(data: any) {
     const player = this.parsePlayerData(data);
     this.stats = player.stats;
-    this.isScout = player.scout;
+    this.scoutLevel = player.scout;
     this.minStats = this.calcMinStats(this.stats);
     this.maxStats = this.calcMaxStats(this.stats);
     this.ovr = data?.rating ?? 0;
@@ -41,7 +43,9 @@ export class Player {
     const player = {} as PlayerStats;
     player.stats = {};
 
-    player.scout = data.skills.every((skill: any) => skill?.hidden ?? false);
+    const allHidden = data.skills.every((skill: any) => skill?.hidden ?? false);
+    const someHidden = data.skills.some((skill: any) => skill?.hidden ?? false);
+    player.scout = allHidden ? 1 : someHidden ? 2 : 0;
 
     for (const s of data.skills) {
       player.stats[s.id] = {
@@ -163,8 +167,8 @@ export class Player {
     return this.maxStats;
   }
 
-  public getIsScout(): boolean {
-    return this.isScout;
+  public getScoutLevel(): ScoutLevel {
+    return this.scoutLevel;
   }
 
   public getOvr(): number {
@@ -179,7 +183,7 @@ export class Player {
   }
 
   private calculateOVR(stats: Stats): number {
-    if (this.isScout) return 0;
+    if (this.scoutLevel === 1) return 0;
     const statsValues = Object.values(stats);
     const sum = statsValues.reduce(
       (acc: number, stat: Stat) => acc + stat.rating,
@@ -206,6 +210,7 @@ class PlayerStatsVisualizer {
   private skillsHeaderDiv: HTMLDivElement | null = null;
   private dropdownElement: HTMLSelectElement | null = null;
   private dropdownListener: ((event: Event) => void) | null = null; // store listeners
+  private disabled: boolean = false;
 
   constructor() {}
 
@@ -267,7 +272,7 @@ class PlayerStatsVisualizer {
       (d) => d?.textContent?.trim() === "Skills",
     ) as HTMLDivElement | null;
 
-    return !!(this.ovrElement || this.statsTable);
+    return !!(this.ovrElement && this.statsTable);
   }
 
   public updatePlayer(player: Player | null) {
@@ -382,32 +387,14 @@ class PlayerStatsVisualizer {
           ? this.playerStats.getMaxOvr()
           : this.playerStats.getOvr();
 
-    // confirm scout logic later
-    let ovrToShow = ovr;
-    if (
+    const isDefaultScoutWithOvr =
       option === "Default" &&
-      this.playerStats.getIsScout() &&
-      this.playerStats.getOvr() > 0
-    ) {
-      ovrToShow = this.playerStats.getOvr();
-    }
+      this.playerStats.getScoutLevel() === 1 &&
+      this.playerStats.getOvr() > 0;
 
-    // only update if we have a valid number (Min/Max calc returns 0 for scouts)
-    // or if it's default view for a scout with known OVR
-    if (
-      ovrToShow > 0 ||
-      (option === "Default" &&
-        this.playerStats.getIsScout() &&
-        this.playerStats.getOvr() > 0)
-    ) {
-      this.updateOVR(ovrToShow);
-    } else if (option !== "Default" && this.playerStats.getIsScout()) {
-      // Handle displaying Min/Max for a scout where calculation is 0
-      this.updateOVR(this.playerStats.getOvr()); // show default OVR as fallback?
-    } else {
-      // fallback to default OVR if other conditions aren't met
-      this.updateOVR(this.playerStats.getOvr());
-    }
+    const ovrToShow = isDefaultScoutWithOvr ? this.playerStats.getOvr() : ovr;
+
+    this.updateOVR(ovrToShow);
   }
   private updateOVR(ovr: number): void {
     if (!this.ovrElement) return;

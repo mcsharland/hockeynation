@@ -4,6 +4,8 @@ interface DraftCards {
   [id: string]: HTMLElement;
 }
 
+type ScoutLevel = 0 | 1 | 2;
+
 class DraftClassVisualizer {
   private parent: HTMLElement | null = null;
   private draftClass: Roster | null = null;
@@ -200,11 +202,15 @@ class DraftClassVisualizer {
 
       // Add MIN
       badgeContainer.appendChild(this.createOvrLabelSpan("MIN"));
-      badgeContainer.appendChild(this.createRatingSpan(player.getMinOvr()));
+      badgeContainer.appendChild(
+        this.createRatingSpan(player.getMinOvr(), player.getScoutLevel()),
+      );
 
       // Add MAX
       badgeContainer.appendChild(this.createOvrLabelSpan("MAX"));
-      badgeContainer.appendChild(this.createRatingSpan(player.getMaxOvr()));
+      badgeContainer.appendChild(
+        this.createRatingSpan(player.getMaxOvr(), player.getScoutLevel()),
+      );
 
       card.setAttribute("data-ovr-badges-added", "true");
     });
@@ -224,26 +230,33 @@ class DraftClassVisualizer {
     return label;
   }
 
-  private createRatingSpan(ovr: number): HTMLSpanElement {
+  private createRatingSpan(ovr: number, scout: ScoutLevel): HTMLSpanElement {
     const ratingSpan = document.createElement("span");
-    // add a class to make it easier to remove later
-    ratingSpan.classList.add("dynamic-ovr-badge", "badge", "ml-1");
-    ratingSpan.style.userSelect = "none";
+    if (scout === 1 || !ovr || ovr <= 0) {
+      ratingSpan.innerText = "N/A";
+      ratingSpan.style.color = "#FF2C2C";
+      ratingSpan.style.textAlign = "center";
+      ratingSpan.style.padding = ".25rem .375rem";
+      ratingSpan.style.fontWeight = "600";
+    } else {
+      ratingSpan.classList.add("dynamic-ovr-badge", "badge", "ml-1");
+      ratingSpan.style.userSelect = "none";
+      ratingSpan.innerText = ovr.toString() + (scout === 2 ? "*" : "");
 
-    if (
-      window.userData &&
-      typeof window.userData.getColorPair === "function" &&
-      ovr > 0
-    ) {
-      try {
-        const [bgColor, color] = window.userData.getColorPair(ovr);
-        ratingSpan.style.backgroundColor = bgColor;
-        ratingSpan.style.color = color;
-      } catch (e) {
-        console.error("Error getting color pair for OVR:", ovr, e);
+      if (
+        window.userData &&
+        typeof window.userData.getColorPair === "function" &&
+        ovr > 0
+      ) {
+        try {
+          const [bgColor, color] = window.userData.getColorPair(ovr);
+          ratingSpan.style.backgroundColor = bgColor;
+          ratingSpan.style.color = color;
+        } catch (e) {
+          console.error("Error getting color pair for OVR:", ovr, e);
+        }
       }
     }
-    ratingSpan.innerText = ovr > 0 ? ovr.toString() : "?"; // Show ? if OVR is 0, shouldn't ever be needed
     return ratingSpan;
   }
 }

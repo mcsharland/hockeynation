@@ -10,6 +10,8 @@ interface DraftCards {
   [id: string]: HTMLTableRowElement;
 }
 
+type ScoutLevel = 0 | 1 | 2;
+
 const DR_HIGHLIGHT_CLASS = "draft-ranking-highlight";
 const DR_GHOST_TRIM = "draft-ranking-ghost-trim";
 const DR_GHOST = "draft-ranking-ghost";
@@ -273,10 +275,10 @@ class DraftRankingVisualizer {
       maxDataCell.dataset.column = "max-ovr";
 
       minDataCell.appendChild(
-        this.createRatingSpan(player.getMinOvr(), player.getIsScout()),
+        this.createRatingSpan(player.getMinOvr(), player.getScoutLevel()),
       );
       maxDataCell.appendChild(
-        this.createRatingSpan(player.getMaxOvr(), player.getIsScout()),
+        this.createRatingSpan(player.getMaxOvr(), player.getScoutLevel()),
       );
 
       row.insertBefore(maxDataCell, row.children[ovrIdx].nextSibling);
@@ -308,16 +310,16 @@ class DraftRankingVisualizer {
   }
 
   // modify to include empty fields
-  private createRatingSpan(ovr: number, scout: boolean): HTMLSpanElement {
+  private createRatingSpan(ovr: number, scout: ScoutLevel): HTMLSpanElement {
     const ratingSpan: HTMLSpanElement = document.createElement("span");
-    if (scout && (!ovr || ovr <= 0)) {
+    if (scout === 1 || !ovr || ovr <= 0) {
       ratingSpan.innerText = "-";
       ratingSpan.style.color = "#555456";
       ratingSpan.style.textAlign = "center";
     } else {
       ratingSpan.classList.add("badge");
       ratingSpan.style.userSelect = "none";
-      ratingSpan.innerText = ovr.toString();
+      ratingSpan.innerText = ovr.toString() + (scout === 2 ? "*" : "");
 
       if (
         window.userData &&
