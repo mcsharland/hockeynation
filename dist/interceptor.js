@@ -46,26 +46,24 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _observer_handler__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./observer-handler */ "./src/observer-handler.ts");
 /* harmony import */ var _pages_draft_class__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./pages/draft-class */ "./src/pages/draft-class.ts");
 /* harmony import */ var _pages_draft_ranking__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./pages/draft-ranking */ "./src/pages/draft-ranking.ts");
-/* harmony import */ var _pages_player__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./pages/player */ "./src/pages/player.ts");
-/* harmony import */ var _pages_roster__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./pages/roster */ "./src/pages/roster.ts");
-
+/* harmony import */ var _pages_roster__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./pages/roster */ "./src/pages/roster.ts");
 
 
 
 
 const PAGE_HANDLERS = {
-    player: {
-        url: "https://hockey-nation.com/player",
-        selector: "table tbody tr",
-        handler: (el) => {
-            (0,_pages_player__WEBPACK_IMPORTED_MODULE_3__.manipulatePlayerPage)(el);
-        },
-    },
+    // player: {
+    //   url: "https://hockey-nation.com/player",
+    //   selector: "table tbody tr",
+    //   handler: (el) => {
+    //     manipulatePlayerPage(el);
+    //   },
+    // },
     roster: {
         url: "https://hockey-nation.com/club/roster",
         selector: "table tbody tr",
         handler: (el) => {
-            (0,_pages_roster__WEBPACK_IMPORTED_MODULE_4__.manipulateRosterPage)(el);
+            (0,_pages_roster__WEBPACK_IMPORTED_MODULE_3__.manipulateRosterPage)(el);
         },
     },
     draftClass: {

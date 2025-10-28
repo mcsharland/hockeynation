@@ -13,13 +13,13 @@ interface PageHandler {
 }
 
 const PAGE_HANDLERS: Record<string, PageHandler> = {
-  player: {
-    url: "https://hockey-nation.com/player",
-    selector: "table tbody tr",
-    handler: (el) => {
-      manipulatePlayerPage(el);
-    },
-  },
+  // player: {
+  //   url: "https://hockey-nation.com/player",
+  //   selector: "table tbody tr",
+  //   handler: (el) => {
+  //     manipulatePlayerPage(el);
+  //   },
+  // },
   roster: {
     url: "https://hockey-nation.com/club/roster",
     selector: "table tbody tr",
