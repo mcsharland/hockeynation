@@ -9,7 +9,7 @@ Calculates min &amp; max potential OVR for players in [hockey-nation](https://ho
 
 # Usage
 
-Click the dropdown on the player page to see the minimum and maximum OVR that a player can grow into.
+Adds extra information to roster and draft class, and draft ranking pages.
 
 # Extras
 
