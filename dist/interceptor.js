@@ -873,7 +873,7 @@ class CoachMarketVisualizer {
         let insertAfter = parentHeader;
         columns.forEach((col) => {
             const th = document.createElement("th");
-            th.className = "py-2 px-4 w-1 sort-column";
+            th.className = "py-2 px-4 w-1 select-none";
             th.dataset.column = `hn-${col.id}`;
             th.textContent = col.label;
             insertAfter.after(th);
@@ -1005,6 +1005,11 @@ class CoachMarketVisualizer {
             childList: true,
         });
     }
+    onDataReceived() {
+        if (!this.container)
+            return;
+        this.onTableUpdateTrigger();
+    }
 }
 const coachMarketVisualizerInstance = new CoachMarketVisualizer();
 function handleCoachingStaffData(data) {
@@ -1015,6 +1020,7 @@ function handleCoachingStaffData(data) {
 }
 function handleCoachMarketData(data) {
     coachMarketVisualizerInstance.updateMarketCoaches(data);
+    coachMarketVisualizerInstance.onDataReceived();
 }
 function manipulateCoachMarket(el) {
     coachMarketVisualizerInstance.attach(el);
