@@ -28,6 +28,11 @@ const SKILL_NAME_TO_ID = {
     Stick: "STK",
     Discipline: "DSC",
     Faceoffs: "FOF",
+    "Offensive Play": "OFP",
+    "Defensive Play": "DFP",
+    "Puck Battling": "BAT",
+    "Power Play": "PP",
+    "Penalty Kill": "PK",
 };
 
 
@@ -47,6 +52,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _pages_draft_class__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./pages/draft-class */ "./src/pages/draft-class.ts");
 /* harmony import */ var _pages_draft_ranking__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./pages/draft-ranking */ "./src/pages/draft-ranking.ts");
 /* harmony import */ var _pages_roster__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./pages/roster */ "./src/pages/roster.ts");
+/* harmony import */ var _pages_coach_market__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./pages/coach-market */ "./src/pages/coach-market.ts");
+
 
 
 
@@ -78,6 +85,13 @@ const PAGE_HANDLERS = {
         selector: "table tbody tr",
         handler: (el) => {
             (0,_pages_draft_ranking__WEBPACK_IMPORTED_MODULE_2__.manipulateDraftRankingPage)(el);
+        },
+    },
+    coachMarket: {
+        url: "https://hockey-nation.com/coaching-staff",
+        selector: "div[market-open='true'] table tbody tr",
+        handler: (el) => {
+            (0,_pages_coach_market__WEBPACK_IMPORTED_MODULE_4__.manipulateCoachMarket)(el);
         },
     },
 };
@@ -173,6 +187,837 @@ class ObserverManager {
             this.observer = null;
         }
     }
+}
+
+
+/***/ }),
+
+/***/ "./src/pages/coach-market.ts":
+/*!***********************************!*\
+  !*** ./src/pages/coach-market.ts ***!
+  \***********************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   Coach: () => (/* binding */ Coach),
+/* harmony export */   CoachingStaff: () => (/* binding */ CoachingStaff),
+/* harmony export */   handleCoachMarketData: () => (/* binding */ handleCoachMarketData),
+/* harmony export */   handleCoachingStaffData: () => (/* binding */ handleCoachingStaffData),
+/* harmony export */   manipulateCoachMarket: () => (/* binding */ manipulateCoachMarket)
+/* harmony export */ });
+/* harmony import */ var _mappings_skill_mappings__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../mappings/skill-mappings */ "./src/mappings/skill-mappings.ts");
+
+const MATCH_SKILL_IDS = ["OFP", "DFP", "BAT", "PP", "PK"];
+class Coach {
+    stats;
+    minStats;
+    maxStats;
+    coachType;
+    isHead;
+    ovr;
+    minOvr;
+    maxOvr;
+    constructor(data) {
+        // amateur might need to be handled differently later on
+        this.coachType = data.interim
+            ? "interim"
+            : data.amateur
+                ? "amateur"
+                : "regular";
+        this.isHead = data.job?.head ?? false;
+        this.stats = this.parseCoachData(data);
+        this.minStats = this.calcMinStats(this.stats);
+        this.maxStats = this.calcMaxStats(this.stats);
+        this.ovr = data?.rating ?? 0;
+        this.minOvr = this.calculateOVR(this.minStats);
+        this.maxOvr = this.calculateOVR(this.maxStats);
+    }
+    getFloor() {
+        return this.coachType === "regular" ? 4 : 3;
+    }
+    getCap() {
+        return this.coachType === "regular" ? 10 : 5;
+    }
+    parseCoachData(data) {
+        const stats = {};
+        for (const s of data.skills) {
+            stats[s.id] = {
+                rating: parseInt(s?.lvl ?? 0),
+                max: s?.max ?? false,
+                strength: null,
+            };
+        }
+        if (data?.talents?.weakest) {
+            const weakestId = _mappings_skill_mappings__WEBPACK_IMPORTED_MODULE_0__.SKILL_NAME_TO_ID[data.talents.weakest];
+            if (weakestId && stats[weakestId]) {
+                stats[weakestId].strength = "weakest";
+            }
+            data.talents.strongest.forEach((str) => {
+                const strongestId = _mappings_skill_mappings__WEBPACK_IMPORTED_MODULE_0__.SKILL_NAME_TO_ID[str];
+                if (strongestId && stats[strongestId]) {
+                    stats[strongestId].strength = "strongest";
+                }
+            });
+        }
+        return stats;
+    }
+    calcMinStats(stats) {
+        const minStats = structuredClone(stats);
+        const cap = this.getCap();
+        const floor = this.getFloor();
+        let weakestRating = cap;
+        let highestNonStrongestRating = 0;
+        // update ratings and find the highest non-strongest rating
+        for (const stat of Object.values(minStats)) {
+            stat.rating = stat.max
+                ? stat.rating
+                : Math.min(stat.rating + 1, cap);
+            if (stat.strength !== "strongest") {
+                highestNonStrongestRating = Math.max(highestNonStrongestRating, stat.rating);
+            }
+        }
+        // find the weakest rating
+        for (const stat of Object.values(minStats)) {
+            if (stat.strength === "weakest") {
+                weakestRating = stat.rating;
+            }
+        }
+        // adjust strongest stats
+        for (const stat of Object.values(minStats)) {
+            if (stat.strength === "strongest" &&
+                stat.rating < highestNonStrongestRating) {
+                stat.rating = highestNonStrongestRating;
+            }
+        }
+        // adjust weakest stats and apply floor
+        for (const stat of Object.values(minStats)) {
+            if (stat.rating < weakestRating) {
+                stat.rating = weakestRating;
+            }
+            if (stat.rating < floor) {
+                stat.rating = floor;
+            }
+        }
+        return minStats;
+    }
+    calcMaxStats(stats) {
+        const maxStats = structuredClone(stats);
+        const cap = this.getCap();
+        const floor = this.getFloor();
+        let strongestRating = cap;
+        let lowestNonWeakestRating = cap;
+        // find the strongest rating
+        for (const stat of Object.values(maxStats)) {
+            if (stat.strength === "strongest") {
+                strongestRating = Math.min(strongestRating, stat.max ? stat.rating : cap);
+            }
+        }
+        // update ratings and find the lowest non-weakest rating
+        for (const stat of Object.values(maxStats)) {
+            if (!stat.max && stat.rating < strongestRating) {
+                stat.rating = strongestRating;
+            }
+            if (stat.strength !== "weakest") {
+                lowestNonWeakestRating = Math.min(lowestNonWeakestRating, stat.rating);
+            }
+        }
+        // adjust strongest stats
+        for (const stat of Object.values(maxStats)) {
+            if (stat.strength === "strongest" &&
+                !stat.max &&
+                stat.rating < cap) {
+                stat.rating = cap;
+            }
+        }
+        // adjust weakest stats and apply floor
+        for (const stat of Object.values(maxStats)) {
+            if (stat.strength === "weakest" &&
+                stat.rating > lowestNonWeakestRating) {
+                stat.rating = lowestNonWeakestRating;
+            }
+            if (stat.rating < floor) {
+                stat.rating = floor;
+            }
+        }
+        return maxStats;
+    }
+    calculateOVR(stats) {
+        const statsValues = Object.values(stats);
+        const sum = statsValues.reduce((acc, stat) => acc + stat.rating, 0);
+        const avg = sum / statsValues.length;
+        const excess = statsValues.reduce((acc, stat) => stat.rating > avg ? acc + stat.rating - avg : acc, 0);
+        const correctedSum = sum + excess;
+        const correctedAverage = correctedSum / statsValues.length;
+        return Math.round(correctedAverage * 10);
+    }
+    getStats() {
+        return this.stats;
+    }
+    getMinStats() {
+        return this.minStats;
+    }
+    getMaxStats() {
+        return this.maxStats;
+    }
+    getCoachType() {
+        return this.coachType;
+    }
+    getIsHead() {
+        return this.isHead;
+    }
+    getOvr() {
+        return this.ovr;
+    }
+    getMinOvr() {
+        return Math.max(this.minOvr, this.ovr);
+    }
+    getMaxOvr() {
+        return Math.max(this.maxOvr, this.ovr);
+    }
+    filterMatchStats(stats) {
+        const matchStats = {};
+        for (const id of MATCH_SKILL_IDS) {
+            if (stats[id]) {
+                matchStats[id] = stats[id];
+            }
+        }
+        return matchStats;
+    }
+    getMatchStats() {
+        return this.filterMatchStats(this.stats);
+    }
+    getMinMatchStats() {
+        return this.filterMatchStats(this.minStats);
+    }
+    getMaxMatchStats() {
+        return this.filterMatchStats(this.maxStats);
+    }
+    getMatchOvr() {
+        return this.calculateOVR(this.getMatchStats());
+    }
+    getMinMatchOvr() {
+        return Math.max(this.calculateOVR(this.getMinMatchStats()), this.getMatchOvr());
+    }
+    getMaxMatchOvr() {
+        return Math.max(this.calculateOVR(this.getMaxMatchStats()), this.getMatchOvr());
+    }
+    filterTrainingStats(stats) {
+        const trainingStats = {};
+        for (const [id, stat] of Object.entries(stats)) {
+            if (!MATCH_SKILL_IDS.includes(id)) {
+                trainingStats[id] = stat;
+            }
+        }
+        return trainingStats;
+    }
+    getTrainingStats() {
+        return this.filterTrainingStats(this.stats);
+    }
+    getMinTrainingStats() {
+        return this.filterTrainingStats(this.minStats);
+    }
+    getMaxTrainingStats() {
+        return this.filterTrainingStats(this.maxStats);
+    }
+    getTrainingOvr() {
+        return this.calculateOVR(this.getTrainingStats());
+    }
+    getMinTrainingOvr() {
+        return Math.max(this.calculateOVR(this.getMinTrainingStats()), this.getTrainingOvr());
+    }
+    getMaxTrainingOvr() {
+        return Math.max(this.calculateOVR(this.getMaxTrainingStats()), this.getTrainingOvr());
+    }
+}
+class CoachingStaff {
+    coachesByTeam;
+    constructor(data) {
+        this.coachesByTeam = this.parseCoachingStaffData(data);
+    }
+    parseCoachingStaffData(data) {
+        const coachesByTeam = {};
+        for (const team of Object.keys(data)) {
+            coachesByTeam[team] = {};
+            for (const c of data[team]) {
+                coachesByTeam[team][c.id] = new Coach(c);
+            }
+        }
+        return coachesByTeam;
+    }
+    getCoach(coachId, team) {
+        return this.coachesByTeam[team]?.[coachId];
+    }
+    getTeamCoaches(team) {
+        return this.coachesByTeam[team] ?? {};
+    }
+    getAllCoachesByTeam() {
+        return this.coachesByTeam;
+    }
+    getHeadCoach(team) {
+        const teamCoaches = this.coachesByTeam[team];
+        if (!teamCoaches)
+            return undefined;
+        return Object.values(teamCoaches).find((c) => c.getIsHead());
+    }
+    getStaffMatchSkillOvr(skillId, team) {
+        const teamCoaches = this.coachesByTeam[team];
+        if (!teamCoaches)
+            return 0;
+        const ratings = [];
+        for (const coach of Object.values(teamCoaches)) {
+            const stats = coach.getStats();
+            const rating = stats[skillId]?.rating ?? 0;
+            if (coach.getIsHead()) {
+                ratings.push(rating, rating);
+            }
+            else {
+                ratings.push(rating);
+            }
+        }
+        return this.calculateOVR(ratings);
+    }
+    calculateOVR(ratings) {
+        if (ratings.length === 0)
+            return 0;
+        const sum = ratings.reduce((acc, r) => acc + r, 0);
+        const avg = sum / ratings.length;
+        const excess = ratings.reduce((acc, r) => (r > avg ? acc + r - avg : acc), 0);
+        const correctedSum = sum + excess;
+        const correctedAverage = correctedSum / ratings.length;
+        return Math.round(correctedAverage * 10);
+    }
+    getAllStaffMatchSkillOvrs(team) {
+        const ovrs = {};
+        for (const id of MATCH_SKILL_IDS) {
+            ovrs[id] = this.getStaffMatchSkillOvr(id, team);
+        }
+        return ovrs;
+    }
+}
+class CoachMarketVisualizer {
+    container = null;
+    coachingStaff = null;
+    marketCoaches = new Map();
+    header = null;
+    dataRows = {};
+    tbody = null;
+    columnState = {
+        overallRating: false,
+        trainingOvr: false,
+        matchOvr: false,
+    };
+    columnGroupOrder = [
+        "overallRating",
+        "matchOvr",
+        "trainingOvr",
+    ];
+    searchButtonListener = null;
+    paginationListeners = new Map();
+    mutationObserver = null;
+    observerTimeoutId = null;
+    columnToggleButtonListener = null;
+    modalObserver = null;
+    headerObserver = null;
+    showMinMax = false;
+    updateCoachingStaff(staff) {
+        this.coachingStaff = staff;
+    }
+    updateMarketCoaches(data) {
+        this.marketCoaches.clear();
+        for (const c of data) {
+            const coach = new Coach(c);
+            this.marketCoaches.set(c.id, coach);
+        }
+    }
+    attach(el) {
+        this.detach();
+        this.container = el.parentElement;
+        if (!this.container)
+            return;
+        // this.columnState = this.loadColumnState();
+        this.showMinMax = this.loadMinMaxState();
+        this.initializeTableReferences();
+        this.attachHeaderObserver();
+        this.syncColumnStateFromTable();
+        this.attachSearchListener();
+        this.attachPaginationListeners();
+        this.attachColumnToggleListener();
+        this.renderColumns();
+    }
+    detach() {
+        if (!this.container)
+            return;
+        // remove injected columns
+        this.container
+            .querySelectorAll(`[data-column^="hn-"]`)
+            .forEach((node) => node.remove());
+        this.detachSearchListener();
+        this.detachPaginationListeners();
+        this.detachColumnToggleListener();
+        if (this.headerObserver) {
+            this.headerObserver.disconnect();
+            this.headerObserver = null;
+        }
+        if (this.modalObserver) {
+            this.modalObserver.disconnect();
+            this.modalObserver = null;
+        }
+        this.disconnectObserver();
+        this.container = null;
+        this.header = null;
+        this.dataRows = {};
+        this.tbody = null;
+    }
+    // public setColumnState(group: keyof ColumnGroupState, visible: boolean) {
+    //     this.columnState[group] = visible;
+    //     // this.saveColumnState();
+    //     if (this.container) {
+    //         this.renderColumns();
+    //     }
+    // }
+    getColumnState() {
+        return { ...this.columnState };
+    }
+    getTableContainer() {
+        if (!this.container)
+            return null;
+        return this.container.querySelector(`div:has(> table)`);
+    }
+    getPaginationContainer() {
+        if (!this.container)
+            return null;
+        return this.container.querySelector(`div:has(> ul) ul`);
+    }
+    getSearchButton() {
+        if (!this.container)
+            return null;
+        const buttons = this.container.querySelectorAll("button");
+        return (Array.from(buttons).find((btn) => btn.textContent?.trim().toLowerCase() === "search") ?? null);
+    }
+    initializeTableReferences() {
+        if (!this.container)
+            return;
+        const tableContainer = this.getTableContainer();
+        this.header = tableContainer?.querySelector(`table thead tr`) ?? null;
+        this.tbody = tableContainer?.querySelector(`table tbody`) ?? null;
+        this.dataRows = {};
+        if (!this.tbody)
+            return;
+        const rows = this.tbody.querySelectorAll(`tr`);
+        rows.forEach((row) => {
+            const tableRow = row;
+            const coachLink = tableRow.querySelector(`a.coach-link`);
+            const href = coachLink?.getAttribute("href");
+            if (href) {
+                const coachId = href.split("/").pop() || "";
+                if (coachId) {
+                    this.dataRows[coachId] = tableRow;
+                }
+            }
+        });
+    }
+    attachSearchListener() {
+        const searchButton = this.getSearchButton();
+        if (!searchButton)
+            return;
+        this.searchButtonListener = () => {
+            this.onTableUpdateTrigger();
+        };
+        searchButton.addEventListener("click", this.searchButtonListener);
+    }
+    detachSearchListener() {
+        if (!this.searchButtonListener)
+            return;
+        const searchButton = this.getSearchButton();
+        if (searchButton) {
+            searchButton.removeEventListener("click", this.searchButtonListener);
+        }
+        this.searchButtonListener = null;
+    }
+    attachPaginationListeners() {
+        if (!this.container)
+            return;
+        this.detachPaginationListeners();
+        const paginationContainer = this.getPaginationContainer();
+        const pageLinks = paginationContainer?.querySelectorAll(`li a:not(.disabled)`) ?? [];
+        pageLinks.forEach((el) => {
+            const listener = () => {
+                this.onTableUpdateTrigger();
+            };
+            el.addEventListener("click", listener);
+            this.paginationListeners.set(el, listener);
+        });
+    }
+    detachPaginationListeners() {
+        this.paginationListeners.forEach((listener, el) => {
+            el.removeEventListener("click", listener);
+        });
+        this.paginationListeners.clear();
+    }
+    onTableUpdateTrigger() {
+        if (this.observerTimeoutId) {
+            clearTimeout(this.observerTimeoutId);
+            this.observerTimeoutId = null;
+        }
+        if (!this.mutationObserver && this.container) {
+            this.mutationObserver = new MutationObserver((mutations) => {
+                if (!this.container?.isConnected) {
+                    this.detach();
+                    return;
+                }
+                const hasTableChanges = mutations.some((m) => m.addedNodes.length > 0 &&
+                    Array.from(m.addedNodes).some((node) => node.nodeType === Node.ELEMENT_NODE &&
+                        (node.tagName === "TR" ||
+                            node.tagName === "TABLE" ||
+                            node.querySelector("tr") ||
+                            node.querySelector("table"))));
+                if (hasTableChanges) {
+                    this.onTableUpdated();
+                }
+            });
+            this.mutationObserver.observe(this.container, {
+                childList: true,
+                subtree: true,
+            });
+        }
+        this.observerTimeoutId = window.setTimeout(() => {
+            this.onTableUpdated();
+        }, 3000);
+    }
+    onTableUpdated() {
+        this.initializeTableReferences();
+        this.syncColumnStateFromTable();
+        this.renderColumns();
+        this.attachPaginationListeners();
+    }
+    getColumnToggleButton() {
+        if (!this.container)
+            return null;
+        const buttons = this.container.querySelectorAll("button");
+        return (Array.from(buttons).find((btn) => btn.querySelector("svg.fa-table-cells")) ?? null);
+    }
+    attachColumnToggleListener() {
+        const toggleButton = this.getColumnToggleButton();
+        if (!toggleButton)
+            return;
+        this.columnToggleButtonListener = () => {
+            this.watchForModal();
+        };
+        toggleButton.addEventListener("click", this.columnToggleButtonListener);
+    }
+    detachColumnToggleListener() {
+        if (!this.columnToggleButtonListener)
+            return;
+        const toggleButton = this.getColumnToggleButton();
+        if (toggleButton) {
+            toggleButton.removeEventListener("click", this.columnToggleButtonListener);
+        }
+        this.columnToggleButtonListener = null;
+    }
+    watchForModal() {
+        if (this.modalObserver) {
+            this.modalObserver.disconnect();
+        }
+        this.modalObserver = new MutationObserver((mutations) => {
+            const modal = document.querySelector(".card-modal");
+            if (modal) {
+                this.modalObserver?.disconnect();
+                this.modalObserver = null;
+                this.injectModalCheckboxes(modal);
+            }
+        });
+        this.modalObserver.observe(document.body, {
+            childList: true,
+            subtree: true,
+        });
+        // fall back - stop watching after 2s
+        setTimeout(() => {
+            this.modalObserver?.disconnect();
+            this.modalObserver = null;
+        }, 2000);
+    }
+    createCheckboxElement(id, label, checked) {
+        const fragment = document.createDocumentFragment();
+        const input = document.createElement("input");
+        input.id = id;
+        input.type = "checkbox";
+        input.checked = checked;
+        input.className = "mr-2 hidden";
+        const labelEl = document.createElement("label");
+        labelEl.htmlFor = id;
+        labelEl.className =
+            "flex flex-row items-center font-semibold text-gray-800 cursor-pointer select-none hover:text-orange-500";
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("class", `svg-inline--fa ${checked ? "fa-square-check" : "fa-square"} mr-2`);
+        svg.setAttribute("aria-hidden", "true");
+        svg.setAttribute("focusable", "false");
+        svg.setAttribute("data-prefix", checked ? "fas" : "far");
+        svg.setAttribute("data-icon", checked ? "square-check" : "square");
+        svg.setAttribute("role", "img");
+        svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+        svg.setAttribute("viewBox", "0 0 448 512");
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("fill", "currentColor");
+        path.setAttribute("d", checked
+            ? "M64 32C28.7 32 0 60.7 0 96L0 416c0 35.3 28.7 64 64 64l320 0c35.3 0 64-28.7 64-64l0-320c0-35.3-28.7-64-64-64L64 32zM337 209L209 337c-9.4 9.4-24.6 9.4-33.9 0l-64-64c-9.4-9.4-9.4-24.6 0-33.9s24.6-9.4 33.9 0l47 47L303 175c9.4-9.4 24.6-9.4 33.9 0s9.4 24.6 0 33.9z"
+            : "M384 80c8.8 0 16 7.2 16 16l0 320c0 8.8-7.2 16-16 16L64 432c-8.8 0-16-7.2-16-16L48 96c0-8.8 7.2-16 16-16l320 0zM64 32C28.7 32 0 60.7 0 96L0 416c0 35.3 28.7 64 64 64l320 0c35.3 0 64-28.7 64-64l0-320c0-35.3-28.7-64-64-64L64 32z");
+        svg.appendChild(path);
+        labelEl.appendChild(svg);
+        const span = document.createElement("span");
+        span.textContent = label;
+        labelEl.appendChild(span);
+        fragment.appendChild(input);
+        fragment.appendChild(labelEl);
+        return fragment;
+    }
+    updateCheckboxVisual(input) {
+        const label = document.querySelector(`label[for="${input.id}"]`);
+        const svg = label?.querySelector("svg");
+        if (!svg)
+            return;
+        const checked = input.checked;
+        svg.setAttribute("class", `svg-inline--fa ${checked ? "fa-square-check" : "fa-square"} mr-2`);
+        svg.setAttribute("data-prefix", checked ? "fas" : "far");
+        svg.setAttribute("data-icon", checked ? "square-check" : "square");
+        const path = svg.querySelector("path");
+        if (path) {
+            path.setAttribute("d", checked
+                ? "M64 32C28.7 32 0 60.7 0 96L0 416c0 35.3 28.7 64 64 64l320 0c35.3 0 64-28.7 64-64l0-320c0-35.3-28.7-64-64-64L64 32zM337 209L209 337c-9.4 9.4-24.6 9.4-33.9 0l-64-64c-9.4-9.4-9.4-24.6 0-33.9s24.6-9.4 33.9 0l47 47L303 175c9.4-9.4 24.6-9.4 33.9 0s9.4 24.6 0 33.9z"
+                : "M384 80c8.8 0 16 7.2 16 16l0 320c0 8.8-7.2 16-16 16L64 432c-8.8 0-16-7.2-16-16L48 96c0-8.8 7.2-16 16-16l320 0zM64 32C28.7 32 0 60.7 0 96L0 416c0 35.3 28.7 64 64 64l320 0c35.3 0 64-28.7 64-64l0-320c0-35.3-28.7-64-64-64L64 32z");
+        }
+    }
+    injectModalCheckboxes(modal) {
+        const ovrLabel = modal.querySelector('label[for="OVR"]');
+        if (!ovrLabel)
+            return;
+        // create  Min/Max checkbox
+        const minMaxElement = this.createCheckboxElement("hn-min-max", "Min/Max", this.showMinMax);
+        ovrLabel.after(minMaxElement);
+        const minMaxInput = modal.querySelector("#hn-min-max");
+        modal
+            .querySelector('label[for="hn-min-max"]')
+            ?.addEventListener("click", (e) => {
+            e.preventDefault();
+            if (minMaxInput) {
+                minMaxInput.checked = !minMaxInput.checked;
+                this.updateCheckboxVisual(minMaxInput);
+            }
+        });
+        // hook into update button
+        const updateButton = Array.from(modal.querySelectorAll("button")).find((btn) => btn.textContent?.trim().toLowerCase() === "update");
+        if (updateButton) {
+            updateButton.addEventListener("click", () => {
+                if (minMaxInput) {
+                    this.showMinMax = minMaxInput.checked;
+                    this.saveMinMaxState();
+                    this.renderColumns();
+                }
+            });
+        }
+        const allCheckbox = modal.querySelector("#all");
+        const allLabel = modal.querySelector('label[for="all"]');
+        if (allCheckbox && allLabel) {
+            allLabel.addEventListener("click", () => {
+                setTimeout(() => {
+                    const newState = allCheckbox.checked;
+                    if (minMaxInput) {
+                        minMaxInput.checked = newState;
+                        this.updateCheckboxVisual(minMaxInput);
+                    }
+                }, 0);
+            });
+        }
+    }
+    disconnectObserver() {
+        if (this.mutationObserver) {
+            this.mutationObserver.disconnect();
+            this.mutationObserver = null;
+        }
+        if (this.observerTimeoutId) {
+            clearTimeout(this.observerTimeoutId);
+            this.observerTimeoutId = null;
+        }
+    }
+    renderColumns() {
+        if (!this.container || !this.header)
+            return;
+        // remove previously injected columns
+        this.container
+            .querySelectorAll(`[data-column^="hn-"]`)
+            .forEach((node) => node.remove());
+        if (!this.showMinMax)
+            return;
+        // render groups in consistent order, appending to end
+        for (const group of this.columnGroupOrder) {
+            if (this.columnState[group]) {
+                this.renderColumnGroup(group);
+            }
+        }
+    }
+    renderColumnGroup(group) {
+        if (!this.header)
+            return;
+        const columns = this.getColumnsForGroup(group);
+        // find parent col to insert after
+        const parentHeaderText = {
+            overallRating: "OVR",
+            matchOvr: "MATCH",
+            trainingOvr: "DRL",
+        }[group];
+        const parentHeader = Array.from(this.header.querySelectorAll("th")).find((th) => th.textContent?.trim() === parentHeaderText);
+        if (!parentHeader)
+            return;
+        const parentIndex = Array.from(this.header.children).indexOf(parentHeader);
+        // add headers after parent, (in reverse order)
+        let insertAfter = parentHeader;
+        columns.forEach((col) => {
+            const th = document.createElement("th");
+            th.className = "py-2 px-4 w-1 sort-column";
+            th.dataset.column = `hn-${col.id}`;
+            th.textContent = col.label;
+            insertAfter.after(th);
+            insertAfter = th;
+        });
+        // append data cells after parent in each row
+        Object.entries(this.dataRows).forEach(([coachId, row]) => {
+            const coach = this.marketCoaches.get(coachId);
+            const parentCell = row.children[parentIndex];
+            if (!parentCell)
+                return;
+            let insertAfterCell = parentCell;
+            columns.forEach((col) => {
+                const td = document.createElement("td");
+                td.className = "px-2 py-1 whitespace-nowrap text-center";
+                td.dataset.column = `hn-${col.id}`;
+                if (coach) {
+                    const value = col.getValue(coach);
+                    td.appendChild(this.createRatingSpan(value));
+                }
+                else {
+                    td.textContent = "-";
+                }
+                insertAfterCell.after(td);
+                insertAfterCell = td;
+            });
+        });
+    }
+    getColumnsForGroup(group) {
+        switch (group) {
+            case "overallRating":
+                return [
+                    {
+                        id: "ovr-min",
+                        label: "Min",
+                        getValue: (c) => c.getMinOvr(),
+                    },
+                    {
+                        id: "ovr-max",
+                        label: "Max",
+                        getValue: (c) => c.getMaxOvr(),
+                    },
+                ];
+            case "trainingOvr":
+                return [
+                    {
+                        id: "train-min",
+                        label: "D.Min",
+                        getValue: (c) => c.getMinTrainingOvr(),
+                    },
+                    {
+                        id: "train-max",
+                        label: "D.Max",
+                        getValue: (c) => c.getMaxTrainingOvr(),
+                    },
+                ];
+            case "matchOvr":
+                return [
+                    {
+                        id: "match-min",
+                        label: "M.Min",
+                        getValue: (c) => c.getMinMatchOvr(),
+                    },
+                    {
+                        id: "match-max",
+                        label: "M.Max",
+                        getValue: (c) => c.getMaxMatchOvr(),
+                    },
+                ];
+        }
+    }
+    createRatingSpan(ovr) {
+        const span = document.createElement("span");
+        span.className = "badge";
+        span.style.userSelect = "none";
+        span.textContent = ovr.toString();
+        if (window.userData &&
+            typeof window.userData.getColorPair === "function") {
+            try {
+                const [bgColor, color] = window.userData.getColorPair(ovr);
+                span.style.backgroundColor = bgColor;
+                span.style.color = color;
+            }
+            catch (e) {
+                console.error("Error getting color pair for OVR:", ovr, e);
+            }
+        }
+        return span;
+    }
+    loadMinMaxState() {
+        return localStorage.getItem("hn-coach-market-minmax") === "true";
+    }
+    saveMinMaxState() {
+        localStorage.setItem("hn-coach-market-minmax", String(this.showMinMax));
+    }
+    syncColumnStateFromTable() {
+        if (!this.header)
+            return;
+        // check if columns exist in header
+        const hasOvr = this.header.querySelector('th:not([data-column^="hn-"])') !==
+            null &&
+            Array.from(this.header.querySelectorAll("th")).some((th) => th.textContent?.trim() === "OVR");
+        const hasMat = Array.from(this.header.querySelectorAll("th")).some((th) => th.textContent?.trim() === "MATCH");
+        const hasDrl = Array.from(this.header.querySelectorAll("th")).some((th) => th.textContent?.trim() === "DRL");
+        this.columnState.overallRating = hasOvr;
+        this.columnState.matchOvr = hasMat;
+        this.columnState.trainingOvr = hasDrl;
+    }
+    attachHeaderObserver() {
+        if (!this.header)
+            return;
+        this.headerObserver = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === "childList") {
+                    const shouldUpdate = Array.from(mutation.addedNodes).some((node) => node instanceof HTMLTableCellElement &&
+                        node.tagName === "TH" &&
+                        ["OVR", "MATCH", "DRL"].includes(node.textContent?.trim() ?? "")) ||
+                        Array.from(mutation.removedNodes).some((node) => node instanceof HTMLTableCellElement &&
+                            node.tagName === "TH" &&
+                            ["OVR", "MATCH", "DRL"].includes(node.textContent?.trim() ?? ""));
+                    if (shouldUpdate) {
+                        this.syncColumnStateFromTable();
+                        this.renderColumns();
+                    }
+                }
+            });
+        });
+        this.headerObserver.observe(this.header, {
+            childList: true,
+        });
+    }
+}
+const coachMarketVisualizerInstance = new CoachMarketVisualizer();
+function handleCoachingStaffData(data) {
+    const staff = data.staff;
+    if (!staff)
+        return;
+    coachMarketVisualizerInstance.updateCoachingStaff(new CoachingStaff(staff));
+}
+function handleCoachMarketData(data) {
+    coachMarketVisualizerInstance.updateMarketCoaches(data);
+}
+function manipulateCoachMarket(el) {
+    coachMarketVisualizerInstance.attach(el);
 }
 
 
@@ -579,7 +1424,8 @@ class DraftRankingVisualizer {
             mutations.forEach((mutation) => {
                 if (mutation.type === "childList") {
                     mutation.addedNodes.forEach((node) => {
-                        if (node instanceof HTMLTableCellElement && node.tagName === "TH") {
+                        if (node instanceof HTMLTableCellElement &&
+                            node.tagName === "TH") {
                             const span = node.querySelector("span");
                             if (span?.textContent?.trim() === "OVR") {
                                 console.log("attempting to add columns");
@@ -590,7 +1436,8 @@ class DraftRankingVisualizer {
                         }
                     });
                     mutation.removedNodes.forEach((node) => {
-                        if (node instanceof HTMLTableCellElement && node.tagName === "TH") {
+                        if (node instanceof HTMLTableCellElement &&
+                            node.tagName === "TH") {
                             const span = node.querySelector("span");
                             if (span?.textContent?.trim() === "OVR") {
                                 console.log("attempting to remove columns");
@@ -725,6 +1572,7 @@ class Player {
     minStats;
     maxStats;
     scoutLevel;
+    isAmateur;
     ovr;
     minOvr;
     maxOvr;
@@ -732,11 +1580,18 @@ class Player {
         const player = this.parsePlayerData(data);
         this.stats = player.stats;
         this.scoutLevel = player.scout;
+        this.isAmateur = data?.amateur ?? false;
         this.minStats = this.calcMinStats(this.stats);
         this.maxStats = this.calcMaxStats(this.stats);
         this.ovr = data?.rating ?? 0;
         this.minOvr = this.calculateOVR(this.minStats);
         this.maxOvr = this.calculateOVR(this.maxStats);
+    }
+    getFloor() {
+        return this.isAmateur ? 3 : 4;
+    }
+    getCap() {
+        return this.isAmateur ? 5 : 10;
     }
     parsePlayerData(data) {
         const player = {};
@@ -761,11 +1616,13 @@ class Player {
     }
     calcMinStats(stats) {
         const minStats = structuredClone(stats);
-        let weakestRating = 10;
+        let weakestRating = this.getCap();
         let highestNonStrongestRating = 0;
         // update ratings and find the highest non-strongest rating
         for (const stat of Object.values(minStats)) {
-            stat.rating = stat.max ? stat.rating : stat.rating + 1;
+            stat.rating = stat.max
+                ? stat.rating
+                : Math.min(stat.rating + 1, this.getCap());
             if (stat.strength !== "strongest") {
                 highestNonStrongestRating = Math.max(highestNonStrongestRating, stat.rating);
             }
@@ -788,20 +1645,20 @@ class Player {
             if (stat.rating < weakestRating) {
                 stat.rating = weakestRating;
             }
-            if (stat.rating < 4) {
-                stat.rating = 4;
+            if (stat.rating < this.getFloor()) {
+                stat.rating = this.getFloor();
             }
         }
         return minStats;
     }
     calcMaxStats(stats) {
         const maxStats = structuredClone(stats);
-        let strongestRating = 10;
-        let lowestNonWeakestRating = 10;
+        let strongestRating = this.getCap();
+        let lowestNonWeakestRating = this.getCap();
         // find the strongest rating
         for (const stat of Object.values(maxStats)) {
             if (stat.strength === "strongest") {
-                strongestRating = Math.min(strongestRating, stat.max ? stat.rating : 10);
+                strongestRating = Math.min(strongestRating, stat.max ? stat.rating : this.getCap());
             }
         }
         // update ratings and find the lowest non-weakest rating
@@ -815,17 +1672,20 @@ class Player {
         }
         // adjust strongest stats
         for (const stat of Object.values(maxStats)) {
-            if (stat.strength === "strongest" && !stat.max && stat.rating < 10) {
-                stat.rating = 10;
+            if (stat.strength === "strongest" &&
+                !stat.max &&
+                stat.rating < this.getCap()) {
+                stat.rating = this.getCap();
             }
         }
         // adjust weakest stats
         for (const stat of Object.values(maxStats)) {
-            if (stat.strength === "weakest" && stat.rating > lowestNonWeakestRating) {
+            if (stat.strength === "weakest" &&
+                stat.rating > lowestNonWeakestRating) {
                 stat.rating = lowestNonWeakestRating;
             }
-            if (stat.rating < 4) {
-                stat.rating = 4;
+            if (stat.rating < this.getFloor()) {
+                stat.rating = this.getFloor();
             }
         }
         return maxStats;
@@ -906,7 +1766,8 @@ class PlayerStatsVisualizer {
     initializeDOMReferences() {
         if (!this.parent)
             return false;
-        this.ovrElement = this.parent.querySelector(".polygon text");
+        this.ovrElement =
+            this.parent.querySelector(".polygon text");
         const puck = this.parent.querySelector("svg.fa-hockey-puck");
         this.statsTable = puck
             ? puck.closest(`tbody`)
@@ -1023,7 +1884,9 @@ class PlayerStatsVisualizer {
         const isDefaultScoutWithOvr = option === "Default" &&
             this.playerStats.getScoutLevel() === 1 &&
             this.playerStats.getOvr() > 0;
-        const ovrToShow = isDefaultScoutWithOvr ? this.playerStats.getOvr() : ovr;
+        const ovrToShow = isDefaultScoutWithOvr
+            ? this.playerStats.getOvr()
+            : ovr;
         this.updateOVR(ovrToShow);
     }
     updateOVR(ovr) {
@@ -1177,7 +2040,8 @@ class RosterStatsVisualizer {
         }
         const isGeneral = tabButtons[0]?.textContent?.trim() === "General";
         const generalButton = isGeneral ? tabButtons[0] : tabButtons[1];
-        this.onGeneralPage = generalButton?.classList.contains("active") ?? true;
+        this.onGeneralPage =
+            generalButton?.classList.contains("active") ?? true;
     }
     initializeTableReferences() {
         if (!this.parent)
@@ -1297,14 +2161,16 @@ class RosterStatsVisualizer {
         });
         //header
         this.minHeaderCell = document.createElement("th");
-        this.minHeaderCell.className = "md:px-4 px-2 py-2 text-center sort-column";
+        this.minHeaderCell.className =
+            "md:px-4 px-2 py-2 text-center sort-column";
         this.minHeaderCell.innerText = " Min ";
         this.minHeaderCell.dataset.column = "min-ovr";
         // TODO: Add click listener here for sorting if implemented
         // this.minHeaderCell.addEventListener('click', this.handleMinSortClick);
         this.header.appendChild(this.minHeaderCell);
         this.maxHeaderCell = document.createElement("th");
-        this.maxHeaderCell.className = "md:px-4 px-2 py-2 text-center sort-column";
+        this.maxHeaderCell.className =
+            "md:px-4 px-2 py-2 text-center sort-column";
         this.maxHeaderCell.innerText = " Max ";
         this.maxHeaderCell.dataset.column = "max-ovr";
         // TODO: Add click listener here for sorting if implemented
@@ -1334,7 +2200,9 @@ class RosterStatsVisualizer {
         if (!players)
             return 0;
         const values = Object.values(players)
-            .filter((player) => player && !(player.getScoutLevel() === 1) && player.getOvr() > 0) // ensure player exists & filter scouts without OVR
+            .filter((player) => player &&
+            !(player.getScoutLevel() === 1) &&
+            player.getOvr() > 0) // ensure player exists & filter scouts without OVR
             .map((player) => playerOvr[ovrType](player));
         return values.length
             ? Math.round(values.reduce((sum, value, _, array) => sum + value / array.length, 0))
@@ -1517,6 +2385,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _user__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./user */ "./src/user.ts");
 /* harmony import */ var _pages_draft_class__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./pages/draft-class */ "./src/pages/draft-class.ts");
 /* harmony import */ var _pages_draft_ranking__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./pages/draft-ranking */ "./src/pages/draft-ranking.ts");
+/* harmony import */ var _pages_coach_market__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./pages/coach-market */ "./src/pages/coach-market.ts");
+
 
 
 
@@ -1561,6 +2431,18 @@ __webpack_require__.r(__webpack_exports__);
             pattern: /\/api\/draft\/[^\/]+\/picks/,
             handler: (data) => {
                 (0,_pages_draft_ranking__WEBPACK_IMPORTED_MODULE_5__.handleDraftPickData)(data.data);
+            },
+        },
+        coachingStaff: {
+            pattern: /\/api\/club\/[^\/]+\/coaching-staff/,
+            handler: (data) => {
+                (0,_pages_coach_market__WEBPACK_IMPORTED_MODULE_6__.handleCoachingStaffData)(data.data);
+            },
+        },
+        coachMarket: {
+            pattern: /\/api\/coach-center\/search/,
+            handler: (data) => {
+                (0,_pages_coach_market__WEBPACK_IMPORTED_MODULE_6__.handleCoachMarketData)(data.data);
             },
         },
     };
