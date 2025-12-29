@@ -1107,6 +1107,6 @@ export function handleCoachMarketData(data: any[]) {
     coachMarketVisualizerInstance.onDataReceived();
 }
 
-export function manipulateCoachMarket(el: HTMLElement) {
+export function manipulateCoachMarketPage(el: HTMLElement) {
     coachMarketVisualizerInstance.attach(el);
 }

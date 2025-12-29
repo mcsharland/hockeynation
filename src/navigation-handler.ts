@@ -3,7 +3,8 @@ import { manipulateDraftClassPage } from "./pages/draft-class";
 import { manipulateDraftRankingPage } from "./pages/draft-ranking";
 import { manipulatePlayerPage } from "./pages/player";
 import { manipulateRosterPage } from "./pages/roster";
-import { manipulateCoachMarket } from "./pages/coach-market";
+import { manipulateCoachMarketPage } from "./pages/coach-market";
+import { manipulateFreeAgentCenterPage } from "./pages/free-agent-center";
 
 type MutationHandler = (element: HTMLElement) => void;
 
@@ -46,7 +47,14 @@ const PAGE_HANDLERS: Record<string, PageHandler> = {
         url: "https://hockey-nation.com/coaching-staff",
         selector: "div[market-open='true'] table tbody tr",
         handler: (el) => {
-            manipulateCoachMarket(el);
+            manipulateCoachMarketPage(el);
+        },
+    },
+    freeAgentCenter: {
+        url: "https://hockey-nation.com/office/free-agent-center",
+        selector: "div.card.card-secondary",
+        handler: (el) => {
+            manipulateFreeAgentCenterPage(el);
         },
     },
 };

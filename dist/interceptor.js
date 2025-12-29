@@ -53,6 +53,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _pages_draft_ranking__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./pages/draft-ranking */ "./src/pages/draft-ranking.ts");
 /* harmony import */ var _pages_roster__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./pages/roster */ "./src/pages/roster.ts");
 /* harmony import */ var _pages_coach_market__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./pages/coach-market */ "./src/pages/coach-market.ts");
+/* harmony import */ var _pages_free_agent_center__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./pages/free-agent-center */ "./src/pages/free-agent-center.ts");
+
 
 
 
@@ -91,7 +93,14 @@ const PAGE_HANDLERS = {
         url: "https://hockey-nation.com/coaching-staff",
         selector: "div[market-open='true'] table tbody tr",
         handler: (el) => {
-            (0,_pages_coach_market__WEBPACK_IMPORTED_MODULE_4__.manipulateCoachMarket)(el);
+            (0,_pages_coach_market__WEBPACK_IMPORTED_MODULE_4__.manipulateCoachMarketPage)(el);
+        },
+    },
+    freeAgentCenter: {
+        url: "https://hockey-nation.com/office/free-agent-center",
+        selector: "div.card.card-secondary",
+        handler: (el) => {
+            (0,_pages_free_agent_center__WEBPACK_IMPORTED_MODULE_5__.manipulateFreeAgentCenterPage)(el);
         },
     },
 };
@@ -204,7 +213,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   CoachingStaff: () => (/* binding */ CoachingStaff),
 /* harmony export */   handleCoachMarketData: () => (/* binding */ handleCoachMarketData),
 /* harmony export */   handleCoachingStaffData: () => (/* binding */ handleCoachingStaffData),
-/* harmony export */   manipulateCoachMarket: () => (/* binding */ manipulateCoachMarket)
+/* harmony export */   manipulateCoachMarketPage: () => (/* binding */ manipulateCoachMarketPage)
 /* harmony export */ });
 /* harmony import */ var _mappings_skill_mappings__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../mappings/skill-mappings */ "./src/mappings/skill-mappings.ts");
 
@@ -1022,7 +1031,7 @@ function handleCoachMarketData(data) {
     coachMarketVisualizerInstance.updateMarketCoaches(data);
     coachMarketVisualizerInstance.onDataReceived();
 }
-function manipulateCoachMarket(el) {
+function manipulateCoachMarketPage(el) {
     coachMarketVisualizerInstance.attach(el);
 }
 
@@ -1554,6 +1563,212 @@ function handleDraftPickData(data) {
 }
 function manipulateDraftRankingPage(el) {
     drVisualizerInstance.attach(el);
+}
+
+
+/***/ }),
+
+/***/ "./src/pages/free-agent-center.ts":
+/*!****************************************!*\
+  !*** ./src/pages/free-agent-center.ts ***!
+  \****************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   handleFreeAgentCenterData: () => (/* binding */ handleFreeAgentCenterData),
+/* harmony export */   manipulateFreeAgentCenterPage: () => (/* binding */ manipulateFreeAgentCenterPage)
+/* harmony export */ });
+/* harmony import */ var _roster__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./roster */ "./src/pages/roster.ts");
+
+class FreeAgentVisualizer {
+    container = null;
+    freeAgents = null;
+    freeAgentCards = null;
+    paginationListeners = new Map();
+    mutationObserver = null;
+    observerTimeoutId = null;
+    constructor() { }
+    attach(el) {
+        this.detach();
+        this.container = el.parentElement;
+        if (!this.container)
+            return;
+        if (this.freeAgents) {
+            this.initializeDOMReferences();
+            this.attachPaginationListeners();
+            this.addBadges();
+        }
+    }
+    detach() {
+        if (!this.container)
+            return;
+        this.detachPaginationListeners();
+        this.disconnectObserver();
+        this.container = null;
+        this.freeAgentCards = null;
+    }
+    updateData(newData) {
+        this.freeAgents = newData;
+        if (this.container) {
+            this.initializeDOMReferences();
+            this.addBadges();
+        }
+    }
+    onDataReceived() {
+        if (!this.container)
+            return;
+        this.onTableUpdateTrigger();
+    }
+    getPaginationContainers() {
+        if (!this.container)
+            return [];
+        const paginationDivs = this.container.querySelectorAll("div.flex.justify-center.bg-gray-700");
+        return Array.from(paginationDivs);
+    }
+    initializeDOMReferences() {
+        if (!this.container)
+            return;
+        const cards = this.container.querySelectorAll("div.card.card-secondary");
+        const fc = {};
+        cards.forEach((card) => {
+            const cardEl = card;
+            const playerLink = cardEl.querySelector("a[href^='/player/']");
+            const badge = cardEl.querySelector(".badge");
+            if (!playerLink || !badge)
+                return;
+            const playerId = playerLink.getAttribute("href")?.split("/").pop();
+            if (playerId) {
+                fc[playerId] = cardEl;
+            }
+        });
+        this.freeAgentCards = fc;
+    }
+    attachPaginationListeners() {
+        if (!this.container)
+            return;
+        this.detachPaginationListeners();
+        const containers = this.getPaginationContainers();
+        containers.forEach((container) => {
+            const pageLinks = container.querySelectorAll("li a:not(.disabled)");
+            pageLinks.forEach((el) => {
+                const listener = () => {
+                    this.onTableUpdateTrigger();
+                };
+                el.addEventListener("click", listener);
+                this.paginationListeners.set(el, listener);
+            });
+        });
+    }
+    detachPaginationListeners() {
+        this.paginationListeners.forEach((listener, el) => {
+            el.removeEventListener("click", listener);
+        });
+        this.paginationListeners.clear();
+    }
+    onTableUpdateTrigger() {
+        if (this.observerTimeoutId) {
+            clearTimeout(this.observerTimeoutId);
+            this.observerTimeoutId = null;
+        }
+        if (!this.mutationObserver && this.container) {
+            this.mutationObserver = new MutationObserver((mutations) => {
+                if (!this.container?.isConnected) {
+                    this.detach();
+                    return;
+                }
+                const hasRelevantChanges = mutations.some((m) => m.addedNodes.length > 0 &&
+                    Array.from(m.addedNodes).some((node) => node.nodeType === Node.ELEMENT_NODE &&
+                        (node.classList?.contains("card") ||
+                            node.querySelector("div.card.card-secondary"))));
+                if (hasRelevantChanges) {
+                    this.onTableUpdated();
+                }
+            });
+            this.mutationObserver.observe(this.container, {
+                childList: true,
+                subtree: true,
+            });
+        }
+        this.observerTimeoutId = window.setTimeout(() => {
+            this.onTableUpdated();
+        }, 3000);
+    }
+    onTableUpdated() {
+        this.disconnectObserver();
+        this.initializeDOMReferences();
+        this.addBadges();
+        this.attachPaginationListeners();
+    }
+    disconnectObserver() {
+        if (this.mutationObserver) {
+            this.mutationObserver.disconnect();
+            this.mutationObserver = null;
+        }
+        if (this.observerTimeoutId) {
+            clearTimeout(this.observerTimeoutId);
+            this.observerTimeoutId = null;
+        }
+    }
+    addBadges() {
+        if (!this.freeAgentCards || !this.freeAgents)
+            return;
+        Object.entries(this.freeAgentCards).forEach(([playerId, card]) => {
+            if (card.getAttribute("data-ovr-badges-added") === "true")
+                return;
+            const badgeContainer = card.querySelector(".badge")?.parentElement;
+            if (!badgeContainer)
+                return;
+            const player = this.freeAgents.getPlayer(playerId);
+            if (!player)
+                return;
+            badgeContainer
+                .querySelectorAll(".dynamic-ovr-label, .dynamic-ovr-badge")
+                .forEach((el) => el.remove());
+            // Add MIN
+            badgeContainer.appendChild(this.createOvrLabelSpan("MIN"));
+            badgeContainer.appendChild(this.createRatingSpan(player.getMinOvr()));
+            // Add MAX
+            badgeContainer.appendChild(this.createOvrLabelSpan("MAX"));
+            badgeContainer.appendChild(this.createRatingSpan(player.getMaxOvr()));
+            card.setAttribute("data-ovr-badges-added", "true");
+        });
+    }
+    createOvrLabelSpan(text) {
+        const label = document.createElement("span");
+        label.classList.add("dynamic-ovr-label", "uppercase", "ml-3", "xs:inline-block", "hidden");
+        label.innerText = text;
+        return label;
+    }
+    createRatingSpan(ovr) {
+        const ratingSpan = document.createElement("span");
+        ratingSpan.classList.add("dynamic-ovr-badge", "badge", "ml-1");
+        ratingSpan.style.userSelect = "none";
+        ratingSpan.innerText = ovr.toString();
+        if (window.userData &&
+            typeof window.userData.getColorPair === "function" &&
+            ovr > 0) {
+            try {
+                const [bgColor, color] = window.userData.getColorPair(ovr);
+                ratingSpan.style.backgroundColor = bgColor;
+                ratingSpan.style.color = color;
+            }
+            catch (e) {
+                console.error("Error getting color pair for OVR:", ovr, e);
+            }
+        }
+        return ratingSpan;
+    }
+}
+const freeAgentVisualizerInstance = new FreeAgentVisualizer();
+function handleFreeAgentCenterData(data) {
+    const rosterData = { players: data };
+    const newRoster = new _roster__WEBPACK_IMPORTED_MODULE_0__.Roster(rosterData);
+    freeAgentVisualizerInstance.updateData(newRoster);
+    freeAgentVisualizerInstance.onDataReceived();
+}
+function manipulateFreeAgentCenterPage(el) {
+    freeAgentVisualizerInstance.attach(el);
 }
 
 
@@ -2392,6 +2607,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _pages_draft_class__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./pages/draft-class */ "./src/pages/draft-class.ts");
 /* harmony import */ var _pages_draft_ranking__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./pages/draft-ranking */ "./src/pages/draft-ranking.ts");
 /* harmony import */ var _pages_coach_market__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./pages/coach-market */ "./src/pages/coach-market.ts");
+/* harmony import */ var _pages_free_agent_center__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./pages/free-agent-center */ "./src/pages/free-agent-center.ts");
+
 
 
 
@@ -2449,6 +2666,12 @@ __webpack_require__.r(__webpack_exports__);
             pattern: /\/api\/coach-center\/search/,
             handler: (data) => {
                 (0,_pages_coach_market__WEBPACK_IMPORTED_MODULE_6__.handleCoachMarketData)(data.data);
+            },
+        },
+        freeAgentCenter: {
+            pattern: /\/api\/free-agent-center\/search/,
+            handler: (data) => {
+                (0,_pages_free_agent_center__WEBPACK_IMPORTED_MODULE_7__.handleFreeAgentCenterData)(data.data);
             },
         },
     };
