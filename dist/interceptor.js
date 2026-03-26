@@ -2,11 +2,11 @@
 /******/ 	"use strict";
 /******/ 	var __webpack_modules__ = ({
 
-/***/ "./src/mappings/skill-mappings.ts":
+/***/ "./src/mappings/skill-mappings.ts"
 /*!****************************************!*\
   !*** ./src/mappings/skill-mappings.ts ***!
   \****************************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
@@ -36,13 +36,13 @@ const SKILL_NAME_TO_ID = {
 };
 
 
-/***/ }),
+/***/ },
 
-/***/ "./src/navigation-handler.ts":
+/***/ "./src/navigation-handler.ts"
 /*!***********************************!*\
   !*** ./src/navigation-handler.ts ***!
   \***********************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
@@ -91,7 +91,7 @@ const PAGE_HANDLERS = {
     },
     coachMarket: {
         url: "https://hockey-nation.com/coaching-staff",
-        selector: "div[market-open='true'] table tbody tr",
+        selector: "div[market-open] table tbody tr",
         handler: (el) => {
             (0,_pages_coach_market__WEBPACK_IMPORTED_MODULE_4__.manipulateCoachMarketPage)(el);
         },
@@ -129,13 +129,13 @@ function handleNavigation() {
 }
 
 
-/***/ }),
+/***/ },
 
-/***/ "./src/observer-handler.ts":
+/***/ "./src/observer-handler.ts"
 /*!*********************************!*\
   !*** ./src/observer-handler.ts ***!
   \*********************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
@@ -161,6 +161,7 @@ class ObserverManager {
     resetCallback() {
         this.currentSelector = null;
         this.currentCallback = null;
+        this.disconnect();
     }
     ensureObserverActive() {
         if (!this.observer) {
@@ -170,7 +171,8 @@ class ObserverManager {
                 if (!currentSelector || !currentCallback)
                     return;
                 mutations.forEach((mutation) => {
-                    if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
+                    if (mutation.type === "childList" &&
+                        mutation.addedNodes.length > 0) {
                         mutation.addedNodes.forEach((node) => {
                             if (node.nodeType === Node.ELEMENT_NODE) {
                                 const element = node;
@@ -199,13 +201,13 @@ class ObserverManager {
 }
 
 
-/***/ }),
+/***/ },
 
-/***/ "./src/pages/coach-market.ts":
+/***/ "./src/pages/coach-market.ts"
 /*!***********************************!*\
   !*** ./src/pages/coach-market.ts ***!
   \***********************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
@@ -625,6 +627,7 @@ class CoachMarketVisualizer {
                 }
             }
         });
+        console.log("table references initializaed");
     }
     attachSearchListener() {
         const searchButton = this.getSearchButton();
@@ -798,6 +801,7 @@ class CoachMarketVisualizer {
     }
     injectModalCheckboxes(modal) {
         const ovrLabel = modal.querySelector('label[for="OVR"]');
+        console.log("overLabel: ", ovrLabel);
         if (!ovrLabel)
             return;
         // create  Min/Max checkbox
@@ -837,6 +841,7 @@ class CoachMarketVisualizer {
                 }, 0);
             });
         }
+        console.log("updated buttons");
     }
     disconnectObserver() {
         if (this.mutationObserver) {
@@ -1036,13 +1041,13 @@ function manipulateCoachMarketPage(el) {
 }
 
 
-/***/ }),
+/***/ },
 
-/***/ "./src/pages/draft-class.ts":
+/***/ "./src/pages/draft-class.ts"
 /*!**********************************!*\
   !*** ./src/pages/draft-class.ts ***!
   \**********************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
@@ -1257,13 +1262,13 @@ function manipulateDraftClassPage(el) {
 }
 
 
-/***/ }),
+/***/ },
 
-/***/ "./src/pages/draft-ranking.ts":
+/***/ "./src/pages/draft-ranking.ts"
 /*!************************************!*\
   !*** ./src/pages/draft-ranking.ts ***!
   \************************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
@@ -1390,7 +1395,6 @@ class DraftRankingVisualizer {
                     if (mutation.type === "childList") {
                         mutation.addedNodes.forEach((node) => {
                             if (node.nodeType === Node.TEXT_NODE) {
-                                console.log("here");
                                 this.applyColumnHighlights();
                                 this.disconnectHighlightObserver();
                             }
@@ -1400,7 +1404,6 @@ class DraftRankingVisualizer {
                     //   mutation.type === "attributes" &&
                     //   mutation.attributeName === "class"
                     // ) {
-                    //   console.log("here2");
                     //   this.applyColumnHighlights();
                     //   this.disconnectHighlightObserver();
                     // }
@@ -1443,7 +1446,6 @@ class DraftRankingVisualizer {
                             node.tagName === "TH") {
                             const span = node.querySelector("span");
                             if (span?.textContent?.trim() === "OVR") {
-                                console.log("attempting to add columns");
                                 this.initializeTableReferences();
                                 this.renderColumns();
                                 this.applyColumnHighlights();
@@ -1455,7 +1457,6 @@ class DraftRankingVisualizer {
                             node.tagName === "TH") {
                             const span = node.querySelector("span");
                             if (span?.textContent?.trim() === "OVR") {
-                                console.log("attempting to remove columns");
                                 this.removeColumns();
                             }
                         }
@@ -1566,13 +1567,13 @@ function manipulateDraftRankingPage(el) {
 }
 
 
-/***/ }),
+/***/ },
 
-/***/ "./src/pages/free-agent-center.ts":
+/***/ "./src/pages/free-agent-center.ts"
 /*!****************************************!*\
   !*** ./src/pages/free-agent-center.ts ***!
   \****************************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
@@ -1772,13 +1773,13 @@ function manipulateFreeAgentCenterPage(el) {
 }
 
 
-/***/ }),
+/***/ },
 
-/***/ "./src/pages/player.ts":
+/***/ "./src/pages/player.ts"
 /*!*****************************!*\
   !*** ./src/pages/player.ts ***!
   \*****************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
@@ -2141,13 +2142,13 @@ function manipulatePlayerPage(el) {
 }
 
 
-/***/ }),
+/***/ },
 
-/***/ "./src/pages/roster.ts":
+/***/ "./src/pages/roster.ts"
 /*!*****************************!*\
   !*** ./src/pages/roster.ts ***!
   \*****************************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
@@ -2468,13 +2469,13 @@ function manipulateRosterPage(el) {
 }
 
 
-/***/ }),
+/***/ },
 
-/***/ "./src/user.ts":
+/***/ "./src/user.ts"
 /*!*********************!*\
   !*** ./src/user.ts ***!
   \*********************/
-/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
@@ -2535,7 +2536,7 @@ function handleUserData(data) {
 }
 
 
-/***/ })
+/***/ }
 
 /******/ 	});
 /************************************************************************/
@@ -2557,6 +2558,12 @@ function handleUserData(data) {
 /******/ 		};
 /******/ 	
 /******/ 		// Execute the module function
+/******/ 		if (!(moduleId in __webpack_modules__)) {
+/******/ 			delete __webpack_module_cache__[moduleId];
+/******/ 			var e = new Error("Cannot find module '" + moduleId + "'");
+/******/ 			e.code = 'MODULE_NOT_FOUND';
+/******/ 			throw e;
+/******/ 		}
 /******/ 		__webpack_modules__[moduleId](module, module.exports, __webpack_require__);
 /******/ 	
 /******/ 		// Return the exports of the module

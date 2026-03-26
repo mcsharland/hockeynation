@@ -32,11 +32,11 @@
       border-color: #6ee7b7;
       border-bottom-width: 1px;
       border-top-width: 1px;
-      background-color: #fbd38d
+      background-color: #fbd38d;
       }
 
       .${DR_GHOST} {
-      background-color: #fbd38d
+      background-color: #fbd38d;
       }
 
     `;

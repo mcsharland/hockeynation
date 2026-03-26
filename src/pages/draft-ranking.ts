@@ -148,7 +148,6 @@ class DraftRankingVisualizer {
                         if (mutation.type === "childList") {
                             mutation.addedNodes.forEach((node) => {
                                 if (node.nodeType === Node.TEXT_NODE) {
-                                    console.log("here");
                                     this.applyColumnHighlights();
                                     this.disconnectHighlightObserver();
                                 }
@@ -158,7 +157,6 @@ class DraftRankingVisualizer {
                         //   mutation.type === "attributes" &&
                         //   mutation.attributeName === "class"
                         // ) {
-                        //   console.log("here2");
                         //   this.applyColumnHighlights();
                         //   this.disconnectHighlightObserver();
                         // }
@@ -208,7 +206,6 @@ class DraftRankingVisualizer {
                         ) {
                             const span = node.querySelector("span");
                             if (span?.textContent?.trim() === "OVR") {
-                                console.log("attempting to add columns");
                                 this.initializeTableReferences();
                                 this.renderColumns();
                                 this.applyColumnHighlights();
@@ -223,7 +220,6 @@ class DraftRankingVisualizer {
                         ) {
                             const span = node.querySelector("span");
                             if (span?.textContent?.trim() === "OVR") {
-                                console.log("attempting to remove columns");
                                 this.removeColumns();
                             }
                         }

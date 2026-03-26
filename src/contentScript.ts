@@ -1,23 +1,23 @@
 (function () {
-  // inject the interceptor script
-  const script = document.createElement("script");
-  script.src = chrome.runtime.getURL("dist/interceptor.js");
-  (document.head || document.documentElement).appendChild(script);
-  // remove after load
-  script.onload = function () {
-    script.remove();
-  };
+    // inject the interceptor script
+    const script = document.createElement("script");
+    script.src = chrome.runtime.getURL("dist/interceptor.js");
+    (document.head || document.documentElement).appendChild(script);
+    // remove after load
+    script.onload = function () {
+        script.remove();
+    };
 
-  const EXTENSION_STYLE_ID = `hockey-nation-ext-styles`;
-  const DR_HIGHLIGHT_CLASS = "draft-ranking-highlight";
-  const DR_GHOST_TRIM = "draft-ranking-ghost-trim";
-  const DR_GHOST = "draft-ranking-ghost";
+    const EXTENSION_STYLE_ID = `hockey-nation-ext-styles`;
+    const DR_HIGHLIGHT_CLASS = "draft-ranking-highlight";
+    const DR_GHOST_TRIM = "draft-ranking-ghost-trim";
+    const DR_GHOST = "draft-ranking-ghost";
 
-  if (document.getElementById(EXTENSION_STYLE_ID)) {
-    return;
-  }
+    if (document.getElementById(EXTENSION_STYLE_ID)) {
+        return;
+    }
 
-  const cssRules = `
+    const cssRules = `
       .${DR_HIGHLIGHT_CLASS} {
       border-color: #6ee7b7;
       border-bottom-width: 1px;
@@ -29,17 +29,17 @@
       border-color: #6ee7b7;
       border-bottom-width: 1px;
       border-top-width: 1px;
-      background-color: #fbd38d
+      background-color: #fbd38d;
       }
 
       .${DR_GHOST} {
-      background-color: #fbd38d
+      background-color: #fbd38d;
       }
 
     `;
 
-  const styleElement = document.createElement("style");
-  styleElement.id = EXTENSION_STYLE_ID;
-  styleElement.textContent = cssRules;
-  (document.head || document.documentElement).appendChild(styleElement);
+    const styleElement = document.createElement("style");
+    styleElement.id = EXTENSION_STYLE_ID;
+    styleElement.textContent = cssRules;
+    (document.head || document.documentElement).appendChild(styleElement);
 })();

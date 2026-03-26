@@ -45,7 +45,7 @@ const PAGE_HANDLERS: Record<string, PageHandler> = {
     },
     coachMarket: {
         url: "https://hockey-nation.com/coaching-staff",
-        selector: "div[market-open='true'] table tbody tr",
+        selector: "div[market-open] table tbody tr",
         handler: (el) => {
             manipulateCoachMarketPage(el);
         },
