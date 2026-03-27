@@ -1248,7 +1248,7 @@ class CoachStaffVisualizer {
             if (!ovrTh)
                 return;
             // inject before OVR
-            [...beforeOvr].reverse().forEach((col) => {
+            [...beforeOvr].forEach((col) => {
                 const th = document.createElement("th");
                 th.className = "py-2 px-4 w-1 select-none";
                 th.dataset.column = `hn-${col.id}`;
@@ -1273,7 +1273,7 @@ class CoachStaffVisualizer {
             if (!parentCell)
                 return;
             // inject before OVR cell
-            [...beforeOvr].reverse().forEach((col) => {
+            [...beforeOvr].forEach((col) => {
                 const td = document.createElement("td");
                 td.className = "px-2 py-1 whitespace-nowrap text-center";
                 td.dataset.column = `hn-${col.id}`;
