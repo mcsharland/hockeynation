@@ -5,64 +5,97 @@ import { manipulatePlayerPage } from "./pages/player";
 import { manipulateRosterPage } from "./pages/roster";
 import { manipulateCoachMarketPage } from "./pages/coach-market";
 import { manipulateFreeAgentCenterPage } from "./pages/free-agent-center";
+import { manipulateCoachingStaffPage } from "./pages/coaching-staff";
 
 type MutationHandler = (element: HTMLElement) => void;
 
-interface PageHandler {
-    url: string;
+export interface SelectorHandler {
     selector: string;
     handler: MutationHandler;
 }
+type PageHandlers = { url: string; handlers: SelectorHandler[] };
 
-const PAGE_HANDLERS: Record<string, PageHandler> = {
+const PAGE_HANDLERS: Record<string, PageHandlers> = {
     // player: {
-    //   url: "https://hockey-nation.com/player",
-    //   selector: "table tbody tr",
-    //   handler: (el) => {
-    //     manipulatePlayerPage(el);
-    //   },
+    //     url: "https://hockey-nation.com/player",
+    //     handlers: [
+    //         {
+    //             selector: "table tbody tr",
+    //             handler: (el) => {
+    //                 manipulatePlayerPage(el);
+    //             },
+    //         },
+    //     ],
     // },
     roster: {
         url: "https://hockey-nation.com/club/roster",
-        selector: "table tbody tr",
-        handler: (el) => {
-            manipulateRosterPage(el);
-        },
+        handlers: [
+            {
+                selector: "table tbody tr",
+                handler: (el) => {
+                    manipulateRosterPage(el);
+                },
+            },
+        ],
     },
     draftClass: {
         url: "https://hockey-nation.com/office/draft-center",
-        selector: ".stats-container",
-        handler: (el) => {
-            manipulateDraftClassPage(el);
-        },
+        handlers: [
+            {
+                selector: ".stats-container",
+                handler: (el) => {
+                    manipulateDraftClassPage(el);
+                },
+            },
+        ],
     },
     draftRanking: {
         url: "https://hockey-nation.com/draft-ranking",
-        selector: "table tbody tr",
-        handler: (el) => {
-            manipulateDraftRankingPage(el);
-        },
+        handlers: [
+            {
+                selector: "table tbody tr",
+                handler: (el) => {
+                    manipulateDraftRankingPage(el);
+                },
+            },
+        ],
     },
     coachMarket: {
         url: "https://hockey-nation.com/coaching-staff",
-        selector: "div[market-open] table tbody tr",
-        handler: (el) => {
-            manipulateCoachMarketPage(el);
-        },
+        handlers: [
+            // Coach Market
+            {
+                selector: "div[market-open] table tbody tr",
+                handler: (el) => {
+                    manipulateCoachMarketPage(el);
+                },
+            },
+            // Coaching Staff
+            {
+                selector: ".market-stats-grid.by-experience",
+                handler: (el) => {
+                    manipulateCoachingStaffPage(el);
+                },
+            },
+        ],
     },
     freeAgentCenter: {
         url: "https://hockey-nation.com/office/free-agent-center",
-        selector: "div.card.card-secondary",
-        handler: (el) => {
-            manipulateFreeAgentCenterPage(el);
-        },
+        handlers: [
+            {
+                selector: "div.card.card-secondary",
+                handler: (el) => {
+                    manipulateFreeAgentCenterPage(el);
+                },
+            },
+        ],
     },
 };
 
-function findPageHandler(url: string): PageHandler | null {
+function findPageHandler(url: string): SelectorHandler[] | null {
     for (const page of Object.values(PAGE_HANDLERS)) {
         if (url.startsWith(page.url)) {
-            return page;
+            return page.handlers;
         }
     }
     return null;
@@ -77,16 +110,13 @@ export function initNavigationHandler() {
 
 function handleNavigation() {
     const url = window.location.href;
-    const pageHandler = findPageHandler(url);
+    const pageHandlers = findPageHandler(url);
 
     // reset previous observer
     ObserverManager.getInstance().resetCallback();
 
-    // set new callback if we have a handler for the page
-    if (pageHandler) {
-        ObserverManager.getInstance().setCallback(
-            pageHandler.selector,
-            pageHandler.handler,
-        );
+    // set new callbacks if we have handlers for the page
+    if (pageHandlers) {
+        ObserverManager.getInstance().setCallbacks(pageHandlers);
     }
 }

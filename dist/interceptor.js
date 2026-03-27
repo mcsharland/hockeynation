@@ -54,6 +54,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _pages_roster__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./pages/roster */ "./src/pages/roster.ts");
 /* harmony import */ var _pages_coach_market__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./pages/coach-market */ "./src/pages/coach-market.ts");
 /* harmony import */ var _pages_free_agent_center__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./pages/free-agent-center */ "./src/pages/free-agent-center.ts");
+/* harmony import */ var _pages_coaching_staff__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./pages/coaching-staff */ "./src/pages/coaching-staff.ts");
+
 
 
 
@@ -62,52 +64,84 @@ __webpack_require__.r(__webpack_exports__);
 
 const PAGE_HANDLERS = {
     // player: {
-    //   url: "https://hockey-nation.com/player",
-    //   selector: "table tbody tr",
-    //   handler: (el) => {
-    //     manipulatePlayerPage(el);
-    //   },
+    //     url: "https://hockey-nation.com/player",
+    //     handlers: [
+    //         {
+    //             selector: "table tbody tr",
+    //             handler: (el) => {
+    //                 manipulatePlayerPage(el);
+    //             },
+    //         },
+    //     ],
     // },
     roster: {
         url: "https://hockey-nation.com/club/roster",
-        selector: "table tbody tr",
-        handler: (el) => {
-            (0,_pages_roster__WEBPACK_IMPORTED_MODULE_3__.manipulateRosterPage)(el);
-        },
+        handlers: [
+            {
+                selector: "table tbody tr",
+                handler: (el) => {
+                    (0,_pages_roster__WEBPACK_IMPORTED_MODULE_3__.manipulateRosterPage)(el);
+                },
+            },
+        ],
     },
     draftClass: {
         url: "https://hockey-nation.com/office/draft-center",
-        selector: ".stats-container",
-        handler: (el) => {
-            (0,_pages_draft_class__WEBPACK_IMPORTED_MODULE_1__.manipulateDraftClassPage)(el);
-        },
+        handlers: [
+            {
+                selector: ".stats-container",
+                handler: (el) => {
+                    (0,_pages_draft_class__WEBPACK_IMPORTED_MODULE_1__.manipulateDraftClassPage)(el);
+                },
+            },
+        ],
     },
     draftRanking: {
         url: "https://hockey-nation.com/draft-ranking",
-        selector: "table tbody tr",
-        handler: (el) => {
-            (0,_pages_draft_ranking__WEBPACK_IMPORTED_MODULE_2__.manipulateDraftRankingPage)(el);
-        },
+        handlers: [
+            {
+                selector: "table tbody tr",
+                handler: (el) => {
+                    (0,_pages_draft_ranking__WEBPACK_IMPORTED_MODULE_2__.manipulateDraftRankingPage)(el);
+                },
+            },
+        ],
     },
     coachMarket: {
         url: "https://hockey-nation.com/coaching-staff",
-        selector: "div[market-open] table tbody tr",
-        handler: (el) => {
-            (0,_pages_coach_market__WEBPACK_IMPORTED_MODULE_4__.manipulateCoachMarketPage)(el);
-        },
+        handlers: [
+            // Coach Market
+            {
+                selector: "div[market-open] table tbody tr",
+                handler: (el) => {
+                    (0,_pages_coach_market__WEBPACK_IMPORTED_MODULE_4__.manipulateCoachMarketPage)(el);
+                },
+            },
+            // Coaching Staff
+            {
+                selector: ".market-stats-grid.by-experience",
+                handler: (el) => {
+                    (0,_pages_coaching_staff__WEBPACK_IMPORTED_MODULE_6__.manipulateCoachingStaffPage)(el);
+                },
+            },
+        ],
     },
     freeAgentCenter: {
         url: "https://hockey-nation.com/office/free-agent-center",
-        selector: "div.card.card-secondary",
-        handler: (el) => {
-            (0,_pages_free_agent_center__WEBPACK_IMPORTED_MODULE_5__.manipulateFreeAgentCenterPage)(el);
-        },
+        handlers: [
+            {
+                selector: "div.card.card-secondary",
+                handler: (el) => {
+                    (0,_pages_free_agent_center__WEBPACK_IMPORTED_MODULE_5__.manipulateFreeAgentCenterPage)(el);
+                },
+            },
+        ],
     },
 };
 function findPageHandler(url) {
     for (const page of Object.values(PAGE_HANDLERS)) {
         if (url.startsWith(page.url)) {
-            return page;
+            return page.handlers;
         }
     }
     return null;
@@ -119,12 +153,12 @@ function initNavigationHandler() {
 }
 function handleNavigation() {
     const url = window.location.href;
-    const pageHandler = findPageHandler(url);
+    const pageHandlers = findPageHandler(url);
     // reset previous observer
     _observer_handler__WEBPACK_IMPORTED_MODULE_0__.ObserverManager.getInstance().resetCallback();
-    // set new callback if we have a handler for the page
-    if (pageHandler) {
-        _observer_handler__WEBPACK_IMPORTED_MODULE_0__.ObserverManager.getInstance().setCallback(pageHandler.selector, pageHandler.handler);
+    // set new callbacks if we have handlers for the page
+    if (pageHandlers) {
+        _observer_handler__WEBPACK_IMPORTED_MODULE_0__.ObserverManager.getInstance().setCallbacks(pageHandlers);
     }
 }
 
@@ -144,8 +178,8 @@ __webpack_require__.r(__webpack_exports__);
 class ObserverManager {
     static instance;
     observer = null;
-    currentSelector = null;
-    currentCallback = null;
+    activeHandlers = null;
+    shouldAutoDisconnect = true;
     constructor() { } //singleton
     static getInstance() {
         if (!ObserverManager.instance) {
@@ -153,34 +187,38 @@ class ObserverManager {
         }
         return ObserverManager.instance;
     }
-    setCallback(selector, callback) {
-        this.currentSelector = selector;
-        this.currentCallback = callback;
+    setCallbacks(handlers) {
+        this.activeHandlers = [...handlers];
+        this.shouldAutoDisconnect = handlers.length === 1;
         this.ensureObserverActive();
     }
     resetCallback() {
-        this.currentSelector = null;
-        this.currentCallback = null;
+        this.activeHandlers = null;
         this.disconnect();
     }
     ensureObserverActive() {
         if (!this.observer) {
             this.observer = new MutationObserver((mutations) => {
-                const currentSelector = this.currentSelector;
-                const currentCallback = this.currentCallback;
-                if (!currentSelector || !currentCallback)
+                const handlers = this.activeHandlers;
+                if (!handlers)
                     return;
                 mutations.forEach((mutation) => {
                     if (mutation.type === "childList" &&
                         mutation.addedNodes.length > 0) {
                         mutation.addedNodes.forEach((node) => {
-                            if (node.nodeType === Node.ELEMENT_NODE) {
-                                const element = node;
-                                const target = element.querySelector(currentSelector);
-                                if (target) {
-                                    currentCallback(element);
-                                    this.disconnect();
+                            if (node.nodeType !== Node.ELEMENT_NODE)
+                                return;
+                            const element = node;
+                            for (const [i, { selector, handler },] of handlers.entries()) {
+                                if (element.querySelector(selector)) {
+                                    handler(element);
+                                    handlers.splice(i, 1); //remove
+                                    break; // re-iterate on next mutation since we modified the array
                                 }
+                            }
+                            if (handlers.length === 0 &&
+                                this.shouldAutoDisconnect) {
+                                this.disconnect();
                             }
                         });
                     }
@@ -212,9 +250,7 @@ class ObserverManager {
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
 /* harmony export */   Coach: () => (/* binding */ Coach),
-/* harmony export */   CoachingStaff: () => (/* binding */ CoachingStaff),
 /* harmony export */   handleCoachMarketData: () => (/* binding */ handleCoachMarketData),
-/* harmony export */   handleCoachingStaffData: () => (/* binding */ handleCoachingStaffData),
 /* harmony export */   manipulateCoachMarketPage: () => (/* binding */ manipulateCoachMarketPage)
 /* harmony export */ });
 /* harmony import */ var _mappings_skill_mappings__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../mappings/skill-mappings */ "./src/mappings/skill-mappings.ts");
@@ -441,74 +477,9 @@ class Coach {
         return Math.max(this.calculateOVR(this.getMaxTrainingStats()), this.getTrainingOvr());
     }
 }
-class CoachingStaff {
-    coachesByTeam;
-    constructor(data) {
-        this.coachesByTeam = this.parseCoachingStaffData(data);
-    }
-    parseCoachingStaffData(data) {
-        const coachesByTeam = {};
-        for (const team of Object.keys(data)) {
-            coachesByTeam[team] = {};
-            for (const c of data[team]) {
-                coachesByTeam[team][c.id] = new Coach(c);
-            }
-        }
-        return coachesByTeam;
-    }
-    getCoach(coachId, team) {
-        return this.coachesByTeam[team]?.[coachId];
-    }
-    getTeamCoaches(team) {
-        return this.coachesByTeam[team] ?? {};
-    }
-    getAllCoachesByTeam() {
-        return this.coachesByTeam;
-    }
-    getHeadCoach(team) {
-        const teamCoaches = this.coachesByTeam[team];
-        if (!teamCoaches)
-            return undefined;
-        return Object.values(teamCoaches).find((c) => c.getIsHead());
-    }
-    getStaffMatchSkillOvr(skillId, team) {
-        const teamCoaches = this.coachesByTeam[team];
-        if (!teamCoaches)
-            return 0;
-        const ratings = [];
-        for (const coach of Object.values(teamCoaches)) {
-            const stats = coach.getStats();
-            const rating = stats[skillId]?.rating ?? 0;
-            if (coach.getIsHead()) {
-                ratings.push(rating, rating);
-            }
-            else {
-                ratings.push(rating);
-            }
-        }
-        return this.calculateOVR(ratings);
-    }
-    calculateOVR(ratings) {
-        if (ratings.length === 0)
-            return 0;
-        const sum = ratings.reduce((acc, r) => acc + r, 0);
-        const avg = sum / ratings.length;
-        const excess = ratings.reduce((acc, r) => (r > avg ? acc + r - avg : acc), 0);
-        const correctedSum = sum + excess;
-        const correctedAverage = correctedSum / ratings.length;
-        return Math.round(correctedAverage * 10);
-    }
-    getAllStaffMatchSkillOvrs(team) {
-        const ovrs = {};
-        for (const id of MATCH_SKILL_IDS) {
-            ovrs[id] = this.getStaffMatchSkillOvr(id, team);
-        }
-        return ovrs;
-    }
-}
 class CoachMarketVisualizer {
     container = null;
-    coachingStaff = null;
+    // private coachingStaff: CoachingStaff | null = null;
     marketCoaches = new Map();
     header = null;
     dataRows = {};
@@ -531,9 +502,9 @@ class CoachMarketVisualizer {
     modalObserver = null;
     headerObserver = null;
     showMinMax = false;
-    updateCoachingStaff(staff) {
-        this.coachingStaff = staff;
-    }
+    // public updateCoachingStaff(staff: CoachingStaff) {
+    //     this.coachingStaff = staff;
+    // }
     updateMarketCoaches(data) {
         this.marketCoaches.clear();
         for (const c of data) {
@@ -627,7 +598,6 @@ class CoachMarketVisualizer {
                 }
             }
         });
-        console.log("table references initializaed");
     }
     attachSearchListener() {
         const searchButton = this.getSearchButton();
@@ -801,7 +771,6 @@ class CoachMarketVisualizer {
     }
     injectModalCheckboxes(modal) {
         const ovrLabel = modal.querySelector('label[for="OVR"]');
-        console.log("overLabel: ", ovrLabel);
         if (!ovrLabel)
             return;
         // create  Min/Max checkbox
@@ -841,7 +810,6 @@ class CoachMarketVisualizer {
                 }, 0);
             });
         }
-        console.log("updated buttons");
     }
     disconnectObserver() {
         if (this.mutationObserver) {
@@ -1026,18 +994,309 @@ class CoachMarketVisualizer {
     }
 }
 const coachMarketVisualizerInstance = new CoachMarketVisualizer();
-function handleCoachingStaffData(data) {
-    const staff = data.staff;
-    if (!staff)
-        return;
-    coachMarketVisualizerInstance.updateCoachingStaff(new CoachingStaff(staff));
-}
+// export function handleCoachingStaffData(data: any) {
+//     const staff = data.staff;
+//     if (!staff) return;
+//     coachMarketVisualizerInstance.updateCoachingStaff(new CoachingStaff(staff));
+// }
 function handleCoachMarketData(data) {
     coachMarketVisualizerInstance.updateMarketCoaches(data);
     coachMarketVisualizerInstance.onDataReceived();
 }
 function manipulateCoachMarketPage(el) {
     coachMarketVisualizerInstance.attach(el);
+}
+
+
+/***/ },
+
+/***/ "./src/pages/coaching-staff.ts"
+/*!*************************************!*\
+  !*** ./src/pages/coaching-staff.ts ***!
+  \*************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   CoachingStaff: () => (/* binding */ CoachingStaff),
+/* harmony export */   handleCoachingStaffData: () => (/* binding */ handleCoachingStaffData),
+/* harmony export */   manipulateCoachingStaffPage: () => (/* binding */ manipulateCoachingStaffPage)
+/* harmony export */ });
+/* harmony import */ var _coach_market__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./coach-market */ "./src/pages/coach-market.ts");
+
+const MATCH_SKILL_IDS = ["OFP", "DFP", "BAT", "PP", "PK"];
+class CoachingStaff {
+    coachesByTeam;
+    constructor(data) {
+        this.coachesByTeam = this.parseCoachingStaffData(data);
+    }
+    parseCoachingStaffData(data) {
+        const coachesByTeam = {};
+        for (const team of Object.keys(data)) {
+            coachesByTeam[team] = {};
+            for (const c of data[team]) {
+                coachesByTeam[team][c.id] = new _coach_market__WEBPACK_IMPORTED_MODULE_0__.Coach(c);
+            }
+        }
+        return coachesByTeam;
+    }
+    getCoach(coachId, team) {
+        return this.coachesByTeam[team]?.[coachId];
+    }
+    findCoachById(coachId) {
+        for (const team of Object.values(this.coachesByTeam)) {
+            if (team[coachId])
+                return team[coachId];
+        }
+        return undefined;
+    }
+    getTeamCoaches(team) {
+        return this.coachesByTeam[team] ?? {};
+    }
+    getAllCoachesByTeam() {
+        return this.coachesByTeam;
+    }
+    getHeadCoach(team) {
+        const teamCoaches = this.coachesByTeam[team];
+        if (!teamCoaches)
+            return undefined;
+        return Object.values(teamCoaches).find((c) => c.getIsHead());
+    }
+    getStaffMatchSkillOvr(skillId, team) {
+        const teamCoaches = this.coachesByTeam[team];
+        if (!teamCoaches)
+            return 0;
+        const ratings = [];
+        for (const coach of Object.values(teamCoaches)) {
+            const stats = coach.getStats();
+            const rating = stats[skillId]?.rating ?? 0;
+            if (coach.getIsHead()) {
+                ratings.push(rating, rating);
+            }
+            else {
+                ratings.push(rating);
+            }
+        }
+        return this.calculateOVR(ratings);
+    }
+    calculateOVR(ratings) {
+        if (ratings.length === 0)
+            return 0;
+        const sum = ratings.reduce((acc, r) => acc + r, 0);
+        const avg = sum / ratings.length;
+        const excess = ratings.reduce((acc, r) => (r > avg ? acc + r - avg : acc), 0);
+        const correctedSum = sum + excess;
+        const correctedAverage = correctedSum / ratings.length;
+        return Math.round(correctedAverage * 10);
+    }
+    getAllStaffMatchSkillOvrs(team) {
+        const ovrs = {};
+        for (const id of MATCH_SKILL_IDS) {
+            ovrs[id] = this.getStaffMatchSkillOvr(id, team);
+        }
+        return ovrs;
+    }
+}
+class CoachStaffVisualizer {
+    container = null;
+    dataRows = {};
+    mutationObserver = null;
+    coachingStaff = null;
+    attach(el) {
+        this.detach();
+        this.container = el.parentElement;
+        if (!this.container)
+            return;
+        this.initializeTableReferences();
+        this.renderColumns();
+        this.observeChanges();
+    }
+    detach() {
+        if (!this.container)
+            return;
+        this.container
+            .querySelectorAll(`[data-column^="hn-"]`)
+            .forEach((node) => node.remove());
+        if (this.mutationObserver) {
+            this.mutationObserver.disconnect();
+            this.mutationObserver = null;
+        }
+        this.container = null;
+        this.dataRows = {};
+    }
+    updateCoachingStaff(staff) {
+        this.coachingStaff = staff;
+    }
+    observeChanges() {
+        if (!this.container)
+            return;
+        this.mutationObserver = new MutationObserver((mutations) => {
+            if (!this.container?.isConnected) {
+                this.detach();
+                return;
+            }
+            const hasTableChanges = mutations.some((m) => m.addedNodes.length > 0 &&
+                Array.from(m.addedNodes).some((node) => node.nodeType === Node.ELEMENT_NODE &&
+                    !node.dataset?.column?.startsWith("hn-") &&
+                    (node.tagName === "TR" ||
+                        node.tagName === "TABLE" ||
+                        node.querySelector?.("tr") ||
+                        node.querySelector?.("table"))));
+            if (hasTableChanges) {
+                this.initializeTableReferences();
+                this.renderColumns();
+            }
+        });
+        this.mutationObserver.observe(this.container, {
+            childList: true,
+            subtree: true,
+        });
+    }
+    initializeTableReferences() {
+        if (!this.container)
+            return;
+        this.dataRows = {};
+        const rows = this.container.querySelectorAll(`table tbody tr`);
+        rows.forEach((row) => {
+            const tableRow = row;
+            const coachLink = tableRow.querySelector(`a.coach-link`);
+            const href = coachLink?.getAttribute("href");
+            if (href) {
+                const coachId = href.split("/").pop() || "";
+                if (coachId) {
+                    this.dataRows[coachId] = tableRow;
+                }
+            }
+        });
+    }
+    renderColumns() {
+        if (!this.container)
+            return;
+        this.container
+            .querySelectorAll(`[data-column^="hn-"]`)
+            .forEach((node) => node.remove());
+        if (!this.coachingStaff)
+            return;
+        const columns = [
+            {
+                id: "min-ovr",
+                label: "Min",
+                getValue: (c) => c.getMinOvr(),
+            },
+            {
+                id: "max-ovr",
+                label: "Max",
+                getValue: (c) => c.getMaxOvr(),
+            },
+            {
+                id: "train-ovr",
+                label: "DRL",
+                getValue: (c) => c.getTrainingOvr(),
+            },
+            {
+                id: "train-min",
+                label: "D.Min",
+                getValue: (c) => c.getMinTrainingOvr(),
+            },
+            {
+                id: "train-max",
+                label: "D.Max",
+                getValue: (c) => c.getMaxTrainingOvr(),
+            },
+            {
+                id: "match-ovr",
+                label: "MATCH",
+                getValue: (c) => c.getMatchOvr(),
+            },
+            {
+                id: "match-min",
+                label: "M.Min",
+                getValue: (c) => c.getMinMatchOvr(),
+            },
+            {
+                id: "match-max",
+                label: "M.Max",
+                getValue: (c) => c.getMaxMatchOvr(),
+            },
+        ];
+        // find OVR column index from first header
+        const allHeaders = this.container.querySelectorAll(`thead tr`);
+        if (!allHeaders.length)
+            return;
+        const firstOvrTh = Array.from(allHeaders[0].querySelectorAll("th")).find((th) => th.textContent?.trim() === "OVR");
+        if (!firstOvrTh)
+            return;
+        const parentIndex = Array.from(allHeaders[0].children).indexOf(firstOvrTh);
+        // inject headers into every thead row
+        allHeaders.forEach((headerRow) => {
+            const ovrTh = headerRow.children[parentIndex];
+            if (!ovrTh)
+                return;
+            let insertAfter = ovrTh;
+            columns.forEach((col) => {
+                const th = document.createElement("th");
+                th.className = "py-2 px-4 w-1 select-none";
+                th.dataset.column = `hn-${col.id}`;
+                th.textContent = col.label;
+                insertAfter.after(th);
+                insertAfter = th;
+            });
+        });
+        // insert data cells in each row
+        Object.entries(this.dataRows).forEach(([coachId, row]) => {
+            const coach = this.coachingStaff.findCoachById(coachId);
+            const parentCell = row.children[parentIndex];
+            if (!parentCell)
+                return;
+            let insertAfterCell = parentCell;
+            columns.forEach((col) => {
+                const td = document.createElement("td");
+                td.className = "px-2 py-1 whitespace-nowrap text-center";
+                td.dataset.column = `hn-${col.id}`;
+                if (coach) {
+                    td.appendChild(this.createRatingSpan(col.getValue(coach)));
+                }
+                else {
+                    td.textContent = "-";
+                }
+                insertAfterCell.after(td);
+                insertAfterCell = td;
+            });
+        });
+    }
+    createRatingSpan(ovr) {
+        const span = document.createElement("span");
+        span.className = "badge";
+        span.style.userSelect = "none";
+        span.textContent = ovr.toString();
+        if (window.userData &&
+            typeof window.userData.getColorPair === "function") {
+            try {
+                const [bgColor, color] = window.userData.getColorPair(ovr);
+                span.style.backgroundColor = bgColor;
+                span.style.color = color;
+            }
+            catch (e) {
+                console.error("Error getting color pair for OVR:", ovr, e);
+            }
+        }
+        return span;
+    }
+    getPaginationContainer() {
+        if (!this.container)
+            return null;
+        return this.container.querySelector(`div:has(> ul) ul`);
+    }
+}
+const coachingStaffVisualizerInstance = new CoachStaffVisualizer();
+function handleCoachingStaffData(data) {
+    const staff = data.staff;
+    if (!staff)
+        return;
+    coachingStaffVisualizerInstance.updateCoachingStaff(new CoachingStaff(staff));
+}
+function manipulateCoachingStaffPage(el) {
+    coachingStaffVisualizerInstance.attach(el);
 }
 
 
@@ -2615,6 +2874,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _pages_draft_ranking__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./pages/draft-ranking */ "./src/pages/draft-ranking.ts");
 /* harmony import */ var _pages_coach_market__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./pages/coach-market */ "./src/pages/coach-market.ts");
 /* harmony import */ var _pages_free_agent_center__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./pages/free-agent-center */ "./src/pages/free-agent-center.ts");
+/* harmony import */ var _pages_coaching_staff__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./pages/coaching-staff */ "./src/pages/coaching-staff.ts");
+
 
 
 
@@ -2666,7 +2927,7 @@ __webpack_require__.r(__webpack_exports__);
         coachingStaff: {
             pattern: /\/api\/club\/[^\/]+\/coaching-staff/,
             handler: (data) => {
-                (0,_pages_coach_market__WEBPACK_IMPORTED_MODULE_6__.handleCoachingStaffData)(data.data);
+                (0,_pages_coaching_staff__WEBPACK_IMPORTED_MODULE_8__.handleCoachingStaffData)(data.data);
             },
         },
         coachMarket: {

@@ -1,8 +1,7 @@
 import { SKILL_NAME_TO_ID } from "../mappings/skill-mappings";
+// import { CoachingStaff } from "./coaching-staff";
 
 type CoachType = "regular" | "interim" | "amateur";
-
-type TeamLevel = "PRO" | "FRM" | "U21" | "U17";
 
 type StatStrength = "strongest" | "weakest" | null;
 
@@ -14,14 +13,6 @@ interface Stat {
 
 interface Stats {
     [id: string]: Stat;
-}
-
-interface Coaches {
-    [id: string]: Coach;
-}
-
-interface CoachesByTeam {
-    [team: string]: Coaches;
 }
 
 interface CoachDataRow {
@@ -337,91 +328,9 @@ export class Coach {
     }
 }
 
-export class CoachingStaff {
-    private coachesByTeam: CoachesByTeam;
-
-    constructor(data: any) {
-        this.coachesByTeam = this.parseCoachingStaffData(data);
-    }
-
-    private parseCoachingStaffData(data: any): CoachesByTeam {
-        const coachesByTeam: CoachesByTeam = {};
-
-        for (const team of Object.keys(data)) {
-            coachesByTeam[team] = {};
-            for (const c of data[team]) {
-                coachesByTeam[team][c.id] = new Coach(c);
-            }
-        }
-
-        return coachesByTeam;
-    }
-
-    public getCoach(coachId: string, team: TeamLevel): Coach | undefined {
-        return this.coachesByTeam[team]?.[coachId];
-    }
-
-    public getTeamCoaches(team: TeamLevel): Coaches {
-        return this.coachesByTeam[team] ?? {};
-    }
-
-    public getAllCoachesByTeam(): CoachesByTeam {
-        return this.coachesByTeam;
-    }
-
-    public getHeadCoach(team: TeamLevel): Coach | undefined {
-        const teamCoaches = this.coachesByTeam[team];
-        if (!teamCoaches) return undefined;
-        return Object.values(teamCoaches).find((c) => c.getIsHead());
-    }
-
-    public getStaffMatchSkillOvr(skillId: string, team: TeamLevel): number {
-        const teamCoaches = this.coachesByTeam[team];
-        if (!teamCoaches) return 0;
-
-        const ratings: number[] = [];
-
-        for (const coach of Object.values(teamCoaches)) {
-            const stats = coach.getStats();
-            const rating = stats[skillId]?.rating ?? 0;
-
-            if (coach.getIsHead()) {
-                ratings.push(rating, rating);
-            } else {
-                ratings.push(rating);
-            }
-        }
-
-        return this.calculateOVR(ratings);
-    }
-
-    private calculateOVR(ratings: number[]): number {
-        if (ratings.length === 0) return 0;
-        const sum = ratings.reduce((acc, r) => acc + r, 0);
-        const avg = sum / ratings.length;
-        const excess = ratings.reduce(
-            (acc, r) => (r > avg ? acc + r - avg : acc),
-            0,
-        );
-        const correctedSum = sum + excess;
-        const correctedAverage = correctedSum / ratings.length;
-        return Math.round(correctedAverage * 10);
-    }
-
-    public getAllStaffMatchSkillOvrs(team: TeamLevel): Record<string, number> {
-        const ovrs: Record<string, number> = {};
-
-        for (const id of MATCH_SKILL_IDS) {
-            ovrs[id] = this.getStaffMatchSkillOvr(id, team);
-        }
-
-        return ovrs;
-    }
-}
-
 class CoachMarketVisualizer {
     private container: HTMLElement | null = null;
-    private coachingStaff: CoachingStaff | null = null;
+    // private coachingStaff: CoachingStaff | null = null;
     private marketCoaches: Map<string, Coach> = new Map();
 
     private header: HTMLTableRowElement | null = null;
@@ -449,9 +358,9 @@ class CoachMarketVisualizer {
     private headerObserver: MutationObserver | null = null;
     private showMinMax: boolean = false;
 
-    public updateCoachingStaff(staff: CoachingStaff) {
-        this.coachingStaff = staff;
-    }
+    // public updateCoachingStaff(staff: CoachingStaff) {
+    //     this.coachingStaff = staff;
+    // }
 
     public updateMarketCoaches(data: any[]) {
         this.marketCoaches.clear();
@@ -1095,12 +1004,12 @@ class CoachMarketVisualizer {
 
 const coachMarketVisualizerInstance = new CoachMarketVisualizer();
 
-export function handleCoachingStaffData(data: any) {
-    const staff = data.staff;
-    if (!staff) return;
+// export function handleCoachingStaffData(data: any) {
+//     const staff = data.staff;
+//     if (!staff) return;
 
-    coachMarketVisualizerInstance.updateCoachingStaff(new CoachingStaff(staff));
-}
+//     coachMarketVisualizerInstance.updateCoachingStaff(new CoachingStaff(staff));
+// }
 
 export function handleCoachMarketData(data: any[]) {
     coachMarketVisualizerInstance.updateMarketCoaches(data);

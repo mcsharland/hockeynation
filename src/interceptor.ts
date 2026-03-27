@@ -7,11 +7,9 @@ import {
     handleDraftRankingData,
     handleDraftPickData,
 } from "./pages/draft-ranking";
-import {
-    handleCoachingStaffData,
-    handleCoachMarketData,
-} from "./pages/coach-market";
+import { handleCoachMarketData } from "./pages/coach-market";
 import { handleFreeAgentCenterData } from "./pages/free-agent-center";
+import { handleCoachingStaffData } from "./pages/coaching-staff";
 
 (function () {
     initNavigationHandler(); // Initialize Observer from script context

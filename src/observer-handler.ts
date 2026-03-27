@@ -1,10 +1,11 @@
+import { SelectorHandler } from "./navigation-handler";
 type ElementCallback = (element: HTMLElement) => void;
 
 export class ObserverManager {
     private static instance: ObserverManager;
     private observer: MutationObserver | null = null;
-    private currentSelector: string | null = null;
-    private currentCallback: ElementCallback | null = null;
+    private activeHandlers: SelectorHandler[] | null = null;
+    private shouldAutoDisconnect: boolean = true;
 
     private constructor() {} //singleton
 
@@ -15,25 +16,22 @@ export class ObserverManager {
         return ObserverManager.instance;
     }
 
-    public setCallback(selector: string, callback: ElementCallback): void {
-        this.currentSelector = selector;
-        this.currentCallback = callback;
+    public setCallbacks(handlers: SelectorHandler[]): void {
+        this.activeHandlers = [...handlers];
+        this.shouldAutoDisconnect = handlers.length === 1;
         this.ensureObserverActive();
     }
 
     public resetCallback(): void {
-        this.currentSelector = null;
-        this.currentCallback = null;
+        this.activeHandlers = null;
         this.disconnect();
     }
 
     private ensureObserverActive(): void {
         if (!this.observer) {
             this.observer = new MutationObserver((mutations) => {
-                const currentSelector = this.currentSelector;
-                const currentCallback = this.currentCallback;
-
-                if (!currentSelector || !currentCallback) return;
+                const handlers = this.activeHandlers;
+                if (!handlers) return;
 
                 mutations.forEach((mutation) => {
                     if (
@@ -41,15 +39,23 @@ export class ObserverManager {
                         mutation.addedNodes.length > 0
                     ) {
                         mutation.addedNodes.forEach((node) => {
-                            if (node.nodeType === Node.ELEMENT_NODE) {
-                                const element = node as HTMLElement;
-                                const target =
-                                    element.querySelector(currentSelector);
-
-                                if (target) {
-                                    currentCallback(element);
-                                    this.disconnect();
+                            if (node.nodeType !== Node.ELEMENT_NODE) return;
+                            const element = node as HTMLElement;
+                            for (const [
+                                i,
+                                { selector, handler },
+                            ] of handlers.entries()) {
+                                if (element.querySelector(selector)) {
+                                    handler(element);
+                                    handlers.splice(i, 1); //remove
+                                    break; // re-iterate on next mutation since we modified the array
                                 }
+                            }
+                            if (
+                                handlers.length === 0 &&
+                                this.shouldAutoDisconnect
+                            ) {
+                                this.disconnect();
                             }
                         });
                     }
