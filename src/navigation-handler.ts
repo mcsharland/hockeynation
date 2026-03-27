@@ -6,6 +6,7 @@ import { manipulateRosterPage } from "./pages/roster";
 import { manipulateCoachMarketPage } from "./pages/coach-market";
 import { manipulateFreeAgentCenterPage } from "./pages/free-agent-center";
 import { manipulateCoachingStaffPage } from "./pages/coaching-staff";
+import { manipulateTradeCenterPage } from "./pages/trade-center";
 
 type MutationHandler = (element: HTMLElement) => void;
 
@@ -86,6 +87,17 @@ const PAGE_HANDLERS: Record<string, PageHandlers> = {
                 selector: "div.card.card-secondary",
                 handler: (el) => {
                     manipulateFreeAgentCenterPage(el);
+                },
+            },
+        ],
+    },
+    tradeCenter: {
+        url: "https://hockey-nation.com/office/trade-center",
+        handlers: [
+            {
+                selector: "div.card.card-secondary",
+                handler: (el) => {
+                    manipulateTradeCenterPage(el);
                 },
             },
         ],

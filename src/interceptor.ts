@@ -10,6 +10,7 @@ import {
 import { handleCoachMarketData } from "./pages/coach-market";
 import { handleFreeAgentCenterData } from "./pages/free-agent-center";
 import { handleCoachingStaffData } from "./pages/coaching-staff";
+import { handleTradeCenterData } from "./pages/trade-center";
 
 (function () {
     initNavigationHandler(); // Initialize Observer from script context
@@ -68,6 +69,12 @@ import { handleCoachingStaffData } from "./pages/coaching-staff";
             pattern: /\/api\/free-agent-center\/search/,
             handler: (data: any) => {
                 handleFreeAgentCenterData(data.data);
+            },
+        },
+        tradeCenter: {
+            pattern: /\/api\/trade-center\/search/,
+            handler: (data: any) => {
+                handleTradeCenterData(data.data);
             },
         },
     };

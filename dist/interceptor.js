@@ -55,6 +55,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _pages_coach_market__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./pages/coach-market */ "./src/pages/coach-market.ts");
 /* harmony import */ var _pages_free_agent_center__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./pages/free-agent-center */ "./src/pages/free-agent-center.ts");
 /* harmony import */ var _pages_coaching_staff__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./pages/coaching-staff */ "./src/pages/coaching-staff.ts");
+/* harmony import */ var _pages_trade_center__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./pages/trade-center */ "./src/pages/trade-center.ts");
+
 
 
 
@@ -133,6 +135,17 @@ const PAGE_HANDLERS = {
                 selector: "div.card.card-secondary",
                 handler: (el) => {
                     (0,_pages_free_agent_center__WEBPACK_IMPORTED_MODULE_5__.manipulateFreeAgentCenterPage)(el);
+                },
+            },
+        ],
+    },
+    tradeCenter: {
+        url: "https://hockey-nation.com/office/trade-center",
+        handlers: [
+            {
+                selector: "div.card.card-secondary",
+                handler: (el) => {
+                    (0,_pages_trade_center__WEBPACK_IMPORTED_MODULE_7__.manipulateTradeCenterPage)(el);
                 },
             },
         ],
@@ -2730,6 +2743,214 @@ function manipulateRosterPage(el) {
 
 /***/ },
 
+/***/ "./src/pages/trade-center.ts"
+/*!***********************************!*\
+  !*** ./src/pages/trade-center.ts ***!
+  \***********************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   handleTradeCenterData: () => (/* binding */ handleTradeCenterData),
+/* harmony export */   manipulateTradeCenterPage: () => (/* binding */ manipulateTradeCenterPage)
+/* harmony export */ });
+/* harmony import */ var _roster__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./roster */ "./src/pages/roster.ts");
+/*
+ * Basically the exact same as the FreeAgentCenter Page
+ * Kept decoupled to be flexible to site changes in the future
+ */
+
+class TradeVisualizer {
+    container = null;
+    tradePlayers = null;
+    tradePlayerCards = null;
+    paginationListeners = new Map();
+    mutationObserver = null;
+    observerTimeoutId = null;
+    constructor() { }
+    attach(el) {
+        this.detach();
+        this.container = el.parentElement;
+        if (!this.container)
+            return;
+        if (!this.tradePlayers)
+            return;
+        this.initializeDOMReferences();
+        this.attachPaginationListeners();
+        this.addBadges();
+    }
+    detach() {
+        if (!this.container)
+            return;
+        this.detachPaginationListeners();
+        this.disconnectObserver();
+        this.container = null;
+        this.tradePlayerCards = null;
+    }
+    updateData(newData) {
+        this.tradePlayers = newData;
+        if (this.container) {
+            this.initializeDOMReferences();
+            this.addBadges();
+        }
+    }
+    onDataReceived() {
+        if (!this.container)
+            return;
+        this.onTableUpdateTrigger();
+    }
+    getPaginationContainers() {
+        if (!this.container)
+            return [];
+        const paginationDivs = this.container.querySelectorAll("div.flex.justify-center.bg-gray-700");
+        return Array.from(paginationDivs);
+    }
+    initializeDOMReferences() {
+        if (!this.container)
+            return;
+        const cards = this.container.querySelectorAll("div.card.card-secondary");
+        const tc = {};
+        cards.forEach((card) => {
+            const cardEl = card;
+            const playerLink = cardEl.querySelector("a[href^='/player/']");
+            const badge = cardEl.querySelector(".badge");
+            if (!playerLink || !badge)
+                return;
+            const playerId = playerLink.getAttribute("href")?.split("/").pop();
+            if (playerId)
+                tc[playerId] = cardEl;
+        });
+        this.tradePlayerCards = tc;
+    }
+    attachPaginationListeners() {
+        if (!this.container)
+            return;
+        this.detachPaginationListeners();
+        const containers = this.getPaginationContainers();
+        containers.forEach((container) => {
+            const pageLinks = container.querySelectorAll("li a:not(.disabled)");
+            pageLinks.forEach((el) => {
+                const listener = () => {
+                    this.onTableUpdateTrigger();
+                };
+                el.addEventListener("click", listener);
+                this.paginationListeners.set(el, listener);
+            });
+        });
+    }
+    detachPaginationListeners() {
+        this.paginationListeners.forEach((listener, el) => {
+            el.removeEventListener("click", listener);
+        });
+        this.paginationListeners.clear();
+    }
+    onTableUpdateTrigger() {
+        if (this.observerTimeoutId) {
+            clearTimeout(this.observerTimeoutId);
+            this.observerTimeoutId = null;
+        }
+        if (!this.mutationObserver && this.container) {
+            this.mutationObserver = new MutationObserver((mutations) => {
+                if (!this.container?.isConnected) {
+                    this.detach();
+                    return;
+                }
+                const hasRelevantChanges = mutations.some((m) => m.addedNodes.length > 0 &&
+                    Array.from(m.addedNodes).some((node) => node.nodeType === Node.ELEMENT_NODE &&
+                        (node.classList?.contains("card") ||
+                            node.querySelector("div.card.card-secondary"))));
+                if (hasRelevantChanges)
+                    this.onTableUpdated();
+            });
+            this.mutationObserver.observe(this.container, {
+                childList: true,
+                subtree: true,
+            });
+        }
+        this.observerTimeoutId = window.setTimeout(() => {
+            this.onTableUpdated();
+        }, 3000);
+    }
+    onTableUpdated() {
+        this.disconnectObserver();
+        this.initializeDOMReferences();
+        this.addBadges();
+        this.attachPaginationListeners();
+    }
+    disconnectObserver() {
+        if (this.mutationObserver) {
+            this.mutationObserver.disconnect();
+            this.mutationObserver = null;
+        }
+        if (this.observerTimeoutId) {
+            clearTimeout(this.observerTimeoutId);
+            this.observerTimeoutId = null;
+        }
+    }
+    addBadges() {
+        if (!this.tradePlayerCards || !this.tradePlayers)
+            return;
+        Object.entries(this.tradePlayerCards).forEach(([playerId, card]) => {
+            if (card.getAttribute("data-ovr-badges-added") === "true")
+                return;
+            const badgeContainer = card.querySelector(".badge")?.parentElement;
+            if (!badgeContainer)
+                return;
+            const player = this.tradePlayers.getPlayer(playerId);
+            if (!player)
+                return;
+            badgeContainer
+                .querySelectorAll(".dynamic-ovr-label, .dynamic-ovr-badge")
+                .forEach((el) => el.remove());
+            // Add MIN
+            badgeContainer.appendChild(this.createOvrLabelSpan("MIN"));
+            badgeContainer.appendChild(this.createRatingSpan(player.getMinOvr()));
+            // Add MAX
+            badgeContainer.appendChild(this.createOvrLabelSpan("MAX"));
+            badgeContainer.appendChild(this.createRatingSpan(player.getMaxOvr()));
+            card.setAttribute("data-ovr-badges-added", "true");
+        });
+    }
+    createOvrLabelSpan(text) {
+        const label = document.createElement("span");
+        label.classList.add("dynamic-ovr-label", "uppercase", "ml-3", "xs:inline-block", "hidden");
+        label.innerText = text;
+        return label;
+    }
+    createRatingSpan(ovr) {
+        const ratingSpan = document.createElement("span");
+        ratingSpan.classList.add("dynamic-ovr-badge", "badge", "ml-1");
+        ratingSpan.style.userSelect = "none";
+        ratingSpan.innerText = ovr.toString();
+        if (window.userData &&
+            typeof window.userData.getColorPair === "function" &&
+            ovr > 0) {
+            try {
+                const [bgColor, color] = window.userData.getColorPair(ovr);
+                ratingSpan.style.backgroundColor = bgColor;
+                ratingSpan.style.color = color;
+            }
+            catch (e) {
+                console.error("Error getting color pair for OVR:", ovr, e);
+            }
+        }
+        return ratingSpan;
+    }
+}
+const tradeVisualizerInstance = new TradeVisualizer();
+function handleTradeCenterData(data) {
+    const rosterData = { players: data };
+    const newRoster = new _roster__WEBPACK_IMPORTED_MODULE_0__.Roster(rosterData);
+    tradeVisualizerInstance.updateData(newRoster);
+    tradeVisualizerInstance.onDataReceived();
+}
+function manipulateTradeCenterPage(el) {
+    tradeVisualizerInstance.attach(el);
+}
+
+
+/***/ },
+
 /***/ "./src/user.ts"
 /*!*********************!*\
   !*** ./src/user.ts ***!
@@ -2875,6 +3096,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _pages_coach_market__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./pages/coach-market */ "./src/pages/coach-market.ts");
 /* harmony import */ var _pages_free_agent_center__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./pages/free-agent-center */ "./src/pages/free-agent-center.ts");
 /* harmony import */ var _pages_coaching_staff__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./pages/coaching-staff */ "./src/pages/coaching-staff.ts");
+/* harmony import */ var _pages_trade_center__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ./pages/trade-center */ "./src/pages/trade-center.ts");
+
 
 
 
@@ -2940,6 +3163,12 @@ __webpack_require__.r(__webpack_exports__);
             pattern: /\/api\/free-agent-center\/search/,
             handler: (data) => {
                 (0,_pages_free_agent_center__WEBPACK_IMPORTED_MODULE_7__.handleFreeAgentCenterData)(data.data);
+            },
+        },
+        tradeCenter: {
+            pattern: /\/api\/trade-center\/search/,
+            handler: (data) => {
+                (0,_pages_trade_center__WEBPACK_IMPORTED_MODULE_9__.handleTradeCenterData)(data.data);
             },
         },
     };
