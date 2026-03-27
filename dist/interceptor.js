@@ -1190,17 +1190,7 @@ class CoachStaffVisualizer {
             .forEach((node) => node.remove());
         if (!this.coachingStaff)
             return;
-        const columns = [
-            {
-                id: "min-ovr",
-                label: "Min",
-                getValue: (c) => c.getMinOvr(),
-            },
-            {
-                id: "max-ovr",
-                label: "Max",
-                getValue: (c) => c.getMaxOvr(),
-            },
+        const beforeOvr = [
             {
                 id: "train-ovr",
                 label: "DRL",
@@ -1232,6 +1222,18 @@ class CoachStaffVisualizer {
                 getValue: (c) => c.getMaxMatchOvr(),
             },
         ];
+        const afterOvr = [
+            {
+                id: "min-ovr",
+                label: "Min",
+                getValue: (c) => c.getMinOvr(),
+            },
+            {
+                id: "max-ovr",
+                label: "Max",
+                getValue: (c) => c.getMaxOvr(),
+            },
+        ];
         // find OVR column index from first header
         const allHeaders = this.container.querySelectorAll(`thead tr`);
         if (!allHeaders.length)
@@ -1245,8 +1247,17 @@ class CoachStaffVisualizer {
             const ovrTh = headerRow.children[parentIndex];
             if (!ovrTh)
                 return;
+            // inject before OVR
+            [...beforeOvr].reverse().forEach((col) => {
+                const th = document.createElement("th");
+                th.className = "py-2 px-4 w-1 select-none";
+                th.dataset.column = `hn-${col.id}`;
+                th.textContent = col.label;
+                ovrTh.before(th);
+            });
+            // inject after OVR
             let insertAfter = ovrTh;
-            columns.forEach((col) => {
+            afterOvr.forEach((col) => {
                 const th = document.createElement("th");
                 th.className = "py-2 px-4 w-1 select-none";
                 th.dataset.column = `hn-${col.id}`;
@@ -1261,8 +1272,22 @@ class CoachStaffVisualizer {
             const parentCell = row.children[parentIndex];
             if (!parentCell)
                 return;
+            // inject before OVR cell
+            [...beforeOvr].reverse().forEach((col) => {
+                const td = document.createElement("td");
+                td.className = "px-2 py-1 whitespace-nowrap text-center";
+                td.dataset.column = `hn-${col.id}`;
+                if (coach) {
+                    td.appendChild(this.createRatingSpan(col.getValue(coach)));
+                }
+                else {
+                    td.textContent = "-";
+                }
+                parentCell.before(td);
+            });
+            // inject after OVR cell
             let insertAfterCell = parentCell;
-            columns.forEach((col) => {
+            afterOvr.forEach((col) => {
                 const td = document.createElement("td");
                 td.className = "px-2 py-1 whitespace-nowrap text-center";
                 td.dataset.column = `hn-${col.id}`;
