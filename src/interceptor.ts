@@ -13,7 +13,6 @@ import { handleCoachingStaffData } from "./pages/coaching-staff";
 import { handleTradeCenterData } from "./pages/trade-center";
 
 (function () {
-    initNavigationHandler(); // Initialize Observer from script context
     window.userData = new User(); // Initialize User Object with default settings, probably not needed but fixes some load inconsistencies
 
     const URL_HANDLERS = {
@@ -156,3 +155,9 @@ import { handleTradeCenterData } from "./pages/trade-center";
         return response;
     };
 })();
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initNavigationHandler, { once: true });
+} else {
+    initNavigationHandler();
+}

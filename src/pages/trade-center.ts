@@ -3,6 +3,7 @@
  * Kept decoupled to be flexible to site changes in the future
  */
 
+ // TODO: Similar break as coaching-staff
 import { Roster } from "./roster";
 
 interface TradePlayerCards {

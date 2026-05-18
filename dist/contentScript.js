@@ -1,1 +1,45 @@
-(()=>{"use strict";!function(){const n="hockey-nation-ext-styles";if(document.getElementById(n))return;const t=document.createElement("style");t.id=n,t.textContent="\n      .draft-ranking-highlight {\n      border-color: #6ee7b7;\n      border-bottom-width: 1px;\n      border-top-width: 1px;\n      background-color: #d1fae5\n      }\n\n      .draft-ranking-ghost-trim {\n      border-color: #6ee7b7;\n      border-bottom-width: 1px;\n      border-top-width: 1px;\n      background-color: #fbd38d;\n      }\n\n      .draft-ranking-ghost {\n      background-color: #fbd38d;\n      }\n\n    ",(document.head||document.documentElement).appendChild(t)}()})();
+/******/ (() => { // webpackBootstrap
+/******/ 	"use strict";
+/*!******************************!*\
+  !*** ./src/contentScript.ts ***!
+  \******************************/
+
+(() => {
+    const EXTENSION_STYLE_ID = `hockey-nation-ext-styles`;
+    const DR_HIGHLIGHT_CLASS = "draft-ranking-highlight";
+    const DR_GHOST_TRIM = "draft-ranking-ghost-trim";
+    if (document.getElementById(EXTENSION_STYLE_ID)) {
+        return;
+    }
+    const cssRules = `
+      [data-column] {
+        background-color: transparent;
+      }
+
+      tr.ghost [data-column] {
+          background-color: var(--bg-orange-300);
+        }
+
+      .${DR_HIGHLIGHT_CLASS} {
+        border-color: #6ee7b7;
+        border-bottom-width: 1px;
+        border-top-width: 1px;
+        background-color: #d1fae5;
+      }
+
+      .${DR_GHOST_TRIM} {
+        border-color: #6ee7b7;
+        border-bottom-width: 1px;
+        border-top-width: 1px;
+        background-color: #fbd38d;
+      }
+    `;
+    const styleElement = document.createElement("style");
+    styleElement.id = EXTENSION_STYLE_ID;
+    styleElement.textContent = cssRules;
+    (document.head || document.documentElement).appendChild(styleElement);
+})();
+
+/******/ })()
+;
+//# sourceMappingURL=contentScript.js.map

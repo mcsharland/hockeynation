@@ -1,1 +1,3266 @@
-(()=>{"use strict";const t={Skating:"SKA",Reflexes:"REF",Endurance:"END",Power:"PWR",Positioning:"POS",Shooting:"SHO",Pads:"PAD",Passing:"PAS",Glove:"GLO",Defending:"DEF",Blocker:"BLO",Checking:"CHK",Stick:"STK",Discipline:"DSC",Faceoffs:"FOF","Offensive Play":"OFP","Defensive Play":"DFP","Puck Battling":"BAT","Power Play":"PP","Penalty Kill":"PK"};class e{stats;minStats;maxStats;scoutLevel;isAmateur;ovr;minOvr;maxOvr;constructor(t){const e=this.parsePlayerData(t);this.stats=e.stats,this.scoutLevel=e.scout,this.isAmateur=t?.amateur??!1,this.minStats=this.calcMinStats(this.stats),this.maxStats=this.calcMaxStats(this.stats),this.ovr=t?.rating??0,this.minOvr=this.calculateOVR(this.minStats),this.maxOvr=this.calculateOVR(this.maxStats)}getFloor(){return this.isAmateur?3:4}getCap(){return this.isAmateur?5:10}parsePlayerData(t){const e={stats:{}},r=t.skills.every(t=>t?.hidden??!1),n=t.skills.some(t=>t?.hidden??!1);e.scout=r?1:n?2:0;for(const r of t.skills)e.stats[r.id]={rating:parseInt(r?.lvl??0),max:r?.max??!1,strength:null};return t?.talents?.weakest&&(e.stats[t.talents.weakest].strength="weakest",t.talents.strongest.forEach(t=>e.stats[t].strength="strongest")),e}calcMinStats(t){const e=structuredClone(t);let r=this.getCap(),n=0;for(const t of Object.values(e))t.rating=t.max?t.rating:Math.min(t.rating+1,this.getCap()),"strongest"!==t.strength&&(n=Math.max(n,t.rating));for(const t of Object.values(e))"weakest"===t.strength&&(r=t.rating);for(const t of Object.values(e))"strongest"===t.strength&&t.rating<n&&(t.rating=n);for(const t of Object.values(e))t.rating<r&&(t.rating=r),t.rating<this.getFloor()&&(t.rating=this.getFloor());return e}calcMaxStats(t){const e=structuredClone(t);let r=this.getCap(),n=this.getCap();for(const t of Object.values(e))"strongest"===t.strength&&(r=Math.min(r,t.max?t.rating:this.getCap()));for(const t of Object.values(e))!t.max&&t.rating<r&&(t.rating=r),"weakest"!==t.strength&&(n=Math.min(n,t.rating));for(const t of Object.values(e))"strongest"===t.strength&&!t.max&&t.rating<this.getCap()&&(t.rating=this.getCap());for(const t of Object.values(e))"weakest"===t.strength&&t.rating>n&&(t.rating=n),t.rating<this.getFloor()&&(t.rating=this.getFloor());return e}getStats(){return this.stats}getMinStats(){return this.minStats}getMaxStats(){return this.maxStats}getScoutLevel(){return this.scoutLevel}getOvr(){return this.ovr}getMaxOvr(){return Math.max(this.maxOvr,this.ovr)}getMinOvr(){return Math.max(this.minOvr,this.ovr)}calculateOVR(t){if(1===this.scoutLevel)return 0;const e=Object.values(t),r=e.reduce((t,e)=>t+e.rating,0),n=r/e.length,a=(r+e.reduce((t,e)=>e.rating>n?t+e.rating-n:t,0))/e.length;return Math.round(10*a)}}const r=new class{playerStats=null;parent=null;ovrElement=null;statsTable=null;statsRows=null;skillsHeaderDiv=null;dropdownElement=null;dropdownListener=null;disabled=!1;constructor(){}attach(t){this.detach(),this.playerStats&&(this.parent=t,this.initializeDOMReferences()?(this.attachUIAndListeners(),this.updateHockeyPucks("Default")):this.detach())}detach(){this.parent&&(this.dropdownElement&&this.dropdownListener&&this.dropdownElement.removeEventListener("change",this.dropdownListener),this.dropdownElement&&this.dropdownElement.parentNode&&this.dropdownElement.parentNode.removeChild(this.dropdownElement),this.parent=null,this.ovrElement=null,this.statsTable=null,this.statsRows=null,this.skillsHeaderDiv=null,this.dropdownElement=null,this.dropdownListener=null)}initializeDOMReferences(){if(!this.parent)return!1;this.ovrElement=this.parent.querySelector(".polygon text");const t=this.parent.querySelector("svg.fa-hockey-puck");if(this.statsTable=t?t.closest("tbody"):null,this.statsTable&&(this.statsRows=this.statsTable.querySelectorAll("tr"),!this.statsRows||0===this.statsRows.length))return!1;const e=Array.from(this.parent.querySelectorAll(".card-header"));return this.skillsHeaderDiv=e.find(t=>"Skills"===t?.textContent?.trim()),!(!this.ovrElement||!this.statsTable)}updatePlayer(t){this.playerStats=t}attachUIAndListeners(){this.skillsHeaderDiv&&(this.skillsHeaderDiv.querySelector(".stats-dropdown-player")||(this.dropdownElement=document.createElement("select"),this.dropdownElement.classList.add("stats-dropdown-player"),this.dropdownElement.style.marginLeft="auto",this.dropdownElement.style.fontSize="12px",this.dropdownElement.style.padding="2px",this.dropdownElement.style.border="none",this.dropdownElement.style.backgroundColor="#fff",this.dropdownElement.style.color="#000",this.dropdownElement.style.width="85px",this.dropdownElement.style.height="18px",this.dropdownElement.style.lineHeight="18px",this.dropdownElement.style.paddingTop="0px",this.dropdownElement.style.paddingBottom="0px",this.dropdownElement.style.paddingRight="21px",this.dropdownElement.style.borderRadius="2px",this.dropdownListener=t=>{const e=t.target.value;this.updateHockeyPucks(e)},this.dropdownElement.addEventListener("change",this.dropdownListener),["Default","Min","Max"].forEach(t=>{const e=document.createElement("option");e.value=t,e.textContent=t,e.style.textAlign="center",this.dropdownElement.appendChild(e)}),this.skillsHeaderDiv.appendChild(this.dropdownElement)))}updateHockeyPucks(e){if(!this.statsRows||!this.playerStats)return;const r="Min"===e?this.playerStats.getMinStats():"Max"===e?this.playerStats.getMaxStats():this.playerStats.getStats();if(!r)return;if(this.statsRows.forEach(e=>{const n=e.cells[0]?.textContent?.trim();if(!n)return;const a=t[n];if(!a)return;const s=e.cells[1],i=e.cells[2];if(!s||!i)return;const o=s.querySelectorAll("svg.fa-hockey-puck"),l=i.querySelector("span"),c=this.playerStats.getStats(),h=c?c[a]:null,d=r[a];h&&d&&o.length>0&&(o.forEach((t,e)=>{t.classList.remove("text-blue-400"),e<d.rating?(t.classList.remove("text-gray-300"),e>=h.rating&&t.classList.add("text-blue-400")):t.classList.add("text-gray-300"),e===d.rating-1&&h.max?t.classList.add("max-level"):t.classList.remove("max-level")}),l&&(l.textContent=`(${d.rating})`))}),!this.playerStats)return;const n="Min"===e?this.playerStats.getMinOvr():"Max"===e?this.playerStats.getMaxOvr():this.playerStats.getOvr(),a="Default"===e&&1===this.playerStats.getScoutLevel()&&this.playerStats.getOvr()>0?this.playerStats.getOvr():n;this.updateOVR(a)}updateOVR(t){if(!this.ovrElement)return;this.ovrElement.textContent=t>0?t.toString():"?";const e=this.ovrElement.parentElement?.querySelector("polygon");if(e&&t>0&&window.userData&&"function"==typeof window.userData.getColorPair)try{const[r,n]=window.userData.getColorPair(t);e.setAttribute("fill",r),this.ovrElement.setAttribute("fill",n)}catch(e){console.error("Failed to get color pair for OVR:",t,e)}}};class n{static instance;observer=null;activeHandlers=null;shouldAutoDisconnect=!0;constructor(){}static getInstance(){return n.instance||(n.instance=new n),n.instance}setCallbacks(t){this.activeHandlers=[...t],this.shouldAutoDisconnect=1===t.length,this.ensureObserverActive()}resetCallback(){this.activeHandlers=null,this.disconnect()}ensureObserverActive(){this.observer||(this.observer=new MutationObserver(t=>{const e=this.activeHandlers;e&&t.forEach(t=>{"childList"===t.type&&t.addedNodes.length>0&&t.addedNodes.forEach(t=>{if(t.nodeType!==Node.ELEMENT_NODE)return;const r=t;for(const[t,{selector:n,handler:a}]of e.entries())if(r.querySelector(n)){a(r),e.splice(t,1);break}0===e.length&&this.shouldAutoDisconnect&&this.disconnect()})})}),this.observer.observe(document.body,{childList:!0,subtree:!0}))}disconnect(){this.observer&&(this.observer.disconnect(),this.observer=null)}}class a{players;constructor(t){this.players=this.parseRosterData(t)}parseRosterData(t){const r={};for(const n of t.players)r[n.id]=new e(n);return r}getPlayer(t){return this.players[t]}getAllPlayers(){return this.players}}const s=new class{roster=null;parent=null;header=null;footer=null;dataRows=null;tbody=null;onGeneralPage=!0;minHeaderCell=null;maxHeaderCell=null;sortColumn=null;sortAscending=!0;generalButtonClickListener=null;skillsButtonClickListener=null;selectChangeListener=null;headerClickListeners=new Map;constructor(){}attach(t){this.detach(),this.parent=t,this.parent&&this.roster?(this.initializeVisualizerState(),this.initializeTableReferences(),this.attachEventListeners(),this.renderColumns()):this.detach()}detach(){if(!this.parent)return;const t=this.parent.querySelectorAll(".btn-toggle");if(t.length>=2){const e="General"===t[0]?.textContent?.trim(),r=e?t[0]:t[1],n=e?t[1]:t[0];this.generalButtonClickListener&&r&&r.removeEventListener("click",this.generalButtonClickListener),this.skillsButtonClickListener&&n&&n.removeEventListener("click",this.skillsButtonClickListener)}const e=this.parent.querySelector("select[value]");this.selectChangeListener&&e&&e.removeEventListener("input",this.selectChangeListener),this.headerClickListeners.forEach((t,e)=>{e.removeEventListener("click",t)}),this.headerClickListeners.clear(),this.parent.querySelectorAll("[data-column]").forEach(t=>t.remove()),this.parent=null,this.header=null,this.footer=null,this.dataRows=null,this.tbody=null,this.minHeaderCell=null,this.maxHeaderCell=null,this.generalButtonClickListener=null,this.skillsButtonClickListener=null,this.selectChangeListener=null}updateRoster(t){this.roster=t,this.parent&&this.roster&&(this.initializeTableReferences(),this.renderColumns())}initializeVisualizerState(){if(!this.parent)return;const t=this.parent.querySelectorAll(".btn-toggle");if(!t.length||t.length<2)return void(this.onGeneralPage=!0);const e="General"===t[0]?.textContent?.trim()?t[0]:t[1];this.onGeneralPage=e?.classList.contains("active")??!0}initializeTableReferences(){this.parent&&(this.header=this.parent.querySelector("table thead tr"),this.footer=this.parent.querySelector("table tfoot tr"),this.tbody=this.parent.querySelector("table tbody"),this.dataRows={},this.tbody&&this.tbody.querySelectorAll("tr").forEach(t=>{const e=t,r=e.querySelector("a.player-link"),n=r?.getAttribute("href");if(n){const t=n.split("/").pop()||"";t&&(this.dataRows[t]=e)}}))}attachEventListeners(){if(!this.parent)return;const t=this.parent.querySelectorAll(".btn-toggle");if(2===t.length){const e="General"===t[0]?.textContent?.trim(),r=e?t[0]:t[1],n=e?t[1]:t[0];this.generalButtonClickListener=()=>{this.onGeneralPage||(this.onGeneralPage=!0,this.initializeTableReferences(),this.renderColumns())},r&&r.addEventListener("click",this.generalButtonClickListener),this.skillsButtonClickListener=()=>{this.onGeneralPage&&(this.onGeneralPage=!1,this.initializeTableReferences(),this.renderColumns())},n&&n.addEventListener("click",this.skillsButtonClickListener)}const e=this.parent.querySelector("select[value]");e&&(this.selectChangeListener=()=>{this.initializeTableReferences(),this.renderColumns()},e.addEventListener("input",this.selectChangeListener)),this.headerClickListeners.forEach((t,e)=>e.removeEventListener("click",t)),this.headerClickListeners.clear(),this.header?.querySelectorAll("th").forEach(t=>{if(!t.hasAttribute("data-column")){const e=()=>{this.sortColumn=null,this.sortAscending=!1};t.addEventListener("click",e),this.headerClickListeners.set(t,e)}})}renderColumns(){if(!(this.parent&&this.roster&&this.dataRows&&this.header&&this.footer))return;if(this.parent.querySelectorAll("[data-column]").forEach(t=>t.remove()),this.minHeaderCell=null,this.maxHeaderCell=null,!this.onGeneralPage)return;Object.entries(this.dataRows).forEach(([t,e])=>{const r=this.roster.getPlayer(t);if(!r)return;const n=document.createElement("td");n.className="md:px-4 px-2 py-2 text-center",n.dataset.column="min-ovr",n.appendChild(this.createRatingSpan(r.getMinOvr(),r.getScoutLevel()));const a=document.createElement("td");a.className="md:px-4 px-2 py-2 text-center",a.dataset.column="max-ovr",a.appendChild(this.createRatingSpan(r.getMaxOvr(),r.getScoutLevel())),e.appendChild(n),e.appendChild(a)}),this.minHeaderCell=document.createElement("th"),this.minHeaderCell.className="md:px-4 px-2 py-2 text-center sort-column",this.minHeaderCell.innerText=" Min ",this.minHeaderCell.dataset.column="min-ovr",this.header.appendChild(this.minHeaderCell),this.maxHeaderCell=document.createElement("th"),this.maxHeaderCell.className="md:px-4 px-2 py-2 text-center sort-column",this.maxHeaderCell.innerText=" Max ",this.maxHeaderCell.dataset.column="max-ovr",this.header.appendChild(this.maxHeaderCell);const t=document.createElement("td");t.className="md:px-4 px-2 py-2 text-center",t.dataset.column="min-ovr",t.appendChild(this.createRatingSpan(this.getRosterAvgOvr("Min"),0));const e=document.createElement("td");e.className="md:px-4 px-2 py-2 text-center",e.dataset.column="max-ovr",e.appendChild(this.createRatingSpan(this.getRosterAvgOvr("Max"),0)),this.footer.appendChild(t),this.footer.appendChild(e)}getRosterAvgOvr(t){if(!this.roster)return 0;const e={Default:t=>t.getOvr(),Min:t=>t.getMinOvr(),Max:t=>t.getMaxOvr()},r=this.roster.getAllPlayers();if(!r)return 0;const n=Object.values(r).filter(t=>t&&!(1===t.getScoutLevel())&&t.getOvr()>0).map(r=>e[t](r));return n.length?Math.round(n.reduce((t,e,r,n)=>t+e/n.length,0)):0}createRatingSpan(t,e){const r=document.createElement("span");if(1===e||!t||t<=0)r.classList.add("question-mark"),r.innerText="?",r.style.color="#bcbabe",r.style.textAlign="center";else if(r.classList.add("badge"),r.style.userSelect="none",r.innerText=t.toString()+(2===e?"*":""),window.userData&&"function"==typeof window.userData.getColorPair)try{const[e,n]=window.userData.getColorPair(t);r.style.backgroundColor=e,r.style.color=n}catch(e){console.error("Error getting color pair for OVR:",t,e)}return r}},i=new class{parent=null;draftClass=null;draftCards=null;toggleButtonListener=null;paginationButtonListeners=new Map;selectMenuListeners=new Map;mutationObserver=null;observerTimeoutId=null;constructor(){}attach(t){this.detach(),this.parent=t,this.parent&&this.draftClass&&(this.initializeDOMReferences(),this.attachEventListeners(),this.addBadges())}detach(){if(!this.parent)return;const t=document.querySelectorAll(".btn-toggle")[1];t&&this.toggleButtonListener&&(t.removeEventListener("click",this.toggleButtonListener),this.toggleButtonListener=null),this.paginationButtonListeners.forEach((t,e)=>{e.removeEventListener("click",t)}),this.paginationButtonListeners.clear(),this.selectMenuListeners.forEach((t,e)=>{e.removeEventListener("change",t)}),this.selectMenuListeners.clear(),this.disconnectObserver(),this.parent=null,this.draftCards=null}updateData(t){this.draftClass=t,this.parent&&(this.initializeDOMReferences(),this.addBadges())}initializeDOMReferences(){if(!this.parent)return;const t=this.parent.querySelectorAll("[id^='draftee-card']"),e={};t.forEach(t=>{const r=t,n=r.querySelector("a[href^='/player/']"),a=r.querySelector(".badge");if(!n||!a)return;const s=n.getAttribute("href")?.split("/").pop();s&&(e[s]=r)}),this.draftCards=e}attachEventListeners(){if(!this.parent)return;const t=document.querySelectorAll(".btn-toggle")[1];t&&(this.toggleButtonListener=()=>{this.initializeDOMReferences(),this.addBadges()},t.addEventListener("click",this.toggleButtonListener)),this.paginationButtonListeners.clear(),Array.from(this.parent.querySelectorAll("button")).filter(t=>{const e=Array.from(t.querySelectorAll("span")).some(t=>/^(1|21|41|61|81)-\d+$/.test(t.textContent?.trim()??"")),r=Array.from(t.childNodes).filter(t=>t.nodeType===Node.TEXT_NODE).map(t=>t.textContent?.trim()).join(""),n=/^(1|21|41|61|81)-\d+$/.test(r);return e||n}).forEach(t=>{const e=()=>{this.initializeDOMReferences(),this.addBadges()};t.addEventListener("click",e),this.paginationButtonListeners.set(t,e)}),this.selectMenuListeners.clear(),this.parent.querySelectorAll("select").forEach(t=>{const e=()=>{this.disconnectObserver(),this.mutationObserver=new MutationObserver(t=>{t.some(t=>t.addedNodes.length>0&&Array.from(t.addedNodes).some(t=>t.nodeType===Node.ELEMENT_NODE&&t.querySelector('[id^="draftee-card"]')))&&(this.initializeDOMReferences(),this.addBadges(),this.disconnectObserver())}),this.mutationObserver.observe(this.parent,{childList:!0,subtree:!0}),this.observerTimeoutId&&clearTimeout(this.observerTimeoutId),this.observerTimeoutId=window.setTimeout(()=>{this.disconnectObserver()},3e3)};t.addEventListener("change",e),this.selectMenuListeners.set(t,e)})}disconnectObserver(){this.mutationObserver&&(this.mutationObserver.disconnect(),this.mutationObserver=null),this.observerTimeoutId&&(clearTimeout(this.observerTimeoutId),this.observerTimeoutId=null)}addBadges(){this.draftCards&&this.draftClass&&Object.entries(this.draftCards).forEach(([t,e])=>{if("true"===e.getAttribute("data-ovr-badges-added"))return;const r=e.querySelector(".badge")?.parentElement;if(!r)return;const n=this.draftClass.getPlayer(t);n&&(r.querySelectorAll(".dynamic-ovr-label, .dynamic-ovr-badge").forEach(t=>t.remove()),r.appendChild(this.createOvrLabelSpan("MIN")),r.appendChild(this.createRatingSpan(n.getMinOvr(),n.getScoutLevel())),r.appendChild(this.createOvrLabelSpan("MAX")),r.appendChild(this.createRatingSpan(n.getMaxOvr(),n.getScoutLevel())),e.setAttribute("data-ovr-badges-added","true"))})}createOvrLabelSpan(t){const e=document.createElement("span");return e.classList.add("dynamic-ovr-label","uppercase","ml-3","xs:inline-block","hidden"),e.innerText=t,e}createRatingSpan(t,e){const r=document.createElement("span");if(1===e||!t||t<=0)r.innerText="N/A",r.style.color="#FF2C2C",r.style.textAlign="center",r.style.padding=".25rem .375rem",r.style.fontWeight="600";else if(r.classList.add("dynamic-ovr-badge","badge","ml-1"),r.style.userSelect="none",r.innerText=t.toString()+(2===e?"*":""),window.userData&&"function"==typeof window.userData.getColorPair&&t>0)try{const[e,n]=window.userData.getColorPair(t);r.style.backgroundColor=e,r.style.color=n}catch(e){console.error("Error getting color pair for OVR:",t,e)}return r}},o="draft-ranking-highlight",l="draft-ranking-ghost-trim",c="draft-ranking-ghost",h=new class{parent=null;draftRanking=null;draftCards=null;ovrTab=null;tableHR=null;picks=null;tbody=null;dragStartListener=null;dragEndListener=null;highlightMutationObserver=null;highlightObserverTimeoutId=null;highlightLast=!1;rowMutationObserver=null;constructor(){}attach(t){this.detach(),this.parent=t,this.parent&&this.draftRanking?(this.initializeTableReferences(),this.attachEventListeners(),this.attachRowObserver(),this.renderColumns(),this.applyColumnHighlights()):this.detach()}detach(){this.parent&&(this.tbody&&(this.dragStartListener&&this.tbody.removeEventListener("dragstart",this.dragStartListener),this.dragEndListener&&this.tbody.removeEventListener("dragend",this.dragEndListener)),this.rowMutationObserver&&this.rowMutationObserver.disconnect(),this.parent=null,this.draftCards=null,this.ovrTab=null,this.tableHR=null,this.tbody=null)}updateRanking(t){this.draftRanking=t,this.parent&&this.draftRanking&&(this.initializeTableReferences(),this.renderColumns(),this.applyColumnHighlights())}updatePicks(t){this.picks=t}initializeTableReferences(){this.parent&&(this.tbody=this.parent.querySelector("table"),this.tableHR=this.parent.querySelector("table thead tr"),this.tbody&&this.tableHR&&(this.ovrTab=Array.from(this.tableHR.querySelectorAll("th span")).filter(t=>"OVR"===t.textContent?.trim())?.[0]?.parentElement??null,this.draftCards={},this.tbody.querySelectorAll("table tbody tr").forEach(t=>{const e=t,r=e.querySelectorAll("a")[1],n=r?.getAttribute("href");if(n){const t=n.split("/").pop()||"";t&&(this.draftCards[t]=e)}})))}attachEventListeners(){this.parent&&this.tbody&&(this.dragStartListener=t=>{const e=t.target;this.highlightLast=this.picks?.includes(e.rowIndex)??!1,Array.from(e.children).forEach(t=>{t.classList.remove(o),t.hasAttribute("data-column")&&t.classList.add(this.highlightLast?l:c)})},this.dragEndListener=t=>{const e=t.target;Array.from(e.children).forEach(t=>{t.hasAttribute("data-column")&&(this.highlightLast&&t.classList.add(o),t.classList.remove(c),t.classList.remove(l))}),this.highlightLast=!1,this.disconnectHighlightObserver(),this.highlightMutationObserver=new MutationObserver(t=>{t.forEach(t=>{"childList"===t.type&&t.addedNodes.forEach(t=>{t.nodeType===Node.TEXT_NODE&&(this.applyColumnHighlights(),this.disconnectHighlightObserver())})})}),this.highlightMutationObserver.observe(e,{childList:!0,subtree:!0,attributes:!0}),this.highlightObserverTimeoutId&&clearTimeout(this.highlightObserverTimeoutId),this.highlightObserverTimeoutId=window.setTimeout(()=>{this.disconnectHighlightObserver()},3e3)},this.tbody.addEventListener("dragstart",this.dragStartListener),this.tbody.addEventListener("dragend",this.dragEndListener,{capture:!0}))}disconnectHighlightObserver(){this.highlightMutationObserver&&(this.highlightMutationObserver.disconnect(),this.highlightMutationObserver=null),this.highlightObserverTimeoutId&&(clearTimeout(this.highlightObserverTimeoutId),this.highlightObserverTimeoutId=null)}attachRowObserver(){this.tableHR&&(this.rowMutationObserver=new MutationObserver(t=>{t.forEach(t=>{"childList"===t.type&&(t.addedNodes.forEach(t=>{if(t instanceof HTMLTableCellElement&&"TH"===t.tagName){const e=t.querySelector("span");"OVR"===e?.textContent?.trim()&&(this.initializeTableReferences(),this.renderColumns(),this.applyColumnHighlights())}}),t.removedNodes.forEach(t=>{if(t instanceof HTMLTableCellElement&&"TH"===t.tagName){const e=t.querySelector("span");"OVR"===e?.textContent?.trim()&&this.removeColumns()}}))})}),this.rowMutationObserver.observe(this.tableHR,{childList:!0}))}removeColumns(){this.parent&&this.parent.querySelectorAll("[data-column]").forEach(t=>t.remove())}renderColumns(){if(!(this.parent&&this.draftRanking&&this.tableHR&&this.ovrTab&&this.draftCards))return;this.removeColumns();const t=this.ovrTab,e=t.parentElement;if(!e)return;const r=Array.from(e.children).indexOf(t),n=this.createOvrLabelSpan("MIN"),a=this.createOvrLabelSpan("MAX");this.tableHR.insertBefore(a,this.ovrTab.nextSibling),this.tableHR.insertBefore(n,this.ovrTab.nextSibling),Object.entries(this.draftCards).forEach(([t,e])=>{const n=this.draftRanking.getPlayer(t);if(!n)return;const a=document.createElement("td");a.className="px-4 text-center",a.dataset.column="min-ovr";const s=document.createElement("td");s.className="px-4 text-center",s.dataset.column="max-ovr",a.appendChild(this.createRatingSpan(n.getMinOvr(),n.getScoutLevel())),s.appendChild(this.createRatingSpan(n.getMaxOvr(),n.getScoutLevel())),e.insertBefore(s,e.children[r].nextSibling),e.insertBefore(a,e.children[r].nextSibling)})}applyColumnHighlights(){this.parent&&this.picks&&this.parent.querySelectorAll("[data-column]").forEach(t=>{t.classList.remove(o),this.picks?.includes(t.parentElement?.rowIndex)&&t.classList.add(o)})}createOvrLabelSpan(t){const e=document.createElement("th");return e.classList.add("px-4","py-2"),e.dataset.column=`${t.toLowerCase()}-ovr`,e.innerHTML=`<span>${t}</span>`,e}createRatingSpan(t,e){const r=document.createElement("span");if(1===e||!t||t<=0)r.innerText="-",r.style.color="#555456",r.style.textAlign="center";else if(r.classList.add("badge"),r.style.userSelect="none",r.innerText=t.toString()+(2===e?"*":""),window.userData&&"function"==typeof window.userData.getColorPair)try{const[e,n]=window.userData.getColorPair(t);r.style.backgroundColor=e,r.style.color=n}catch(e){console.error("Error getting color pair for OVR:",t,e)}return r}},d=["OFP","DFP","BAT","PP","PK"];class u{stats;minStats;maxStats;coachType;isHead;ovr;minOvr;maxOvr;constructor(t){this.coachType=t.interim?"interim":t.amateur?"amateur":"regular",this.isHead=t.job?.head??!1,this.stats=this.parseCoachData(t),this.minStats=this.calcMinStats(this.stats),this.maxStats=this.calcMaxStats(this.stats),this.ovr=t?.rating??0,this.minOvr=this.calculateOVR(this.minStats),this.maxOvr=this.calculateOVR(this.maxStats)}getFloor(){return"regular"===this.coachType?4:3}getCap(){return"regular"===this.coachType?10:5}parseCoachData(e){const r={};for(const t of e.skills)r[t.id]={rating:parseInt(t?.lvl??0),max:t?.max??!1,strength:null};if(e?.talents?.weakest){const n=t[e.talents.weakest];n&&r[n]&&(r[n].strength="weakest"),e.talents.strongest.forEach(e=>{const n=t[e];n&&r[n]&&(r[n].strength="strongest")})}return r}calcMinStats(t){const e=structuredClone(t),r=this.getCap(),n=this.getFloor();let a=r,s=0;for(const t of Object.values(e))t.rating=t.max?t.rating:Math.min(t.rating+1,r),"strongest"!==t.strength&&(s=Math.max(s,t.rating));for(const t of Object.values(e))"weakest"===t.strength&&(a=t.rating);for(const t of Object.values(e))"strongest"===t.strength&&t.rating<s&&(t.rating=s);for(const t of Object.values(e))t.rating<a&&(t.rating=a),t.rating<n&&(t.rating=n);return e}calcMaxStats(t){const e=structuredClone(t),r=this.getCap(),n=this.getFloor();let a=r,s=r;for(const t of Object.values(e))"strongest"===t.strength&&(a=Math.min(a,t.max?t.rating:r));for(const t of Object.values(e))!t.max&&t.rating<a&&(t.rating=a),"weakest"!==t.strength&&(s=Math.min(s,t.rating));for(const t of Object.values(e))"strongest"===t.strength&&!t.max&&t.rating<r&&(t.rating=r);for(const t of Object.values(e))"weakest"===t.strength&&t.rating>s&&(t.rating=s),t.rating<n&&(t.rating=n);return e}calculateOVR(t){const e=Object.values(t),r=e.reduce((t,e)=>t+e.rating,0),n=r/e.length,a=(r+e.reduce((t,e)=>e.rating>n?t+e.rating-n:t,0))/e.length;return Math.round(10*a)}getStats(){return this.stats}getMinStats(){return this.minStats}getMaxStats(){return this.maxStats}getCoachType(){return this.coachType}getIsHead(){return this.isHead}getOvr(){return this.ovr}getMinOvr(){return Math.max(this.minOvr,this.ovr)}getMaxOvr(){return Math.max(this.maxOvr,this.ovr)}filterMatchStats(t){const e={};for(const r of d)t[r]&&(e[r]=t[r]);return e}getMatchStats(){return this.filterMatchStats(this.stats)}getMinMatchStats(){return this.filterMatchStats(this.minStats)}getMaxMatchStats(){return this.filterMatchStats(this.maxStats)}getMatchOvr(){return this.calculateOVR(this.getMatchStats())}getMinMatchOvr(){return Math.max(this.calculateOVR(this.getMinMatchStats()),this.getMatchOvr())}getMaxMatchOvr(){return Math.max(this.calculateOVR(this.getMaxMatchStats()),this.getMatchOvr())}filterTrainingStats(t){const e={};for(const[r,n]of Object.entries(t))d.includes(r)||(e[r]=n);return e}getTrainingStats(){return this.filterTrainingStats(this.stats)}getMinTrainingStats(){return this.filterTrainingStats(this.minStats)}getMaxTrainingStats(){return this.filterTrainingStats(this.maxStats)}getTrainingOvr(){return this.calculateOVR(this.getTrainingStats())}getMinTrainingOvr(){return Math.max(this.calculateOVR(this.getMinTrainingStats()),this.getTrainingOvr())}getMaxTrainingOvr(){return Math.max(this.calculateOVR(this.getMaxTrainingStats()),this.getTrainingOvr())}}const g=new class{container=null;marketCoaches=new Map;header=null;dataRows={};tbody=null;columnState={overallRating:!1,trainingOvr:!1,matchOvr:!1};columnGroupOrder=["overallRating","matchOvr","trainingOvr"];searchButtonListener=null;paginationListeners=new Map;mutationObserver=null;observerTimeoutId=null;columnToggleButtonListener=null;modalObserver=null;headerObserver=null;showMinMax=!1;updateMarketCoaches(t){this.marketCoaches.clear();for(const e of t){const t=new u(e);this.marketCoaches.set(e.id,t)}}attach(t){this.detach(),this.container=t.parentElement,this.container&&(this.showMinMax=this.loadMinMaxState(),this.initializeTableReferences(),this.attachHeaderObserver(),this.syncColumnStateFromTable(),this.attachSearchListener(),this.attachPaginationListeners(),this.attachColumnToggleListener(),this.renderColumns())}detach(){this.container&&(this.container.querySelectorAll('[data-column^="hn-"]').forEach(t=>t.remove()),this.detachSearchListener(),this.detachPaginationListeners(),this.detachColumnToggleListener(),this.headerObserver&&(this.headerObserver.disconnect(),this.headerObserver=null),this.modalObserver&&(this.modalObserver.disconnect(),this.modalObserver=null),this.disconnectObserver(),this.container=null,this.header=null,this.dataRows={},this.tbody=null)}getColumnState(){return{...this.columnState}}getTableContainer(){return this.container?this.container.querySelector("div:has(> table)"):null}getPaginationContainer(){return this.container?this.container.querySelector("div:has(> ul) ul"):null}getSearchButton(){if(!this.container)return null;const t=this.container.querySelectorAll("button");return Array.from(t).find(t=>"search"===t.textContent?.trim().toLowerCase())??null}initializeTableReferences(){if(!this.container)return;const t=this.getTableContainer();this.header=t?.querySelector("table thead tr")??null,this.tbody=t?.querySelector("table tbody")??null,this.dataRows={},this.tbody&&this.tbody.querySelectorAll("tr").forEach(t=>{const e=t,r=e.querySelector("a.coach-link"),n=r?.getAttribute("href");if(n){const t=n.split("/").pop()||"";t&&(this.dataRows[t]=e)}})}attachSearchListener(){const t=this.getSearchButton();t&&(this.searchButtonListener=()=>{this.onTableUpdateTrigger()},t.addEventListener("click",this.searchButtonListener))}detachSearchListener(){if(!this.searchButtonListener)return;const t=this.getSearchButton();t&&t.removeEventListener("click",this.searchButtonListener),this.searchButtonListener=null}attachPaginationListeners(){if(!this.container)return;this.detachPaginationListeners();const t=this.getPaginationContainer();(t?.querySelectorAll("li a:not(.disabled)")??[]).forEach(t=>{const e=()=>{this.onTableUpdateTrigger()};t.addEventListener("click",e),this.paginationListeners.set(t,e)})}detachPaginationListeners(){this.paginationListeners.forEach((t,e)=>{e.removeEventListener("click",t)}),this.paginationListeners.clear()}onTableUpdateTrigger(){this.observerTimeoutId&&(clearTimeout(this.observerTimeoutId),this.observerTimeoutId=null),!this.mutationObserver&&this.container&&(this.mutationObserver=new MutationObserver(t=>{this.container?.isConnected?t.some(t=>t.addedNodes.length>0&&Array.from(t.addedNodes).some(t=>t.nodeType===Node.ELEMENT_NODE&&("TR"===t.tagName||"TABLE"===t.tagName||t.querySelector("tr")||t.querySelector("table"))))&&this.onTableUpdated():this.detach()}),this.mutationObserver.observe(this.container,{childList:!0,subtree:!0})),this.observerTimeoutId=window.setTimeout(()=>{this.onTableUpdated()},3e3)}onTableUpdated(){this.initializeTableReferences(),this.syncColumnStateFromTable(),this.renderColumns(),this.attachPaginationListeners()}getColumnToggleButton(){if(!this.container)return null;const t=this.container.querySelectorAll("button");return Array.from(t).find(t=>t.querySelector("svg.fa-table-cells"))??null}attachColumnToggleListener(){const t=this.getColumnToggleButton();t&&(this.columnToggleButtonListener=()=>{this.watchForModal()},t.addEventListener("click",this.columnToggleButtonListener))}detachColumnToggleListener(){if(!this.columnToggleButtonListener)return;const t=this.getColumnToggleButton();t&&t.removeEventListener("click",this.columnToggleButtonListener),this.columnToggleButtonListener=null}watchForModal(){this.modalObserver&&this.modalObserver.disconnect(),this.modalObserver=new MutationObserver(t=>{const e=document.querySelector(".card-modal");e&&(this.modalObserver?.disconnect(),this.modalObserver=null,this.injectModalCheckboxes(e))}),this.modalObserver.observe(document.body,{childList:!0,subtree:!0}),setTimeout(()=>{this.modalObserver?.disconnect(),this.modalObserver=null},2e3)}createCheckboxElement(t,e,r){const n=document.createDocumentFragment(),a=document.createElement("input");a.id=t,a.type="checkbox",a.checked=r,a.className="mr-2 hidden";const s=document.createElement("label");s.htmlFor=t,s.className="flex flex-row items-center font-semibold text-gray-800 cursor-pointer select-none hover:text-orange-500";const i=document.createElementNS("http://www.w3.org/2000/svg","svg");i.setAttribute("class",`svg-inline--fa ${r?"fa-square-check":"fa-square"} mr-2`),i.setAttribute("aria-hidden","true"),i.setAttribute("focusable","false"),i.setAttribute("data-prefix",r?"fas":"far"),i.setAttribute("data-icon",r?"square-check":"square"),i.setAttribute("role","img"),i.setAttribute("xmlns","http://www.w3.org/2000/svg"),i.setAttribute("viewBox","0 0 448 512");const o=document.createElementNS("http://www.w3.org/2000/svg","path");o.setAttribute("fill","currentColor"),o.setAttribute("d",r?"M64 32C28.7 32 0 60.7 0 96L0 416c0 35.3 28.7 64 64 64l320 0c35.3 0 64-28.7 64-64l0-320c0-35.3-28.7-64-64-64L64 32zM337 209L209 337c-9.4 9.4-24.6 9.4-33.9 0l-64-64c-9.4-9.4-9.4-24.6 0-33.9s24.6-9.4 33.9 0l47 47L303 175c9.4-9.4 24.6-9.4 33.9 0s9.4 24.6 0 33.9z":"M384 80c8.8 0 16 7.2 16 16l0 320c0 8.8-7.2 16-16 16L64 432c-8.8 0-16-7.2-16-16L48 96c0-8.8 7.2-16 16-16l320 0zM64 32C28.7 32 0 60.7 0 96L0 416c0 35.3 28.7 64 64 64l320 0c35.3 0 64-28.7 64-64l0-320c0-35.3-28.7-64-64-64L64 32z"),i.appendChild(o),s.appendChild(i);const l=document.createElement("span");return l.textContent=e,s.appendChild(l),n.appendChild(a),n.appendChild(s),n}updateCheckboxVisual(t){const e=document.querySelector(`label[for="${t.id}"]`),r=e?.querySelector("svg");if(!r)return;const n=t.checked;r.setAttribute("class",`svg-inline--fa ${n?"fa-square-check":"fa-square"} mr-2`),r.setAttribute("data-prefix",n?"fas":"far"),r.setAttribute("data-icon",n?"square-check":"square");const a=r.querySelector("path");a&&a.setAttribute("d",n?"M64 32C28.7 32 0 60.7 0 96L0 416c0 35.3 28.7 64 64 64l320 0c35.3 0 64-28.7 64-64l0-320c0-35.3-28.7-64-64-64L64 32zM337 209L209 337c-9.4 9.4-24.6 9.4-33.9 0l-64-64c-9.4-9.4-9.4-24.6 0-33.9s24.6-9.4 33.9 0l47 47L303 175c9.4-9.4 24.6-9.4 33.9 0s9.4 24.6 0 33.9z":"M384 80c8.8 0 16 7.2 16 16l0 320c0 8.8-7.2 16-16 16L64 432c-8.8 0-16-7.2-16-16L48 96c0-8.8 7.2-16 16-16l320 0zM64 32C28.7 32 0 60.7 0 96L0 416c0 35.3 28.7 64 64 64l320 0c35.3 0 64-28.7 64-64l0-320c0-35.3-28.7-64-64-64L64 32z")}injectModalCheckboxes(t){const e=t.querySelector('label[for="OVR"]');if(!e)return;const r=this.createCheckboxElement("hn-min-max","Min/Max",this.showMinMax);e.after(r);const n=t.querySelector("#hn-min-max");t.querySelector('label[for="hn-min-max"]')?.addEventListener("click",t=>{t.preventDefault(),n&&(n.checked=!n.checked,this.updateCheckboxVisual(n))});const a=Array.from(t.querySelectorAll("button")).find(t=>"update"===t.textContent?.trim().toLowerCase());a&&a.addEventListener("click",()=>{n&&(this.showMinMax=n.checked,this.saveMinMaxState(),this.renderColumns())});const s=t.querySelector("#all"),i=t.querySelector('label[for="all"]');s&&i&&i.addEventListener("click",()=>{setTimeout(()=>{const t=s.checked;n&&(n.checked=t,this.updateCheckboxVisual(n))},0)})}disconnectObserver(){this.mutationObserver&&(this.mutationObserver.disconnect(),this.mutationObserver=null),this.observerTimeoutId&&(clearTimeout(this.observerTimeoutId),this.observerTimeoutId=null)}renderColumns(){if(this.container&&this.header&&(this.container.querySelectorAll('[data-column^="hn-"]').forEach(t=>t.remove()),this.showMinMax))for(const t of this.columnGroupOrder)this.columnState[t]&&this.renderColumnGroup(t)}renderColumnGroup(t){if(!this.header)return;const e=this.getColumnsForGroup(t),r={overallRating:"OVR",matchOvr:"MATCH",trainingOvr:"DRL"}[t],n=Array.from(this.header.querySelectorAll("th")).find(t=>t.textContent?.trim()===r);if(!n)return;const a=Array.from(this.header.children).indexOf(n);let s=n;e.forEach(t=>{const e=document.createElement("th");e.className="py-2 px-4 w-1 select-none",e.dataset.column=`hn-${t.id}`,e.textContent=t.label,s.after(e),s=e}),Object.entries(this.dataRows).forEach(([t,r])=>{const n=this.marketCoaches.get(t),s=r.children[a];if(!s)return;let i=s;e.forEach(t=>{const e=document.createElement("td");if(e.className="px-2 py-1 whitespace-nowrap text-center",e.dataset.column=`hn-${t.id}`,n){const r=t.getValue(n);e.appendChild(this.createRatingSpan(r))}else e.textContent="-";i.after(e),i=e})})}getColumnsForGroup(t){switch(t){case"overallRating":return[{id:"ovr-min",label:"Min",getValue:t=>t.getMinOvr()},{id:"ovr-max",label:"Max",getValue:t=>t.getMaxOvr()}];case"trainingOvr":return[{id:"train-min",label:"D.Min",getValue:t=>t.getMinTrainingOvr()},{id:"train-max",label:"D.Max",getValue:t=>t.getMaxTrainingOvr()}];case"matchOvr":return[{id:"match-min",label:"M.Min",getValue:t=>t.getMinMatchOvr()},{id:"match-max",label:"M.Max",getValue:t=>t.getMaxMatchOvr()}]}}createRatingSpan(t){const e=document.createElement("span");if(e.className="badge",e.style.userSelect="none",e.textContent=t.toString(),window.userData&&"function"==typeof window.userData.getColorPair)try{const[r,n]=window.userData.getColorPair(t);e.style.backgroundColor=r,e.style.color=n}catch(e){console.error("Error getting color pair for OVR:",t,e)}return e}loadMinMaxState(){return"true"===localStorage.getItem("hn-coach-market-minmax")}saveMinMaxState(){localStorage.setItem("hn-coach-market-minmax",String(this.showMinMax))}syncColumnStateFromTable(){if(!this.header)return;const t=null!==this.header.querySelector('th:not([data-column^="hn-"])')&&Array.from(this.header.querySelectorAll("th")).some(t=>"OVR"===t.textContent?.trim()),e=Array.from(this.header.querySelectorAll("th")).some(t=>"MATCH"===t.textContent?.trim()),r=Array.from(this.header.querySelectorAll("th")).some(t=>"DRL"===t.textContent?.trim());this.columnState.overallRating=t,this.columnState.matchOvr=e,this.columnState.trainingOvr=r}attachHeaderObserver(){this.header&&(this.headerObserver=new MutationObserver(t=>{t.forEach(t=>{"childList"===t.type&&(Array.from(t.addedNodes).some(t=>t instanceof HTMLTableCellElement&&"TH"===t.tagName&&["OVR","MATCH","DRL"].includes(t.textContent?.trim()??""))||Array.from(t.removedNodes).some(t=>t instanceof HTMLTableCellElement&&"TH"===t.tagName&&["OVR","MATCH","DRL"].includes(t.textContent?.trim()??"")))&&(this.syncColumnStateFromTable(),this.renderColumns())})}),this.headerObserver.observe(this.header,{childList:!0}))}onDataReceived(){this.container&&this.onTableUpdateTrigger()}},m=new class{container=null;freeAgents=null;freeAgentCards=null;paginationListeners=new Map;mutationObserver=null;observerTimeoutId=null;constructor(){}attach(t){this.detach(),this.container=t.parentElement,this.container&&this.freeAgents&&(this.initializeDOMReferences(),this.attachPaginationListeners(),this.addBadges())}detach(){this.container&&(this.detachPaginationListeners(),this.disconnectObserver(),this.container=null,this.freeAgentCards=null)}updateData(t){this.freeAgents=t,this.container&&(this.initializeDOMReferences(),this.addBadges())}onDataReceived(){this.container&&this.onTableUpdateTrigger()}getPaginationContainers(){if(!this.container)return[];const t=this.container.querySelectorAll("div.flex.justify-center.bg-gray-700");return Array.from(t)}initializeDOMReferences(){if(!this.container)return;const t=this.container.querySelectorAll("div.card.card-secondary"),e={};t.forEach(t=>{const r=t,n=r.querySelector("a[href^='/player/']"),a=r.querySelector(".badge");if(!n||!a)return;const s=n.getAttribute("href")?.split("/").pop();s&&(e[s]=r)}),this.freeAgentCards=e}attachPaginationListeners(){this.container&&(this.detachPaginationListeners(),this.getPaginationContainers().forEach(t=>{t.querySelectorAll("li a:not(.disabled)").forEach(t=>{const e=()=>{this.onTableUpdateTrigger()};t.addEventListener("click",e),this.paginationListeners.set(t,e)})}))}detachPaginationListeners(){this.paginationListeners.forEach((t,e)=>{e.removeEventListener("click",t)}),this.paginationListeners.clear()}onTableUpdateTrigger(){this.observerTimeoutId&&(clearTimeout(this.observerTimeoutId),this.observerTimeoutId=null),!this.mutationObserver&&this.container&&(this.mutationObserver=new MutationObserver(t=>{this.container?.isConnected?t.some(t=>t.addedNodes.length>0&&Array.from(t.addedNodes).some(t=>t.nodeType===Node.ELEMENT_NODE&&(t.classList?.contains("card")||t.querySelector("div.card.card-secondary"))))&&this.onTableUpdated():this.detach()}),this.mutationObserver.observe(this.container,{childList:!0,subtree:!0})),this.observerTimeoutId=window.setTimeout(()=>{this.onTableUpdated()},3e3)}onTableUpdated(){this.disconnectObserver(),this.initializeDOMReferences(),this.addBadges(),this.attachPaginationListeners()}disconnectObserver(){this.mutationObserver&&(this.mutationObserver.disconnect(),this.mutationObserver=null),this.observerTimeoutId&&(clearTimeout(this.observerTimeoutId),this.observerTimeoutId=null)}addBadges(){this.freeAgentCards&&this.freeAgents&&Object.entries(this.freeAgentCards).forEach(([t,e])=>{if("true"===e.getAttribute("data-ovr-badges-added"))return;const r=e.querySelector(".badge")?.parentElement;if(!r)return;const n=this.freeAgents.getPlayer(t);n&&(r.querySelectorAll(".dynamic-ovr-label, .dynamic-ovr-badge").forEach(t=>t.remove()),r.appendChild(this.createOvrLabelSpan("MIN")),r.appendChild(this.createRatingSpan(n.getMinOvr())),r.appendChild(this.createOvrLabelSpan("MAX")),r.appendChild(this.createRatingSpan(n.getMaxOvr())),e.setAttribute("data-ovr-badges-added","true"))})}createOvrLabelSpan(t){const e=document.createElement("span");return e.classList.add("dynamic-ovr-label","uppercase","ml-3","xs:inline-block","hidden"),e.innerText=t,e}createRatingSpan(t){const e=document.createElement("span");if(e.classList.add("dynamic-ovr-badge","badge","ml-1"),e.style.userSelect="none",e.innerText=t.toString(),window.userData&&"function"==typeof window.userData.getColorPair&&t>0)try{const[r,n]=window.userData.getColorPair(t);e.style.backgroundColor=r,e.style.color=n}catch(e){console.error("Error getting color pair for OVR:",t,e)}return e}},p=["OFP","DFP","BAT","PP","PK"];class f{coachesByTeam;constructor(t){this.coachesByTeam=this.parseCoachingStaffData(t)}parseCoachingStaffData(t){const e={};for(const r of Object.keys(t)){e[r]={};for(const n of t[r])e[r][n.id]=new u(n)}return e}getCoach(t,e){return this.coachesByTeam[e]?.[t]}findCoachById(t){for(const e of Object.values(this.coachesByTeam))if(e[t])return e[t]}getTeamCoaches(t){return this.coachesByTeam[t]??{}}getAllCoachesByTeam(){return this.coachesByTeam}getHeadCoach(t){const e=this.coachesByTeam[t];if(e)return Object.values(e).find(t=>t.getIsHead())}getStaffMatchSkillOvr(t,e){const r=this.coachesByTeam[e];if(!r)return 0;const n=[];for(const e of Object.values(r)){const r=e.getStats(),a=r[t]?.rating??0;e.getIsHead()?n.push(a,a):n.push(a)}return this.calculateOVR(n)}calculateOVR(t){if(0===t.length)return 0;const e=t.reduce((t,e)=>t+e,0),r=e/t.length,n=(e+t.reduce((t,e)=>e>r?t+e-r:t,0))/t.length;return Math.round(10*n)}getAllStaffMatchSkillOvrs(t){const e={};for(const r of p)e[r]=this.getStaffMatchSkillOvr(r,t);return e}}const v=new class{container=null;dataRows={};mutationObserver=null;coachingStaff=null;attach(t){this.detach(),this.container=t.parentElement,this.container&&(this.initializeTableReferences(),this.renderColumns(),this.observeChanges())}detach(){this.container&&(this.container.querySelectorAll('[data-column^="hn-"]').forEach(t=>t.remove()),this.mutationObserver&&(this.mutationObserver.disconnect(),this.mutationObserver=null),this.container=null,this.dataRows={})}updateCoachingStaff(t){this.coachingStaff=t}observeChanges(){this.container&&(this.mutationObserver=new MutationObserver(t=>{this.container?.isConnected?t.some(t=>t.addedNodes.length>0&&Array.from(t.addedNodes).some(t=>t.nodeType===Node.ELEMENT_NODE&&!t.dataset?.column?.startsWith("hn-")&&("TR"===t.tagName||"TABLE"===t.tagName||t.querySelector?.("tr")||t.querySelector?.("table"))))&&(this.initializeTableReferences(),this.renderColumns()):this.detach()}),this.mutationObserver.observe(this.container,{childList:!0,subtree:!0}))}initializeTableReferences(){this.container&&(this.dataRows={},this.container.querySelectorAll("table tbody tr").forEach(t=>{const e=t,r=e.querySelector("a.coach-link"),n=r?.getAttribute("href");if(n){const t=n.split("/").pop()||"";t&&(this.dataRows[t]=e)}}))}renderColumns(){if(!this.container)return;if(this.container.querySelectorAll('[data-column^="hn-"]').forEach(t=>t.remove()),!this.coachingStaff)return;const t=[{id:"train-ovr",label:"DRL",getValue:t=>t.getTrainingOvr()},{id:"train-min",label:"D.Min",getValue:t=>t.getMinTrainingOvr()},{id:"train-max",label:"D.Max",getValue:t=>t.getMaxTrainingOvr()},{id:"match-ovr",label:"MATCH",getValue:t=>t.getMatchOvr()},{id:"match-min",label:"M.Min",getValue:t=>t.getMinMatchOvr()},{id:"match-max",label:"M.Max",getValue:t=>t.getMaxMatchOvr()}],e=[{id:"min-ovr",label:"Min",getValue:t=>t.getMinOvr()},{id:"max-ovr",label:"Max",getValue:t=>t.getMaxOvr()}],r=this.container.querySelectorAll("thead tr");if(!r.length)return;const n=Array.from(r[0].querySelectorAll("th")).find(t=>"OVR"===t.textContent?.trim());if(!n)return;const a=Array.from(r[0].children).indexOf(n);r.forEach(r=>{const n=r.children[a];if(!n)return;[...t].forEach(t=>{const e=document.createElement("th");e.className="py-2 px-4 w-1 select-none",e.dataset.column=`hn-${t.id}`,e.textContent=t.label,n.before(e)});let s=n;e.forEach(t=>{const e=document.createElement("th");e.className="py-2 px-4 w-1 select-none",e.dataset.column=`hn-${t.id}`,e.textContent=t.label,s.after(e),s=e})}),Object.entries(this.dataRows).forEach(([r,n])=>{const s=this.coachingStaff.findCoachById(r),i=n.children[a];if(!i)return;[...t].forEach(t=>{const e=document.createElement("td");e.className="px-2 py-1 whitespace-nowrap text-center",e.dataset.column=`hn-${t.id}`,s?e.appendChild(this.createRatingSpan(t.getValue(s))):e.textContent="-",i.before(e)});let o=i;e.forEach(t=>{const e=document.createElement("td");e.className="px-2 py-1 whitespace-nowrap text-center",e.dataset.column=`hn-${t.id}`,s?e.appendChild(this.createRatingSpan(t.getValue(s))):e.textContent="-",o.after(e),o=e})})}createRatingSpan(t){const e=document.createElement("span");if(e.className="badge",e.style.userSelect="none",e.textContent=t.toString(),window.userData&&"function"==typeof window.userData.getColorPair)try{const[r,n]=window.userData.getColorPair(t);e.style.backgroundColor=r,e.style.color=n}catch(e){console.error("Error getting color pair for OVR:",t,e)}return e}getPaginationContainer(){return this.container?this.container.querySelector("div:has(> ul) ul"):null}},b=new class{container=null;tradePlayers=null;tradePlayerCards=null;paginationListeners=new Map;mutationObserver=null;observerTimeoutId=null;constructor(){}attach(t){this.detach(),this.container=t.parentElement,this.container&&this.tradePlayers&&(this.initializeDOMReferences(),this.attachPaginationListeners(),this.addBadges())}detach(){this.container&&(this.detachPaginationListeners(),this.disconnectObserver(),this.container=null,this.tradePlayerCards=null)}updateData(t){this.tradePlayers=t,this.container&&(this.initializeDOMReferences(),this.addBadges())}onDataReceived(){this.container&&this.onTableUpdateTrigger()}getPaginationContainers(){if(!this.container)return[];const t=this.container.querySelectorAll("div.flex.justify-center.bg-gray-700");return Array.from(t)}initializeDOMReferences(){if(!this.container)return;const t=this.container.querySelectorAll("div.card.card-secondary"),e={};t.forEach(t=>{const r=t,n=r.querySelector("a[href^='/player/']"),a=r.querySelector(".badge");if(!n||!a)return;const s=n.getAttribute("href")?.split("/").pop();s&&(e[s]=r)}),this.tradePlayerCards=e}attachPaginationListeners(){this.container&&(this.detachPaginationListeners(),this.getPaginationContainers().forEach(t=>{t.querySelectorAll("li a:not(.disabled)").forEach(t=>{const e=()=>{this.onTableUpdateTrigger()};t.addEventListener("click",e),this.paginationListeners.set(t,e)})}))}detachPaginationListeners(){this.paginationListeners.forEach((t,e)=>{e.removeEventListener("click",t)}),this.paginationListeners.clear()}onTableUpdateTrigger(){this.observerTimeoutId&&(clearTimeout(this.observerTimeoutId),this.observerTimeoutId=null),!this.mutationObserver&&this.container&&(this.mutationObserver=new MutationObserver(t=>{this.container?.isConnected?t.some(t=>t.addedNodes.length>0&&Array.from(t.addedNodes).some(t=>t.nodeType===Node.ELEMENT_NODE&&(t.classList?.contains("card")||t.querySelector("div.card.card-secondary"))))&&this.onTableUpdated():this.detach()}),this.mutationObserver.observe(this.container,{childList:!0,subtree:!0})),this.observerTimeoutId=window.setTimeout(()=>{this.onTableUpdated()},3e3)}onTableUpdated(){this.disconnectObserver(),this.initializeDOMReferences(),this.addBadges(),this.attachPaginationListeners()}disconnectObserver(){this.mutationObserver&&(this.mutationObserver.disconnect(),this.mutationObserver=null),this.observerTimeoutId&&(clearTimeout(this.observerTimeoutId),this.observerTimeoutId=null)}addBadges(){this.tradePlayerCards&&this.tradePlayers&&Object.entries(this.tradePlayerCards).forEach(([t,e])=>{if("true"===e.getAttribute("data-ovr-badges-added"))return;const r=e.querySelector(".badge")?.parentElement;if(!r)return;const n=this.tradePlayers.getPlayer(t);n&&(r.querySelectorAll(".dynamic-ovr-label, .dynamic-ovr-badge").forEach(t=>t.remove()),r.appendChild(this.createOvrLabelSpan("MIN")),r.appendChild(this.createRatingSpan(n.getMinOvr())),r.appendChild(this.createOvrLabelSpan("MAX")),r.appendChild(this.createRatingSpan(n.getMaxOvr())),e.setAttribute("data-ovr-badges-added","true"))})}createOvrLabelSpan(t){const e=document.createElement("span");return e.classList.add("dynamic-ovr-label","uppercase","ml-3","xs:inline-block","hidden"),e.innerText=t,e}createRatingSpan(t){const e=document.createElement("span");if(e.classList.add("dynamic-ovr-badge","badge","ml-1"),e.style.userSelect="none",e.innerText=t.toString(),window.userData&&"function"==typeof window.userData.getColorPair&&t>0)try{const[r,n]=window.userData.getColorPair(t);e.style.backgroundColor=r,e.style.color=n}catch(e){console.error("Error getting color pair for OVR:",t,e)}return e}},y={roster:{url:"https://hockey-nation.com/club/roster",handlers:[{selector:"table tbody tr",handler:t=>{!function(t){s.attach(t)}(t)}}]},draftClass:{url:"https://hockey-nation.com/office/draft-center",handlers:[{selector:".stats-container",handler:t=>{!function(t){i.attach(t)}(t)}}]},draftRanking:{url:"https://hockey-nation.com/draft-ranking",handlers:[{selector:"table tbody tr",handler:t=>{!function(t){h.attach(t)}(t)}}]},coachMarket:{url:"https://hockey-nation.com/coaching-staff",handlers:[{selector:"div[market-open] table tbody tr",handler:t=>{!function(t){g.attach(t)}(t)}},{selector:".market-stats-grid.by-experience",handler:t=>{!function(t){v.attach(t)}(t)}}]},freeAgentCenter:{url:"https://hockey-nation.com/office/free-agent-center",handlers:[{selector:"div.card.card-secondary",handler:t=>{!function(t){m.attach(t)}(t)}}]},tradeCenter:{url:"https://hockey-nation.com/office/trade-center",handlers:[{selector:"div.card.card-secondary",handler:t=>{!function(t){b.attach(t)}(t)}}]}};function O(){const t=function(t){for(const e of Object.values(y))if(t.startsWith(e.url))return e.handlers;return null}(window.location.href);n.getInstance().resetCallback(),t&&n.getInstance().setCallbacks(t)}class S{"bg-color-rating-90plus"="#383839";"bg-color-rating-85plus"="#383839";"bg-color-rating-80plus"="#383839";"bg-color-rating-75plus"="#10b981";"bg-color-rating-70plus"="#10b981";"bg-color-rating-65plus"="#1995AD";"bg-color-rating-60plus"="#1995AD";"bg-color-rating-55plus"="#1995AD";"bg-color-rating-50plus"="#ed8936";"bg-color-rating-45plus"="#ed8936";"bg-color-rating-40plus"="#ed8936";"bg-color-rating-40less"="#f56565";"color-rating-90plus"="#f8f8f9";"color-rating-85plus"="#f8f8f9";"color-rating-80plus"="#f8f8f9";"color-rating-75plus"="#f8f8f9";"color-rating-70plus"="#f8f8f9";"color-rating-65plus"="#f8f8f9";"color-rating-60plus"="#f8f8f9";"color-rating-55plus"="#f8f8f9";"color-rating-50plus"="#f8f8f9";"color-rating-45plus"="#f8f8f9";"color-rating-40plus"="#f8f8f9";"color-rating-40less"="#f8f8f9";constructor(t){t&&t?.settings&&this.loadFromConfig(t.settings)}loadFromConfig(t){for(const{id:e,value:r}of t)e in this&&(this[e]=r)}getColorPair(t){const e=[90,85,80,75,70,65,60,55,50,45,40].find(e=>t>=e),r=void 0!==e?`${e}plus`:"40less",n=`color-rating-${r}`;return[this[`bg-color-rating-${r}`],this[n]]}}!function(){O(),window.navigation.addEventListener("currententrychange",O),window.userData=new S;const t={player:{pattern:/\/api\/player\/[^\/]+$/,handler:t=>{!function(t){const n=new e(t);r.updatePlayer(n)}(t.data)}},roster:{pattern:/\/api\/team\/[^\/]+\/roster/,handler:t=>{!function(t){const e=new a(t);s.updateRoster(e)}(t.data)}},draftClass:{pattern:/\/api\/league\/[^\/]+\/draft-class/,handler:t=>{!function(t){const e={...t,players:t.draftees},r=new a(e);i.updateData(r)}(t.data)}},userInfo:{pattern:/\/api\/user$/,handler:t=>{!function(t){window.userData=new S(t)}(t)}},draftRanking:{pattern:/\/api\/draft\/[^\/]+\/rankings/,handler:t=>{!function(t){const e=new a({players:t});h.updateRanking(e)}(t.data)}},draftPicks:{pattern:/\/api\/draft\/[^\/]+\/picks/,handler:t=>{!function(t){const e=t.map(t=>t.rank);h.updatePicks(e)}(t.data)}},coachingStaff:{pattern:/\/api\/club\/[^\/]+\/coaching-staff/,handler:t=>{!function(t){const e=t.staff;e&&v.updateCoachingStaff(new f(e))}(t.data)}},coachMarket:{pattern:/\/api\/coach-center\/search/,handler:t=>{!function(t){g.updateMarketCoaches(t),g.onDataReceived()}(t.data)}},freeAgentCenter:{pattern:/\/api\/free-agent-center\/search/,handler:t=>{!function(t){const e=new a({players:t});m.updateData(e),m.onDataReceived()}(t.data)}},tradeCenter:{pattern:/\/api\/trade-center\/search/,handler:t=>{!function(t){const e=new a({players:t});b.updateData(e),b.onDataReceived()}(t.data)}}};function n(e){for(const{pattern:r,handler:n}of Object.values(t))if(r.test(e))return n;return null}class o extends XMLHttpRequest{interceptedUrl=null;open(t,e,...r){this.interceptedUrl=e,super.open(t,e,...r)}send(...t){this.interceptedUrl;const e=n(this.interceptedUrl??"");if(e){const t=this.onreadystatechange;this.onreadystatechange=function(){if(4===this.readyState&&200===this.status)try{const t=JSON.parse(this.responseText);e(t)}catch(t){}t&&t.apply(this,arguments)}}super.send(...t)}}window.XMLHttpRequest=o;const l=window.fetch;window.fetch=async function(t,e){const r="string"==typeof t?t:t instanceof Request?t.url:t.toString(),a=await l.call(this,t,e),s=r&&n(r);if(s)try{const t=a.clone();s(await t.json())}catch(t){console.error("Error processing fetch response:",t)}return a}}()})();
+/******/ (() => { // webpackBootstrap
+/******/ 	"use strict";
+/******/ 	var __webpack_modules__ = ({
+
+/***/ "./src/mappings/skill-mappings.ts"
+/*!****************************************!*\
+  !*** ./src/mappings/skill-mappings.ts ***!
+  \****************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   SKILL_NAME_TO_ID: () => (/* binding */ SKILL_NAME_TO_ID)
+/* harmony export */ });
+const SKILL_NAME_TO_ID = {
+    Skating: "SKA",
+    Reflexes: "REF",
+    Endurance: "END",
+    Power: "PWR",
+    Positioning: "POS",
+    Shooting: "SHO",
+    Pads: "PAD",
+    Passing: "PAS",
+    Glove: "GLO",
+    Defending: "DEF",
+    Blocker: "BLO",
+    Checking: "CHK",
+    Stick: "STK",
+    Discipline: "DSC",
+    Faceoffs: "FOF",
+    "Offensive Play": "OFP",
+    "Defensive Play": "DFP",
+    "Puck Battling": "BAT",
+    "Power Play": "PP",
+    "Penalty Kill": "PK",
+};
+
+
+/***/ },
+
+/***/ "./src/navigation-handler.ts"
+/*!***********************************!*\
+  !*** ./src/navigation-handler.ts ***!
+  \***********************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   initNavigationHandler: () => (/* binding */ initNavigationHandler)
+/* harmony export */ });
+/* harmony import */ var _observer_handler__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./observer-handler */ "./src/observer-handler.ts");
+/* harmony import */ var _pages_draft_class__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./pages/draft-class */ "./src/pages/draft-class.ts");
+/* harmony import */ var _pages_draft_ranking__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./pages/draft-ranking */ "./src/pages/draft-ranking.ts");
+/* harmony import */ var _pages_roster__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./pages/roster */ "./src/pages/roster.ts");
+/* harmony import */ var _pages_coach_market__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./pages/coach-market */ "./src/pages/coach-market.ts");
+/* harmony import */ var _pages_free_agent_center__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./pages/free-agent-center */ "./src/pages/free-agent-center.ts");
+/* harmony import */ var _pages_coaching_staff__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./pages/coaching-staff */ "./src/pages/coaching-staff.ts");
+/* harmony import */ var _pages_trade_center__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./pages/trade-center */ "./src/pages/trade-center.ts");
+
+
+
+
+
+
+
+
+const PAGE_HANDLERS = {
+    // player: {
+    //     url: "https://hockey-nation.com/player",
+    //     handlers: [
+    //         {
+    //             selector: "table tbody tr",
+    //             handler: (el) => {
+    //                 manipulatePlayerPage(el);
+    //             },
+    //         },
+    //     ],
+    // },
+    roster: {
+        url: "https://hockey-nation.com/club/roster",
+        handlers: [
+            {
+                selector: "table tbody tr",
+                handler: (el) => {
+                    (0,_pages_roster__WEBPACK_IMPORTED_MODULE_3__.manipulateRosterPage)(el);
+                },
+            },
+        ],
+    },
+    draftClass: {
+        url: "https://hockey-nation.com/office/draft-center",
+        handlers: [
+            {
+                selector: ".stats-container",
+                handler: (el) => {
+                    (0,_pages_draft_class__WEBPACK_IMPORTED_MODULE_1__.manipulateDraftClassPage)(el);
+                },
+            },
+        ],
+    },
+    draftRanking: {
+        url: "https://hockey-nation.com/draft-ranking",
+        handlers: [
+            {
+                selector: "table tbody tr",
+                handler: (el) => {
+                    (0,_pages_draft_ranking__WEBPACK_IMPORTED_MODULE_2__.manipulateDraftRankingPage)(el);
+                },
+            },
+        ],
+    },
+    coachMarket: {
+        url: "https://hockey-nation.com/coaching-staff",
+        handlers: [
+            // Coach Market
+            {
+                selector: "div[market-open] table tbody tr",
+                handler: (el) => {
+                    (0,_pages_coach_market__WEBPACK_IMPORTED_MODULE_4__.manipulateCoachMarketPage)(el);
+                },
+            },
+            // Coaching Staff
+            {
+                selector: ".market-stats-grid.by-experience",
+                handler: (el) => {
+                    (0,_pages_coaching_staff__WEBPACK_IMPORTED_MODULE_6__.manipulateCoachingStaffPage)(el);
+                },
+            },
+        ],
+    },
+    freeAgentCenter: {
+        url: "https://hockey-nation.com/office/free-agent-center",
+        handlers: [
+            {
+                selector: "div.card.card-secondary",
+                handler: (el) => {
+                    (0,_pages_free_agent_center__WEBPACK_IMPORTED_MODULE_5__.manipulateFreeAgentCenterPage)(el);
+                },
+            },
+        ],
+    },
+    tradeCenter: {
+        url: "https://hockey-nation.com/office/trade-center",
+        handlers: [
+            {
+                selector: "div.card.card-secondary",
+                handler: (el) => {
+                    (0,_pages_trade_center__WEBPACK_IMPORTED_MODULE_7__.manipulateTradeCenterPage)(el);
+                },
+            },
+        ],
+    },
+};
+function findPageHandler(url) {
+    for (const page of Object.values(PAGE_HANDLERS)) {
+        if (url.startsWith(page.url)) {
+            return page.handlers;
+        }
+    }
+    return null;
+}
+function initNavigationHandler() {
+    handleNavigation();
+    // @ts-ignore
+    window.navigation.addEventListener("currententrychange", handleNavigation);
+}
+function handleNavigation() {
+    const url = window.location.href;
+    const pageHandlers = findPageHandler(url);
+    // reset previous observer
+    _observer_handler__WEBPACK_IMPORTED_MODULE_0__.ObserverManager.getInstance().resetCallback();
+    // set new callbacks if we have handlers for the page
+    if (pageHandlers) {
+        _observer_handler__WEBPACK_IMPORTED_MODULE_0__.ObserverManager.getInstance().setCallbacks(pageHandlers);
+    }
+}
+
+
+/***/ },
+
+/***/ "./src/observer-handler.ts"
+/*!*********************************!*\
+  !*** ./src/observer-handler.ts ***!
+  \*********************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   ObserverManager: () => (/* binding */ ObserverManager)
+/* harmony export */ });
+class ObserverManager {
+    static instance;
+    observer = null;
+    activeHandlers = null;
+    shouldAutoDisconnect = true;
+    constructor() { } //singleton
+    static getInstance() {
+        if (!ObserverManager.instance) {
+            ObserverManager.instance = new ObserverManager();
+        }
+        return ObserverManager.instance;
+    }
+    setCallbacks(handlers) {
+        this.activeHandlers = [...handlers];
+        this.shouldAutoDisconnect = handlers.length === 1;
+        this.ensureObserverActive();
+    }
+    resetCallback() {
+        this.activeHandlers = null;
+        this.disconnect();
+    }
+    ensureObserverActive() {
+        if (!this.observer) {
+            this.observer = new MutationObserver((mutations) => {
+                const handlers = this.activeHandlers;
+                if (!handlers)
+                    return;
+                mutations.forEach((mutation) => {
+                    if (mutation.type === "childList" &&
+                        mutation.addedNodes.length > 0) {
+                        mutation.addedNodes.forEach((node) => {
+                            if (node.nodeType !== Node.ELEMENT_NODE)
+                                return;
+                            const element = node;
+                            for (const [i, { selector, handler },] of handlers.entries()) {
+                                if (element.querySelector(selector)) {
+                                    handler(element);
+                                    handlers.splice(i, 1); //remove
+                                    break; // re-iterate on next mutation since we modified the array
+                                }
+                            }
+                            if (handlers.length === 0 &&
+                                this.shouldAutoDisconnect) {
+                                this.disconnect();
+                            }
+                        });
+                    }
+                });
+            });
+            this.observer.observe(document.body, {
+                childList: true,
+                subtree: true,
+            });
+        }
+    }
+    disconnect() {
+        if (this.observer) {
+            this.observer.disconnect();
+            this.observer = null;
+        }
+    }
+}
+
+
+/***/ },
+
+/***/ "./src/pages/coach-market.ts"
+/*!***********************************!*\
+  !*** ./src/pages/coach-market.ts ***!
+  \***********************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   Coach: () => (/* binding */ Coach),
+/* harmony export */   handleCoachMarketData: () => (/* binding */ handleCoachMarketData),
+/* harmony export */   manipulateCoachMarketPage: () => (/* binding */ manipulateCoachMarketPage)
+/* harmony export */ });
+/* harmony import */ var _mappings_skill_mappings__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../mappings/skill-mappings */ "./src/mappings/skill-mappings.ts");
+
+const MATCH_SKILL_IDS = ["OFP", "DFP", "BAT", "PP", "PK"];
+class Coach {
+    stats;
+    minStats;
+    maxStats;
+    coachType;
+    isHead;
+    ovr;
+    minOvr;
+    maxOvr;
+    constructor(data) {
+        // amateur might need to be handled differently later on
+        this.coachType = data.interim
+            ? "interim"
+            : data.amateur
+                ? "amateur"
+                : "regular";
+        this.isHead = data.job?.head ?? false;
+        this.stats = this.parseCoachData(data);
+        this.minStats = this.calcMinStats(this.stats);
+        this.maxStats = this.calcMaxStats(this.stats);
+        this.ovr = data?.rating ?? 0;
+        this.minOvr = this.calculateOVR(this.minStats);
+        this.maxOvr = this.calculateOVR(this.maxStats);
+    }
+    getFloor() {
+        return this.coachType === "regular" ? 4 : 3;
+    }
+    getCap() {
+        return this.coachType === "regular" ? 10 : 5;
+    }
+    parseCoachData(data) {
+        const stats = {};
+        for (const s of data.skills) {
+            stats[s.id] = {
+                rating: parseInt(s?.lvl ?? 0),
+                max: s?.max ?? false,
+                strength: null,
+            };
+        }
+        if (data?.talents?.weakest) {
+            const weakestId = _mappings_skill_mappings__WEBPACK_IMPORTED_MODULE_0__.SKILL_NAME_TO_ID[data.talents.weakest];
+            if (weakestId && stats[weakestId]) {
+                stats[weakestId].strength = "weakest";
+            }
+            data.talents.strongest.forEach((str) => {
+                const strongestId = _mappings_skill_mappings__WEBPACK_IMPORTED_MODULE_0__.SKILL_NAME_TO_ID[str];
+                if (strongestId && stats[strongestId]) {
+                    stats[strongestId].strength = "strongest";
+                }
+            });
+        }
+        return stats;
+    }
+    calcMinStats(stats) {
+        const minStats = structuredClone(stats);
+        const cap = this.getCap();
+        const floor = this.getFloor();
+        let weakestRating = cap;
+        let highestNonStrongestRating = 0;
+        // update ratings and find the highest non-strongest rating
+        for (const stat of Object.values(minStats)) {
+            stat.rating = stat.max ? stat.rating : Math.min(stat.rating + 1, cap);
+            if (stat.strength !== "strongest") {
+                highestNonStrongestRating = Math.max(highestNonStrongestRating, stat.rating);
+            }
+        }
+        // find the weakest rating
+        for (const stat of Object.values(minStats)) {
+            if (stat.strength === "weakest") {
+                weakestRating = stat.rating;
+            }
+        }
+        // adjust strongest stats
+        for (const stat of Object.values(minStats)) {
+            if (stat.strength === "strongest" &&
+                stat.rating < highestNonStrongestRating) {
+                stat.rating = highestNonStrongestRating;
+            }
+        }
+        // adjust weakest stats and apply floor
+        for (const stat of Object.values(minStats)) {
+            if (stat.rating < weakestRating) {
+                stat.rating = weakestRating;
+            }
+            if (stat.rating < floor) {
+                stat.rating = floor;
+            }
+        }
+        return minStats;
+    }
+    calcMaxStats(stats) {
+        const maxStats = structuredClone(stats);
+        const cap = this.getCap();
+        const floor = this.getFloor();
+        let strongestRating = cap;
+        let lowestNonWeakestRating = cap;
+        // find the strongest rating
+        for (const stat of Object.values(maxStats)) {
+            if (stat.strength === "strongest") {
+                strongestRating = Math.min(strongestRating, stat.max ? stat.rating : cap);
+            }
+        }
+        // update ratings and find the lowest non-weakest rating
+        for (const stat of Object.values(maxStats)) {
+            if (!stat.max && stat.rating < strongestRating) {
+                stat.rating = strongestRating;
+            }
+            if (stat.strength !== "weakest") {
+                lowestNonWeakestRating = Math.min(lowestNonWeakestRating, stat.rating);
+            }
+        }
+        // adjust strongest stats
+        for (const stat of Object.values(maxStats)) {
+            if (stat.strength === "strongest" && !stat.max && stat.rating < cap) {
+                stat.rating = cap;
+            }
+        }
+        // adjust weakest stats and apply floor
+        for (const stat of Object.values(maxStats)) {
+            if (stat.strength === "weakest" && stat.rating > lowestNonWeakestRating) {
+                stat.rating = lowestNonWeakestRating;
+            }
+            if (stat.rating < floor) {
+                stat.rating = floor;
+            }
+        }
+        return maxStats;
+    }
+    calculateOVR(stats) {
+        const statsValues = Object.values(stats);
+        const sum = statsValues.reduce((acc, stat) => acc + stat.rating, 0);
+        const avg = sum / statsValues.length;
+        const excess = statsValues.reduce((acc, stat) => stat.rating > avg ? acc + stat.rating - avg : acc, 0);
+        const correctedSum = sum + excess;
+        const correctedAverage = correctedSum / statsValues.length;
+        return Math.round(correctedAverage * 10);
+    }
+    getStats() {
+        return this.stats;
+    }
+    getMinStats() {
+        return this.minStats;
+    }
+    getMaxStats() {
+        return this.maxStats;
+    }
+    getCoachType() {
+        return this.coachType;
+    }
+    getIsHead() {
+        return this.isHead;
+    }
+    getOvr() {
+        return this.ovr;
+    }
+    getMinOvr() {
+        return Math.max(this.minOvr, this.ovr);
+    }
+    getMaxOvr() {
+        return Math.max(this.maxOvr, this.ovr);
+    }
+    filterMatchStats(stats) {
+        const matchStats = {};
+        for (const id of MATCH_SKILL_IDS) {
+            if (stats[id]) {
+                matchStats[id] = stats[id];
+            }
+        }
+        return matchStats;
+    }
+    getMatchStats() {
+        return this.filterMatchStats(this.stats);
+    }
+    getMinMatchStats() {
+        return this.filterMatchStats(this.minStats);
+    }
+    getMaxMatchStats() {
+        return this.filterMatchStats(this.maxStats);
+    }
+    getMatchOvr() {
+        return this.calculateOVR(this.getMatchStats());
+    }
+    getMinMatchOvr() {
+        return Math.max(this.calculateOVR(this.getMinMatchStats()), this.getMatchOvr());
+    }
+    getMaxMatchOvr() {
+        return Math.max(this.calculateOVR(this.getMaxMatchStats()), this.getMatchOvr());
+    }
+    filterTrainingStats(stats) {
+        const trainingStats = {};
+        for (const [id, stat] of Object.entries(stats)) {
+            if (!MATCH_SKILL_IDS.includes(id)) {
+                trainingStats[id] = stat;
+            }
+        }
+        return trainingStats;
+    }
+    getTrainingStats() {
+        return this.filterTrainingStats(this.stats);
+    }
+    getMinTrainingStats() {
+        return this.filterTrainingStats(this.minStats);
+    }
+    getMaxTrainingStats() {
+        return this.filterTrainingStats(this.maxStats);
+    }
+    getTrainingOvr() {
+        return this.calculateOVR(this.getTrainingStats());
+    }
+    getMinTrainingOvr() {
+        return Math.max(this.calculateOVR(this.getMinTrainingStats()), this.getTrainingOvr());
+    }
+    getMaxTrainingOvr() {
+        return Math.max(this.calculateOVR(this.getMaxTrainingStats()), this.getTrainingOvr());
+    }
+}
+class CoachMarketVisualizer {
+    container = null;
+    // private coachingStaff: CoachingStaff | null = null;
+    marketCoaches = new Map();
+    header = null;
+    dataRows = {};
+    tbody = null;
+    columnState = {
+        overallRating: false,
+        trainingOvr: false,
+        matchOvr: false,
+    };
+    columnGroupOrder = [
+        "overallRating",
+        "matchOvr",
+        "trainingOvr",
+    ];
+    searchButtonListener = null;
+    paginationListeners = new Map();
+    mutationObserver = null;
+    observerTimeoutId = null;
+    columnToggleButtonListener = null;
+    modalObserver = null;
+    headerObserver = null;
+    showMinMax = false;
+    // public updateCoachingStaff(staff: CoachingStaff) {
+    //     this.coachingStaff = staff;
+    // }
+    updateMarketCoaches(data) {
+        this.marketCoaches.clear();
+        for (const c of data) {
+            const coach = new Coach(c);
+            this.marketCoaches.set(c.id, coach);
+        }
+    }
+    attach(el) {
+        this.detach();
+        this.container = el.parentElement;
+        if (!this.container)
+            return;
+        // this.columnState = this.loadColumnState();
+        this.showMinMax = this.loadMinMaxState();
+        this.initializeTableReferences();
+        this.attachHeaderObserver();
+        this.syncColumnStateFromTable();
+        this.attachSearchListener();
+        this.attachPaginationListeners();
+        this.attachColumnToggleListener();
+        this.renderColumns();
+    }
+    detach() {
+        if (!this.container)
+            return;
+        // remove injected columns
+        this.container
+            .querySelectorAll(`[data-column^="hn-"]`)
+            .forEach((node) => node.remove());
+        this.detachSearchListener();
+        this.detachPaginationListeners();
+        this.detachColumnToggleListener();
+        if (this.headerObserver) {
+            this.headerObserver.disconnect();
+            this.headerObserver = null;
+        }
+        if (this.modalObserver) {
+            this.modalObserver.disconnect();
+            this.modalObserver = null;
+        }
+        this.disconnectObserver();
+        this.container = null;
+        this.header = null;
+        this.dataRows = {};
+        this.tbody = null;
+    }
+    // public setColumnState(group: keyof ColumnGroupState, visible: boolean) {
+    //     this.columnState[group] = visible;
+    //     // this.saveColumnState();
+    //     if (this.container) {
+    //         this.renderColumns();
+    //     }
+    // }
+    getColumnState() {
+        return { ...this.columnState };
+    }
+    getTableContainer() {
+        if (!this.container)
+            return null;
+        return this.container.querySelector(`div:has(> table)`);
+    }
+    getPaginationContainer() {
+        if (!this.container)
+            return null;
+        return this.container.querySelector(`div:has(> ul) ul`);
+    }
+    getSearchButton() {
+        if (!this.container)
+            return null;
+        const buttons = this.container.querySelectorAll("button");
+        return (Array.from(buttons).find((btn) => btn.textContent?.trim().toLowerCase() === "search") ?? null);
+    }
+    initializeTableReferences() {
+        if (!this.container)
+            return;
+        const tableContainer = this.getTableContainer();
+        this.header = tableContainer?.querySelector(`table thead tr`) ?? null;
+        this.tbody = tableContainer?.querySelector(`table tbody`) ?? null;
+        this.dataRows = {};
+        if (!this.tbody)
+            return;
+        const rows = this.tbody.querySelectorAll(`tr`);
+        rows.forEach((row) => {
+            const tableRow = row;
+            const coachLink = tableRow.querySelector(`a.coach-link`);
+            const href = coachLink?.getAttribute("href");
+            if (href) {
+                const coachId = href.split("/").pop() || "";
+                if (coachId) {
+                    this.dataRows[coachId] = tableRow;
+                }
+            }
+        });
+    }
+    attachSearchListener() {
+        const searchButton = this.getSearchButton();
+        if (!searchButton)
+            return;
+        this.searchButtonListener = () => {
+            this.onTableUpdateTrigger();
+        };
+        searchButton.addEventListener("click", this.searchButtonListener);
+    }
+    detachSearchListener() {
+        if (!this.searchButtonListener)
+            return;
+        const searchButton = this.getSearchButton();
+        if (searchButton) {
+            searchButton.removeEventListener("click", this.searchButtonListener);
+        }
+        this.searchButtonListener = null;
+    }
+    attachPaginationListeners() {
+        if (!this.container)
+            return;
+        this.detachPaginationListeners();
+        const paginationContainer = this.getPaginationContainer();
+        const pageLinks = paginationContainer?.querySelectorAll(`li a:not(.disabled)`) ?? [];
+        pageLinks.forEach((el) => {
+            const listener = () => {
+                this.onTableUpdateTrigger();
+            };
+            el.addEventListener("click", listener);
+            this.paginationListeners.set(el, listener);
+        });
+    }
+    detachPaginationListeners() {
+        this.paginationListeners.forEach((listener, el) => {
+            el.removeEventListener("click", listener);
+        });
+        this.paginationListeners.clear();
+    }
+    onTableUpdateTrigger() {
+        if (this.observerTimeoutId) {
+            clearTimeout(this.observerTimeoutId);
+            this.observerTimeoutId = null;
+        }
+        if (!this.mutationObserver && this.container) {
+            this.mutationObserver = new MutationObserver((mutations) => {
+                if (!this.container?.isConnected) {
+                    this.detach();
+                    return;
+                }
+                const hasTableChanges = mutations.some((m) => m.addedNodes.length > 0 &&
+                    Array.from(m.addedNodes).some((node) => node.nodeType === Node.ELEMENT_NODE &&
+                        (node.tagName === "TR" ||
+                            node.tagName === "TABLE" ||
+                            node.querySelector("tr") ||
+                            node.querySelector("table"))));
+                if (hasTableChanges) {
+                    this.onTableUpdated();
+                }
+            });
+            this.mutationObserver.observe(this.container, {
+                childList: true,
+                subtree: true,
+            });
+        }
+        this.observerTimeoutId = window.setTimeout(() => {
+            this.onTableUpdated();
+        }, 3000);
+    }
+    onTableUpdated() {
+        console.log("[coach-market] onTableUpdated, container connected:", this.container?.isConnected, "URL:", window.location.href);
+        this.initializeTableReferences();
+        this.syncColumnStateFromTable();
+        this.renderColumns();
+        this.attachPaginationListeners();
+    }
+    getColumnToggleButton() {
+        if (!this.container)
+            return null;
+        const buttons = this.container.querySelectorAll("button");
+        return (Array.from(buttons).find((btn) => btn.querySelector("svg.fa-table-cells")) ?? null);
+    }
+    attachColumnToggleListener() {
+        const toggleButton = this.getColumnToggleButton();
+        if (!toggleButton)
+            return;
+        this.columnToggleButtonListener = () => {
+            this.watchForModal();
+        };
+        toggleButton.addEventListener("click", this.columnToggleButtonListener);
+    }
+    detachColumnToggleListener() {
+        if (!this.columnToggleButtonListener)
+            return;
+        const toggleButton = this.getColumnToggleButton();
+        if (toggleButton) {
+            toggleButton.removeEventListener("click", this.columnToggleButtonListener);
+        }
+        this.columnToggleButtonListener = null;
+    }
+    watchForModal() {
+        if (this.modalObserver) {
+            this.modalObserver.disconnect();
+        }
+        this.modalObserver = new MutationObserver((mutations) => {
+            const modal = document.querySelector(".card-modal");
+            if (modal) {
+                this.modalObserver?.disconnect();
+                this.modalObserver = null;
+                this.injectModalCheckboxes(modal);
+            }
+        });
+        this.modalObserver.observe(document.body, {
+            childList: true,
+            subtree: true,
+        });
+        // fall back - stop watching after 2s
+        setTimeout(() => {
+            this.modalObserver?.disconnect();
+            this.modalObserver = null;
+        }, 2000);
+    }
+    createCheckboxElement(id, label, checked) {
+        const fragment = document.createDocumentFragment();
+        const input = document.createElement("input");
+        input.id = id;
+        input.type = "checkbox";
+        input.checked = checked;
+        input.className = "mr-2 hidden";
+        const labelEl = document.createElement("label");
+        labelEl.htmlFor = id;
+        labelEl.className =
+            "flex flex-row items-center font-semibold text-gray-800 cursor-pointer select-none hover:text-orange-500";
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("class", `svg-inline--fa ${checked ? "fa-square-check" : "fa-square"} mr-2`);
+        svg.setAttribute("aria-hidden", "true");
+        svg.setAttribute("focusable", "false");
+        svg.setAttribute("data-prefix", checked ? "fas" : "far");
+        svg.setAttribute("data-icon", checked ? "square-check" : "square");
+        svg.setAttribute("role", "img");
+        svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+        svg.setAttribute("viewBox", "0 0 448 512");
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("fill", "currentColor");
+        path.setAttribute("d", checked
+            ? "M64 32C28.7 32 0 60.7 0 96L0 416c0 35.3 28.7 64 64 64l320 0c35.3 0 64-28.7 64-64l0-320c0-35.3-28.7-64-64-64L64 32zM337 209L209 337c-9.4 9.4-24.6 9.4-33.9 0l-64-64c-9.4-9.4-9.4-24.6 0-33.9s24.6-9.4 33.9 0l47 47L303 175c9.4-9.4 24.6-9.4 33.9 0s9.4 24.6 0 33.9z"
+            : "M384 80c8.8 0 16 7.2 16 16l0 320c0 8.8-7.2 16-16 16L64 432c-8.8 0-16-7.2-16-16L48 96c0-8.8 7.2-16 16-16l320 0zM64 32C28.7 32 0 60.7 0 96L0 416c0 35.3 28.7 64 64 64l320 0c35.3 0 64-28.7 64-64l0-320c0-35.3-28.7-64-64-64L64 32z");
+        svg.appendChild(path);
+        labelEl.appendChild(svg);
+        const span = document.createElement("span");
+        span.textContent = label;
+        labelEl.appendChild(span);
+        fragment.appendChild(input);
+        fragment.appendChild(labelEl);
+        return fragment;
+    }
+    updateCheckboxVisual(input) {
+        const label = document.querySelector(`label[for="${input.id}"]`);
+        const svg = label?.querySelector("svg");
+        if (!svg)
+            return;
+        const checked = input.checked;
+        svg.setAttribute("class", `svg-inline--fa ${checked ? "fa-square-check" : "fa-square"} mr-2`);
+        svg.setAttribute("data-prefix", checked ? "fas" : "far");
+        svg.setAttribute("data-icon", checked ? "square-check" : "square");
+        const path = svg.querySelector("path");
+        if (path) {
+            path.setAttribute("d", checked
+                ? "M64 32C28.7 32 0 60.7 0 96L0 416c0 35.3 28.7 64 64 64l320 0c35.3 0 64-28.7 64-64l0-320c0-35.3-28.7-64-64-64L64 32zM337 209L209 337c-9.4 9.4-24.6 9.4-33.9 0l-64-64c-9.4-9.4-9.4-24.6 0-33.9s24.6-9.4 33.9 0l47 47L303 175c9.4-9.4 24.6-9.4 33.9 0s9.4 24.6 0 33.9z"
+                : "M384 80c8.8 0 16 7.2 16 16l0 320c0 8.8-7.2 16-16 16L64 432c-8.8 0-16-7.2-16-16L48 96c0-8.8 7.2-16 16-16l320 0zM64 32C28.7 32 0 60.7 0 96L0 416c0 35.3 28.7 64 64 64l320 0c35.3 0 64-28.7 64-64l0-320c0-35.3-28.7-64-64-64L64 32z");
+        }
+    }
+    injectModalCheckboxes(modal) {
+        const ovrLabel = modal.querySelector('label[for="OVR"]');
+        if (!ovrLabel)
+            return;
+        // create  Min/Max checkbox
+        const minMaxElement = this.createCheckboxElement("hn-min-max", "Min/Max", this.showMinMax);
+        ovrLabel.after(minMaxElement);
+        const minMaxInput = modal.querySelector("#hn-min-max");
+        modal
+            .querySelector('label[for="hn-min-max"]')
+            ?.addEventListener("click", (e) => {
+            e.preventDefault();
+            if (minMaxInput) {
+                minMaxInput.checked = !minMaxInput.checked;
+                this.updateCheckboxVisual(minMaxInput);
+            }
+        });
+        // hook into update button
+        const updateButton = Array.from(modal.querySelectorAll("button")).find((btn) => btn.textContent?.trim().toLowerCase() === "update");
+        if (updateButton) {
+            updateButton.addEventListener("click", () => {
+                if (minMaxInput) {
+                    this.showMinMax = minMaxInput.checked;
+                    this.saveMinMaxState();
+                    this.renderColumns();
+                }
+            });
+        }
+        const allCheckbox = modal.querySelector("#all");
+        const allLabel = modal.querySelector('label[for="all"]');
+        if (allCheckbox && allLabel) {
+            allLabel.addEventListener("click", () => {
+                setTimeout(() => {
+                    const newState = allCheckbox.checked;
+                    if (minMaxInput) {
+                        minMaxInput.checked = newState;
+                        this.updateCheckboxVisual(minMaxInput);
+                    }
+                }, 0);
+            });
+        }
+    }
+    disconnectObserver() {
+        if (this.mutationObserver) {
+            this.mutationObserver.disconnect();
+            this.mutationObserver = null;
+        }
+        if (this.observerTimeoutId) {
+            clearTimeout(this.observerTimeoutId);
+            this.observerTimeoutId = null;
+        }
+    }
+    renderColumns() {
+        if (!this.container || !this.header)
+            return;
+        // remove previously injected columns
+        this.container
+            .querySelectorAll(`[data-column^="hn-"]`)
+            .forEach((node) => node.remove());
+        if (!this.showMinMax)
+            return;
+        // render groups in consistent order, appending to end
+        for (const group of this.columnGroupOrder) {
+            if (this.columnState[group]) {
+                this.renderColumnGroup(group);
+            }
+        }
+    }
+    renderColumnGroup(group) {
+        if (!this.header)
+            return;
+        const columns = this.getColumnsForGroup(group);
+        // find parent col to insert after
+        const parentHeaderText = {
+            overallRating: "OVR",
+            matchOvr: "MATCH",
+            trainingOvr: "DRL",
+        }[group];
+        const parentHeader = Array.from(this.header.querySelectorAll("th")).find((th) => th.textContent?.trim() === parentHeaderText);
+        if (!parentHeader)
+            return;
+        const parentIndex = Array.from(this.header.children).indexOf(parentHeader);
+        // add headers after parent, (in reverse order)
+        let insertAfter = parentHeader;
+        columns.forEach((col) => {
+            const th = document.createElement("th");
+            th.className = "py-2 px-4 w-1 select-none";
+            th.dataset.column = `hn-${col.id}`;
+            th.textContent = col.label;
+            insertAfter.after(th);
+            insertAfter = th;
+        });
+        // append data cells after parent in each row
+        Object.entries(this.dataRows).forEach(([coachId, row]) => {
+            const coach = this.marketCoaches.get(coachId);
+            const parentCell = row.children[parentIndex];
+            if (!parentCell)
+                return;
+            let insertAfterCell = parentCell;
+            columns.forEach((col) => {
+                const td = document.createElement("td");
+                td.className = "px-2 py-1 whitespace-nowrap text-center";
+                td.dataset.column = `hn-${col.id}`;
+                if (coach) {
+                    const value = col.getValue(coach);
+                    td.appendChild(this.createRatingSpan(value));
+                }
+                else {
+                    td.textContent = "-";
+                }
+                insertAfterCell.after(td);
+                insertAfterCell = td;
+            });
+        });
+    }
+    getColumnsForGroup(group) {
+        switch (group) {
+            case "overallRating":
+                return [
+                    {
+                        id: "ovr-min",
+                        label: "Min",
+                        getValue: (c) => c.getMinOvr(),
+                    },
+                    {
+                        id: "ovr-max",
+                        label: "Max",
+                        getValue: (c) => c.getMaxOvr(),
+                    },
+                ];
+            case "trainingOvr":
+                return [
+                    {
+                        id: "train-min",
+                        label: "D.Min",
+                        getValue: (c) => c.getMinTrainingOvr(),
+                    },
+                    {
+                        id: "train-max",
+                        label: "D.Max",
+                        getValue: (c) => c.getMaxTrainingOvr(),
+                    },
+                ];
+            case "matchOvr":
+                return [
+                    {
+                        id: "match-min",
+                        label: "M.Min",
+                        getValue: (c) => c.getMinMatchOvr(),
+                    },
+                    {
+                        id: "match-max",
+                        label: "M.Max",
+                        getValue: (c) => c.getMaxMatchOvr(),
+                    },
+                ];
+        }
+    }
+    createRatingSpan(ovr) {
+        const span = document.createElement("span");
+        span.className = "badge";
+        span.style.userSelect = "none";
+        span.textContent = ovr.toString();
+        if (window.userData && typeof window.userData.getColorPair === "function") {
+            try {
+                const [bgColor, color] = window.userData.getColorPair(ovr);
+                span.style.backgroundColor = bgColor;
+                span.style.color = color;
+            }
+            catch (e) {
+                console.error("Error getting color pair for OVR:", ovr, e);
+            }
+        }
+        return span;
+    }
+    loadMinMaxState() {
+        return localStorage.getItem("hn-coach-market-minmax") === "true";
+    }
+    saveMinMaxState() {
+        localStorage.setItem("hn-coach-market-minmax", String(this.showMinMax));
+    }
+    syncColumnStateFromTable() {
+        if (!this.header)
+            return;
+        // check if columns exist in header
+        const hasOvr = this.header.querySelector('th:not([data-column^="hn-"])') !== null &&
+            Array.from(this.header.querySelectorAll("th")).some((th) => th.textContent?.trim() === "OVR");
+        const hasMat = Array.from(this.header.querySelectorAll("th")).some((th) => th.textContent?.trim() === "MATCH");
+        const hasDrl = Array.from(this.header.querySelectorAll("th")).some((th) => th.textContent?.trim() === "DRL");
+        this.columnState.overallRating = hasOvr;
+        this.columnState.matchOvr = hasMat;
+        this.columnState.trainingOvr = hasDrl;
+    }
+    attachHeaderObserver() {
+        if (!this.header)
+            return;
+        this.headerObserver = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === "childList") {
+                    const shouldUpdate = Array.from(mutation.addedNodes).some((node) => node instanceof HTMLTableCellElement &&
+                        node.tagName === "TH" &&
+                        ["OVR", "MATCH", "DRL"].includes(node.textContent?.trim() ?? "")) ||
+                        Array.from(mutation.removedNodes).some((node) => node instanceof HTMLTableCellElement &&
+                            node.tagName === "TH" &&
+                            ["OVR", "MATCH", "DRL"].includes(node.textContent?.trim() ?? ""));
+                    if (shouldUpdate) {
+                        this.syncColumnStateFromTable();
+                        this.renderColumns();
+                    }
+                }
+            });
+        });
+        this.headerObserver.observe(this.header, {
+            childList: true,
+        });
+    }
+    onDataReceived() {
+        if (!this.container)
+            return;
+        this.onTableUpdateTrigger();
+    }
+}
+const coachMarketVisualizerInstance = new CoachMarketVisualizer();
+// export function handleCoachingStaffData(data: any) {
+//     const staff = data.staff;
+//     if (!staff) return;
+//     coachMarketVisualizerInstance.updateCoachingStaff(new CoachingStaff(staff));
+// }
+function handleCoachMarketData(data) {
+    coachMarketVisualizerInstance.updateMarketCoaches(data);
+    coachMarketVisualizerInstance.onDataReceived();
+}
+function manipulateCoachMarketPage(el) {
+    coachMarketVisualizerInstance.attach(el);
+}
+
+
+/***/ },
+
+/***/ "./src/pages/coaching-staff.ts"
+/*!*************************************!*\
+  !*** ./src/pages/coaching-staff.ts ***!
+  \*************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   CoachingStaff: () => (/* binding */ CoachingStaff),
+/* harmony export */   handleCoachingStaffData: () => (/* binding */ handleCoachingStaffData),
+/* harmony export */   manipulateCoachingStaffPage: () => (/* binding */ manipulateCoachingStaffPage)
+/* harmony export */ });
+/* harmony import */ var _coach_market__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./coach-market */ "./src/pages/coach-market.ts");
+// TODO: Accidentally selecting Interim page - improve selector to make it explicit
+// Also breaks when navigating back from another page via back arrow, then selecting first tab, needs to be properly initialized
+
+const MATCH_SKILL_IDS = ["OFP", "DFP", "BAT", "PP", "PK"];
+class CoachingStaff {
+    coachesByTeam;
+    constructor(data) {
+        this.coachesByTeam = this.parseCoachingStaffData(data);
+    }
+    parseCoachingStaffData(data) {
+        const coachesByTeam = {};
+        for (const team of Object.keys(data)) {
+            coachesByTeam[team] = {};
+            for (const c of data[team]) {
+                coachesByTeam[team][c.id] = new _coach_market__WEBPACK_IMPORTED_MODULE_0__.Coach(c);
+            }
+        }
+        return coachesByTeam;
+    }
+    getCoach(coachId, team) {
+        return this.coachesByTeam[team]?.[coachId];
+    }
+    findCoachById(coachId) {
+        for (const team of Object.values(this.coachesByTeam)) {
+            if (team[coachId])
+                return team[coachId];
+        }
+        return undefined;
+    }
+    getTeamCoaches(team) {
+        return this.coachesByTeam[team] ?? {};
+    }
+    getAllCoachesByTeam() {
+        return this.coachesByTeam;
+    }
+    getHeadCoach(team) {
+        const teamCoaches = this.coachesByTeam[team];
+        if (!teamCoaches)
+            return undefined;
+        return Object.values(teamCoaches).find((c) => c.getIsHead());
+    }
+    getStaffMatchSkillOvr(skillId, team) {
+        const teamCoaches = this.coachesByTeam[team];
+        if (!teamCoaches)
+            return 0;
+        const ratings = [];
+        for (const coach of Object.values(teamCoaches)) {
+            const stats = coach.getStats();
+            const rating = stats[skillId]?.rating ?? 0;
+            if (coach.getIsHead()) {
+                ratings.push(rating, rating);
+            }
+            else {
+                ratings.push(rating);
+            }
+        }
+        return this.calculateOVR(ratings);
+    }
+    calculateOVR(ratings) {
+        if (ratings.length === 0)
+            return 0;
+        const sum = ratings.reduce((acc, r) => acc + r, 0);
+        const avg = sum / ratings.length;
+        const excess = ratings.reduce((acc, r) => (r > avg ? acc + r - avg : acc), 0);
+        const correctedSum = sum + excess;
+        const correctedAverage = correctedSum / ratings.length;
+        return Math.round(correctedAverage * 10);
+    }
+    getAllStaffMatchSkillOvrs(team) {
+        const ovrs = {};
+        for (const id of MATCH_SKILL_IDS) {
+            ovrs[id] = this.getStaffMatchSkillOvr(id, team);
+        }
+        return ovrs;
+    }
+}
+class CoachStaffVisualizer {
+    container = null;
+    dataRows = {};
+    mutationObserver = null;
+    coachingStaff = null;
+    attach(el) {
+        this.detach();
+        this.container = el.parentElement;
+        if (!this.container)
+            return;
+        this.initializeTableReferences();
+        this.renderColumns();
+        this.observeChanges();
+    }
+    detach() {
+        if (!this.container)
+            return;
+        this.container
+            .querySelectorAll(`[data-column^="hn-"]`)
+            .forEach((node) => node.remove());
+        if (this.mutationObserver) {
+            this.mutationObserver.disconnect();
+            this.mutationObserver = null;
+        }
+        this.container = null;
+        this.dataRows = {};
+    }
+    updateCoachingStaff(staff) {
+        this.coachingStaff = staff;
+    }
+    observeChanges() {
+        if (!this.container)
+            return;
+        this.mutationObserver = new MutationObserver((mutations) => {
+            if (!this.container?.isConnected) {
+                this.detach();
+                return;
+            }
+            const hasTableChanges = mutations.some((m) => m.addedNodes.length > 0 &&
+                Array.from(m.addedNodes).some((node) => node.nodeType === Node.ELEMENT_NODE &&
+                    !node.dataset?.column?.startsWith("hn-") &&
+                    (node.tagName === "TR" ||
+                        node.tagName === "TABLE" ||
+                        node.querySelector?.("tr") ||
+                        node.querySelector?.("table"))));
+            if (hasTableChanges) {
+                this.initializeTableReferences();
+                this.renderColumns();
+            }
+        });
+        this.mutationObserver.observe(this.container, {
+            childList: true,
+            subtree: true,
+        });
+    }
+    initializeTableReferences() {
+        if (!this.container)
+            return;
+        this.dataRows = {};
+        const rows = this.container.querySelectorAll(`table tbody tr`);
+        rows.forEach((row) => {
+            const tableRow = row;
+            const coachLink = tableRow.querySelector(`a.coach-link`);
+            const href = coachLink?.getAttribute("href");
+            if (href) {
+                const coachId = href.split("/").pop() || "";
+                if (coachId) {
+                    this.dataRows[coachId] = tableRow;
+                }
+            }
+        });
+    }
+    renderColumns() {
+        if (!this.container)
+            return;
+        this.container
+            .querySelectorAll(`[data-column^="hn-"]`)
+            .forEach((node) => node.remove());
+        if (!this.coachingStaff)
+            return;
+        const beforeOvr = [
+            {
+                id: "train-ovr",
+                label: "DRL",
+                getValue: (c) => c.getTrainingOvr(),
+            },
+            {
+                id: "train-min",
+                label: "D.Min",
+                getValue: (c) => c.getMinTrainingOvr(),
+            },
+            {
+                id: "train-max",
+                label: "D.Max",
+                getValue: (c) => c.getMaxTrainingOvr(),
+            },
+            {
+                id: "match-ovr",
+                label: "MATCH",
+                getValue: (c) => c.getMatchOvr(),
+            },
+            {
+                id: "match-min",
+                label: "M.Min",
+                getValue: (c) => c.getMinMatchOvr(),
+            },
+            {
+                id: "match-max",
+                label: "M.Max",
+                getValue: (c) => c.getMaxMatchOvr(),
+            },
+        ];
+        const afterOvr = [
+            {
+                id: "min-ovr",
+                label: "Min",
+                getValue: (c) => c.getMinOvr(),
+            },
+            {
+                id: "max-ovr",
+                label: "Max",
+                getValue: (c) => c.getMaxOvr(),
+            },
+        ];
+        // find OVR column index from first header
+        const allHeaders = this.container.querySelectorAll(`thead tr`);
+        if (!allHeaders.length)
+            return;
+        const firstOvrTh = Array.from(allHeaders[0].querySelectorAll("th")).find((th) => th.textContent?.trim() === "OVR");
+        if (!firstOvrTh)
+            return;
+        const parentIndex = Array.from(allHeaders[0].children).indexOf(firstOvrTh);
+        // inject headers into every thead row
+        allHeaders.forEach((headerRow) => {
+            const ovrTh = headerRow.children[parentIndex];
+            if (!ovrTh)
+                return;
+            // inject before OVR
+            [...beforeOvr].forEach((col) => {
+                const th = document.createElement("th");
+                th.className = "py-2 px-4 w-1 select-none";
+                th.dataset.column = `hn-${col.id}`;
+                th.textContent = col.label;
+                ovrTh.before(th);
+            });
+            // inject after OVR
+            let insertAfter = ovrTh;
+            afterOvr.forEach((col) => {
+                const th = document.createElement("th");
+                th.className = "py-2 px-4 w-1 select-none";
+                th.dataset.column = `hn-${col.id}`;
+                th.textContent = col.label;
+                insertAfter.after(th);
+                insertAfter = th;
+            });
+        });
+        // insert data cells in each row
+        Object.entries(this.dataRows).forEach(([coachId, row]) => {
+            const coach = this.coachingStaff.findCoachById(coachId);
+            const parentCell = row.children[parentIndex];
+            if (!parentCell)
+                return;
+            // inject before OVR cell
+            [...beforeOvr].forEach((col) => {
+                const td = document.createElement("td");
+                td.className = "px-2 py-1 whitespace-nowrap text-center";
+                td.dataset.column = `hn-${col.id}`;
+                if (coach) {
+                    td.appendChild(this.createRatingSpan(col.getValue(coach)));
+                }
+                else {
+                    td.textContent = "-";
+                }
+                parentCell.before(td);
+            });
+            // inject after OVR cell
+            let insertAfterCell = parentCell;
+            afterOvr.forEach((col) => {
+                const td = document.createElement("td");
+                td.className = "px-2 py-1 whitespace-nowrap text-center";
+                td.dataset.column = `hn-${col.id}`;
+                if (coach) {
+                    td.appendChild(this.createRatingSpan(col.getValue(coach)));
+                }
+                else {
+                    td.textContent = "-";
+                }
+                insertAfterCell.after(td);
+                insertAfterCell = td;
+            });
+        });
+    }
+    createRatingSpan(ovr) {
+        const span = document.createElement("span");
+        span.className = "badge";
+        span.style.userSelect = "none";
+        span.textContent = ovr.toString();
+        if (window.userData && typeof window.userData.getColorPair === "function") {
+            try {
+                const [bgColor, color] = window.userData.getColorPair(ovr);
+                span.style.backgroundColor = bgColor;
+                span.style.color = color;
+            }
+            catch (e) {
+                console.error("Error getting color pair for OVR:", ovr, e);
+            }
+        }
+        return span;
+    }
+    getPaginationContainer() {
+        if (!this.container)
+            return null;
+        return this.container.querySelector(`div:has(> ul) ul`);
+    }
+}
+const coachingStaffVisualizerInstance = new CoachStaffVisualizer();
+function handleCoachingStaffData(data) {
+    const staff = data.staff;
+    if (!staff)
+        return;
+    coachingStaffVisualizerInstance.updateCoachingStaff(new CoachingStaff(staff));
+}
+function manipulateCoachingStaffPage(el) {
+    coachingStaffVisualizerInstance.attach(el);
+}
+
+
+/***/ },
+
+/***/ "./src/pages/draft-class.ts"
+/*!**********************************!*\
+  !*** ./src/pages/draft-class.ts ***!
+  \**********************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   handleDraftClassData: () => (/* binding */ handleDraftClassData),
+/* harmony export */   manipulateDraftClassPage: () => (/* binding */ manipulateDraftClassPage)
+/* harmony export */ });
+/* harmony import */ var _roster__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./roster */ "./src/pages/roster.ts");
+
+class DraftClassVisualizer {
+    parent = null;
+    draftClass = null;
+    draftCards = null;
+    toggleButtonListener = null;
+    paginationButtonListeners = new Map();
+    selectMenuListeners = new Map();
+    mutationObserver = null;
+    observerTimeoutId = null;
+    constructor() { }
+    attach(el) {
+        this.detach(); // clean up any previous state/listeners
+        this.parent = el;
+        if (this.parent && this.draftClass) {
+            this.initializeDOMReferences(); // Find cards within the new parent
+            this.attachEventListeners(); // Add listeners within the new parent scope
+            this.addBadges(); // Add badges based on current data/DOM
+        }
+    }
+    detach() {
+        if (!this.parent)
+            return;
+        const toggleButton = document.querySelectorAll(`.btn-toggle`)[1];
+        if (toggleButton && this.toggleButtonListener) {
+            toggleButton.removeEventListener("click", this.toggleButtonListener);
+            this.toggleButtonListener = null;
+        }
+        // remove pagination listeners
+        this.paginationButtonListeners.forEach((listener, button) => {
+            button.removeEventListener("click", listener);
+        });
+        this.paginationButtonListeners.clear();
+        // remove select menu listeners and observer
+        this.selectMenuListeners.forEach((listener, select) => {
+            select.removeEventListener("change", listener);
+        });
+        this.selectMenuListeners.clear();
+        this.disconnectObserver(); // disconnect observer if active
+        this.parent = null;
+        this.draftCards = null;
+    }
+    updateData(newData) {
+        this.draftClass = newData;
+        if (this.parent) {
+            this.initializeDOMReferences();
+            this.addBadges();
+        }
+    }
+    initializeDOMReferences() {
+        if (!this.parent)
+            return;
+        const rows = this.parent.querySelectorAll("[id^='draftee-card']");
+        const dc = {};
+        rows.forEach((row) => {
+            const card = row;
+            const playerLink = card.querySelector(`a[href^='/player/']`);
+            const badge = card.querySelector(".badge"); // needed by addBadges later
+            if (!playerLink || !badge)
+                return;
+            const playerId = playerLink.getAttribute("href")?.split("/").pop();
+            if (playerId) {
+                dc[playerId] = card;
+            }
+        });
+        this.draftCards = dc;
+    }
+    attachEventListeners() {
+        if (!this.parent)
+            return;
+        const toggleButton = document.querySelectorAll(`.btn-toggle`)[1];
+        if (toggleButton) {
+            this.toggleButtonListener = () => {
+                this.initializeDOMReferences();
+                this.addBadges();
+            };
+            toggleButton.addEventListener("click", this.toggleButtonListener);
+        }
+        this.paginationButtonListeners.clear(); // clear map before adding
+        const buttons = Array.from(this.parent.querySelectorAll("button")).filter((btn) => {
+            const hasMatchingSpan = Array.from(btn.querySelectorAll("span")).some((span) => /^(1|21|41|61|81)-\d+$/.test(span.textContent?.trim() ?? ""));
+            const buttonText = Array.from(btn.childNodes)
+                .filter((node) => node.nodeType === Node.TEXT_NODE)
+                .map((node) => node.textContent?.trim())
+                .join("");
+            const hasMatchingDirectText = /^(1|21|41|61|81)-\d+$/.test(buttonText);
+            return hasMatchingSpan || hasMatchingDirectText;
+        });
+        buttons.forEach((button) => {
+            const listener = () => {
+                this.initializeDOMReferences();
+                this.addBadges();
+            };
+            button.addEventListener("click", listener);
+            this.paginationButtonListeners.set(button, listener); // store for removal
+        });
+        this.selectMenuListeners.clear();
+        this.parent.querySelectorAll("select").forEach((menu) => {
+            const listener = () => {
+                this.disconnectObserver(); // disconnect previous observer
+                this.mutationObserver = new MutationObserver((mutations) => {
+                    const hasRelevantChanges = mutations.some((mutation) => mutation.addedNodes.length > 0 &&
+                        Array.from(mutation.addedNodes).some((node) => node.nodeType === Node.ELEMENT_NODE &&
+                            node.querySelector('[id^="draftee-card"]')));
+                    if (hasRelevantChanges) {
+                        this.initializeDOMReferences();
+                        this.addBadges();
+                        this.disconnectObserver();
+                    }
+                });
+                this.mutationObserver.observe(this.parent, {
+                    childList: true,
+                    subtree: true,
+                });
+                if (this.observerTimeoutId)
+                    clearTimeout(this.observerTimeoutId);
+                this.observerTimeoutId = window.setTimeout(() => {
+                    this.disconnectObserver();
+                }, 3000); // 3 seconds
+            };
+            menu.addEventListener("change", listener);
+            this.selectMenuListeners.set(menu, listener);
+        });
+    }
+    disconnectObserver() {
+        if (this.mutationObserver) {
+            this.mutationObserver.disconnect();
+            this.mutationObserver = null;
+        }
+        if (this.observerTimeoutId) {
+            clearTimeout(this.observerTimeoutId);
+            this.observerTimeoutId = null;
+        }
+    }
+    addBadges() {
+        // Adds Min/Max badges to draft cards
+        if (!this.draftCards || !this.draftClass)
+            return;
+        Object.entries(this.draftCards).forEach(([playerId, card]) => {
+            // //safety
+            if (card.getAttribute("data-ovr-badges-added") === "true")
+                return;
+            const badgeContainer = card.querySelector(`.badge`)?.parentElement;
+            if (!badgeContainer)
+                return;
+            const player = this.draftClass.getPlayer(playerId); // draftClass checked above
+            if (!player)
+                return;
+            badgeContainer
+                .querySelectorAll(".dynamic-ovr-label, .dynamic-ovr-badge")
+                .forEach((el) => el.remove());
+            // Add MIN
+            badgeContainer.appendChild(this.createOvrLabelSpan("MIN"));
+            badgeContainer.appendChild(this.createRatingSpan(player.getMinOvr(), player.getScoutLevel()));
+            // Add MAX
+            badgeContainer.appendChild(this.createOvrLabelSpan("MAX"));
+            badgeContainer.appendChild(this.createRatingSpan(player.getMaxOvr(), player.getScoutLevel()));
+            card.setAttribute("data-ovr-badges-added", "true");
+        });
+    }
+    createOvrLabelSpan(text) {
+        const label = document.createElement("span");
+        // add a class to make it easier to remove later
+        label.classList.add("dynamic-ovr-label", "uppercase", "ml-3", "xs:inline-block", "hidden");
+        label.innerText = text;
+        return label;
+    }
+    createRatingSpan(ovr, scout) {
+        const ratingSpan = document.createElement("span");
+        if (scout === 1 || !ovr || ovr <= 0) {
+            ratingSpan.innerText = "N/A";
+            ratingSpan.style.color = "#FF2C2C";
+            ratingSpan.style.textAlign = "center";
+            ratingSpan.style.padding = ".25rem .375rem";
+            ratingSpan.style.fontWeight = "600";
+        }
+        else {
+            ratingSpan.classList.add("dynamic-ovr-badge", "badge", "ml-1");
+            ratingSpan.style.userSelect = "none";
+            ratingSpan.innerText = ovr.toString() + (scout === 2 ? "*" : "");
+            if (window.userData &&
+                typeof window.userData.getColorPair === "function" &&
+                ovr > 0) {
+                try {
+                    const [bgColor, color] = window.userData.getColorPair(ovr);
+                    ratingSpan.style.backgroundColor = bgColor;
+                    ratingSpan.style.color = color;
+                }
+                catch (e) {
+                    console.error("Error getting color pair for OVR:", ovr, e);
+                }
+            }
+        }
+        return ratingSpan;
+    }
+}
+const draftVisualizerInstance = new DraftClassVisualizer();
+function handleDraftClassData(data) {
+    const rosterData = { ...data, players: data.draftees };
+    const newRoster = new _roster__WEBPACK_IMPORTED_MODULE_0__.Roster(rosterData);
+    draftVisualizerInstance.updateData(newRoster);
+}
+function manipulateDraftClassPage(el) {
+    draftVisualizerInstance.attach(el);
+}
+
+
+/***/ },
+
+/***/ "./src/pages/draft-ranking.ts"
+/*!************************************!*\
+  !*** ./src/pages/draft-ranking.ts ***!
+  \************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   handleDraftPickData: () => (/* binding */ handleDraftPickData),
+/* harmony export */   handleDraftRankingData: () => (/* binding */ handleDraftRankingData),
+/* harmony export */   manipulateDraftRankingPage: () => (/* binding */ manipulateDraftRankingPage)
+/* harmony export */ });
+/* harmony import */ var _roster__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./roster */ "./src/pages/roster.ts");
+
+const DR_HIGHLIGHT_CLASS = "draft-ranking-highlight";
+const DR_GHOST_TRIM = "draft-ranking-ghost-trim";
+class DraftRankingVisualizer {
+    parent = null;
+    draftRanking = null;
+    draftCards = null;
+    ovrTab = null;
+    tableHR = null;
+    picks = null;
+    tbody = null;
+    dragStartListener = null;
+    dragEndListener = null;
+    highlightMutationObserver = null;
+    highlightObserverTimeoutId = null;
+    highlightLast = false;
+    rowMutationObserver = null;
+    constructor() { }
+    attach(el) {
+        this.detach();
+        this.parent = el;
+        if (this.parent && this.draftRanking) {
+            this.initializeTableReferences();
+            this.attachEventListeners();
+            this.attachRowObserver();
+            this.renderColumns();
+            this.applyColumnHighlights();
+        }
+        else {
+            this.detach();
+        }
+    }
+    detach() {
+        if (!this.parent)
+            return;
+        if (this.tbody) {
+            if (this.dragStartListener)
+                this.tbody.removeEventListener("dragstart", this.dragStartListener);
+            if (this.dragEndListener)
+                this.tbody.removeEventListener("dragend", this.dragEndListener);
+        }
+        if (this.rowMutationObserver)
+            this.rowMutationObserver.disconnect();
+        // this.disconnectHighlightObserver();
+        this.parent = null;
+        this.draftCards = null;
+        this.ovrTab = null;
+        this.tableHR = null;
+        this.tbody = null;
+    }
+    updateRanking(newRanking) {
+        this.draftRanking = newRanking;
+        if (this.parent && this.draftRanking) {
+            this.initializeTableReferences();
+            this.renderColumns();
+            this.applyColumnHighlights();
+        }
+    }
+    updatePicks(picks) {
+        this.picks = picks;
+    }
+    initializeTableReferences() {
+        if (!this.parent)
+            return;
+        this.tbody = this.parent.querySelector(`table`);
+        this.tableHR = this.parent.querySelector(`table thead tr`);
+        if (!this.tbody || !this.tableHR)
+            return;
+        this.ovrTab =
+            Array.from(this.tableHR.querySelectorAll(`th span`)).filter((span) => span.textContent?.trim() === "OVR")?.[0]?.parentElement ?? null;
+        this.draftCards = {}; // reset reference
+        const rows = this.tbody.querySelectorAll(`table tbody tr`);
+        rows.forEach((row) => {
+            const tableRow = row;
+            const playerLink = tableRow.querySelectorAll(`a`)[1];
+            const href = playerLink?.getAttribute("href");
+            if (href) {
+                const playerId = href.split("/").pop() || "";
+                if (playerId) {
+                    this.draftCards[playerId] = tableRow;
+                }
+            }
+        });
+    }
+    attachEventListeners() {
+        if (!this.parent || !this.tbody)
+            return;
+        // only do this if its in the picks
+        this.dragStartListener = (event) => {
+            const row = event.target;
+            this.highlightLast = this.picks?.includes(row.rowIndex) ?? false;
+            Array.from(row.children).forEach((el) => {
+                el.classList.remove(DR_HIGHLIGHT_CLASS);
+                if (el.hasAttribute("data-column") && this.highlightLast)
+                    el.classList.add(DR_GHOST_TRIM);
+            });
+        };
+        // needs to improve logic to when elements doesn't update a pick
+        this.dragEndListener = (event) => {
+            const row = event.target;
+            Array.from(row.children).forEach((el) => {
+                if (el.hasAttribute("data-column")) {
+                    if (this.highlightLast)
+                        el.classList.add(DR_HIGHLIGHT_CLASS);
+                    el.classList.remove(DR_GHOST_TRIM);
+                }
+            });
+            this.highlightLast = false;
+            this.disconnectHighlightObserver();
+            // is this the most unnecessary thing in the world? yes
+            // does it ensure that there is no visual discrepancy to the user? also yes
+            this.highlightMutationObserver = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (mutation.type === "childList") {
+                        mutation.addedNodes.forEach((node) => {
+                            if (node.nodeType === Node.TEXT_NODE) {
+                                this.applyColumnHighlights();
+                                this.disconnectHighlightObserver();
+                            }
+                        });
+                    }
+                    // if (
+                    //   mutation.type === "attributes" &&
+                    //   mutation.attributeName === "class"
+                    // ) {
+                    //   this.applyColumnHighlights();
+                    //   this.disconnectHighlightObserver();
+                    // }
+                });
+            });
+            this.highlightMutationObserver.observe(row, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+            });
+            if (this.highlightObserverTimeoutId)
+                clearTimeout(this.highlightObserverTimeoutId);
+            this.highlightObserverTimeoutId = window.setTimeout(() => {
+                this.disconnectHighlightObserver();
+            }, 3000);
+        };
+        this.tbody.addEventListener("dragstart", this.dragStartListener);
+        this.tbody.addEventListener("dragend", this.dragEndListener, {
+            capture: true,
+        });
+    }
+    disconnectHighlightObserver() {
+        if (this.highlightMutationObserver) {
+            this.highlightMutationObserver.disconnect();
+            this.highlightMutationObserver = null;
+        }
+        if (this.highlightObserverTimeoutId) {
+            clearTimeout(this.highlightObserverTimeoutId);
+            this.highlightObserverTimeoutId = null;
+        }
+    }
+    attachRowObserver() {
+        if (!this.tableHR)
+            return;
+        this.rowMutationObserver = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === "childList") {
+                    mutation.addedNodes.forEach((node) => {
+                        if (node instanceof HTMLTableCellElement && node.tagName === "TH") {
+                            const span = node.querySelector("span");
+                            if (span?.textContent?.trim() === "OVR") {
+                                this.initializeTableReferences();
+                                this.renderColumns();
+                                this.applyColumnHighlights();
+                            }
+                        }
+                    });
+                    mutation.removedNodes.forEach((node) => {
+                        if (node instanceof HTMLTableCellElement && node.tagName === "TH") {
+                            const span = node.querySelector("span");
+                            if (span?.textContent?.trim() === "OVR") {
+                                this.removeColumns();
+                            }
+                        }
+                    });
+                }
+            });
+        });
+        this.rowMutationObserver.observe(this.tableHR, {
+            childList: true,
+        });
+    }
+    removeColumns() {
+        if (!this.parent)
+            return;
+        for (const node of this.parent.querySelectorAll("[data-column]")) {
+            node.remove();
+        }
+    }
+    renderColumns() {
+        if (!this.parent ||
+            !this.draftRanking ||
+            !this.tableHR ||
+            !this.ovrTab ||
+            !this.draftCards) {
+            return;
+        }
+        // remove previously added columns and their headers
+        this.removeColumns();
+        const tabElement = this.ovrTab;
+        const headerRow = tabElement.parentElement;
+        if (!headerRow)
+            return;
+        const ovrIdx = Array.from(headerRow.children).indexOf(tabElement);
+        const minHeader = this.createOvrLabelSpan("MIN");
+        const maxHeader = this.createOvrLabelSpan("MAX");
+        this.tableHR.insertBefore(maxHeader, this.ovrTab.nextSibling);
+        this.tableHR.insertBefore(minHeader, this.ovrTab.nextSibling);
+        Object.entries(this.draftCards).forEach(([playerId, row]) => {
+            const player = this.draftRanking.getPlayer(playerId);
+            if (!player)
+                return;
+            const minDataCell = document.createElement("td");
+            minDataCell.className = "px-4 text-center";
+            minDataCell.dataset.column = "min-ovr";
+            const maxDataCell = document.createElement("td");
+            maxDataCell.className = "px-4 text-center";
+            maxDataCell.dataset.column = "max-ovr";
+            minDataCell.appendChild(this.createRatingSpan(player.getMinOvr(), player.getScoutLevel()));
+            maxDataCell.appendChild(this.createRatingSpan(player.getMaxOvr(), player.getScoutLevel()));
+            row.insertBefore(maxDataCell, row.children[ovrIdx].nextSibling);
+            row.insertBefore(minDataCell, row.children[ovrIdx].nextSibling);
+        });
+    }
+    applyColumnHighlights() {
+        if (!this.parent || !this.picks)
+            return;
+        this.parent.querySelectorAll(`[data-column]`).forEach((node) => {
+            node.classList.remove(DR_HIGHLIGHT_CLASS);
+            if (this.picks?.includes(node.parentElement?.rowIndex))
+                node.classList.add(DR_HIGHLIGHT_CLASS);
+        });
+    }
+    createOvrLabelSpan(text) {
+        const header = document.createElement("th");
+        header.classList.add("px-4", "py-2");
+        header.dataset.column = `${text.toLowerCase()}-ovr`;
+        header.innerHTML = `<span>${text}</span>`;
+        return header;
+    }
+    // modify to include empty fields
+    createRatingSpan(ovr, scout) {
+        const ratingSpan = document.createElement("span");
+        if (scout === 1 || !ovr || ovr <= 0) {
+            ratingSpan.innerText = "-";
+            ratingSpan.style.color = "#555456";
+            ratingSpan.style.textAlign = "center";
+        }
+        else {
+            ratingSpan.classList.add("badge");
+            ratingSpan.style.userSelect = "none";
+            ratingSpan.innerText = ovr.toString() + (scout === 2 ? "*" : "");
+            if (window.userData &&
+                typeof window.userData.getColorPair === "function") {
+                try {
+                    const [bgColor, color] = window.userData.getColorPair(ovr);
+                    ratingSpan.style.backgroundColor = bgColor;
+                    ratingSpan.style.color = color;
+                }
+                catch (e) {
+                    console.error("Error getting color pair for OVR:", ovr, e);
+                }
+            }
+        }
+        return ratingSpan;
+    }
+}
+const drVisualizerInstance = new DraftRankingVisualizer();
+function handleDraftRankingData(data) {
+    const newDraftRanking = new _roster__WEBPACK_IMPORTED_MODULE_0__.Roster({ players: data });
+    drVisualizerInstance.updateRanking(newDraftRanking);
+}
+function handleDraftPickData(data) {
+    const picks = data.map((pick) => pick.rank);
+    drVisualizerInstance.updatePicks(picks);
+}
+function manipulateDraftRankingPage(el) {
+    drVisualizerInstance.attach(el);
+}
+
+
+/***/ },
+
+/***/ "./src/pages/free-agent-center.ts"
+/*!****************************************!*\
+  !*** ./src/pages/free-agent-center.ts ***!
+  \****************************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   handleFreeAgentCenterData: () => (/* binding */ handleFreeAgentCenterData),
+/* harmony export */   manipulateFreeAgentCenterPage: () => (/* binding */ manipulateFreeAgentCenterPage)
+/* harmony export */ });
+/* harmony import */ var _roster__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./roster */ "./src/pages/roster.ts");
+
+class FreeAgentVisualizer {
+    container = null;
+    freeAgents = null;
+    freeAgentCards = null;
+    paginationListeners = new Map();
+    mutationObserver = null;
+    observerTimeoutId = null;
+    constructor() { }
+    attach(el) {
+        this.detach();
+        this.container = el.parentElement;
+        if (!this.container)
+            return;
+        if (this.freeAgents) {
+            this.initializeDOMReferences();
+            this.attachPaginationListeners();
+            this.addBadges();
+        }
+    }
+    detach() {
+        if (!this.container)
+            return;
+        this.detachPaginationListeners();
+        this.disconnectObserver();
+        this.container = null;
+        this.freeAgentCards = null;
+    }
+    updateData(newData) {
+        this.freeAgents = newData;
+        if (this.container) {
+            this.initializeDOMReferences();
+            this.addBadges();
+        }
+    }
+    onDataReceived() {
+        if (!this.container)
+            return;
+        this.onTableUpdateTrigger();
+    }
+    getPaginationContainers() {
+        if (!this.container)
+            return [];
+        const paginationDivs = this.container.querySelectorAll("div.flex.justify-center.bg-gray-700");
+        return Array.from(paginationDivs);
+    }
+    initializeDOMReferences() {
+        if (!this.container)
+            return;
+        const cards = this.container.querySelectorAll("div.card.card-secondary");
+        const fc = {};
+        cards.forEach((card) => {
+            const cardEl = card;
+            const playerLink = cardEl.querySelector("a[href^='/player/']");
+            const badge = cardEl.querySelector(".badge");
+            if (!playerLink || !badge)
+                return;
+            const playerId = playerLink.getAttribute("href")?.split("/").pop();
+            if (playerId) {
+                fc[playerId] = cardEl;
+            }
+        });
+        this.freeAgentCards = fc;
+    }
+    attachPaginationListeners() {
+        if (!this.container)
+            return;
+        this.detachPaginationListeners();
+        const containers = this.getPaginationContainers();
+        containers.forEach((container) => {
+            const pageLinks = container.querySelectorAll("li a:not(.disabled)");
+            pageLinks.forEach((el) => {
+                const listener = () => {
+                    this.onTableUpdateTrigger();
+                };
+                el.addEventListener("click", listener);
+                this.paginationListeners.set(el, listener);
+            });
+        });
+    }
+    detachPaginationListeners() {
+        this.paginationListeners.forEach((listener, el) => {
+            el.removeEventListener("click", listener);
+        });
+        this.paginationListeners.clear();
+    }
+    onTableUpdateTrigger() {
+        if (this.observerTimeoutId) {
+            clearTimeout(this.observerTimeoutId);
+            this.observerTimeoutId = null;
+        }
+        if (!this.mutationObserver && this.container) {
+            this.mutationObserver = new MutationObserver((mutations) => {
+                if (!this.container?.isConnected) {
+                    this.detach();
+                    return;
+                }
+                const hasRelevantChanges = mutations.some((m) => m.addedNodes.length > 0 &&
+                    Array.from(m.addedNodes).some((node) => node.nodeType === Node.ELEMENT_NODE &&
+                        (node.classList?.contains("card") ||
+                            node.querySelector("div.card.card-secondary"))));
+                if (hasRelevantChanges) {
+                    this.onTableUpdated();
+                }
+            });
+            this.mutationObserver.observe(this.container, {
+                childList: true,
+                subtree: true,
+            });
+        }
+        this.observerTimeoutId = window.setTimeout(() => {
+            this.onTableUpdated();
+        }, 3000);
+    }
+    onTableUpdated() {
+        this.disconnectObserver();
+        this.initializeDOMReferences();
+        this.addBadges();
+        this.attachPaginationListeners();
+    }
+    disconnectObserver() {
+        if (this.mutationObserver) {
+            this.mutationObserver.disconnect();
+            this.mutationObserver = null;
+        }
+        if (this.observerTimeoutId) {
+            clearTimeout(this.observerTimeoutId);
+            this.observerTimeoutId = null;
+        }
+    }
+    addBadges() {
+        if (!this.freeAgentCards || !this.freeAgents)
+            return;
+        Object.entries(this.freeAgentCards).forEach(([playerId, card]) => {
+            if (card.getAttribute("data-ovr-badges-added") === "true")
+                return;
+            const badgeContainer = card.querySelector(".badge")?.parentElement;
+            if (!badgeContainer)
+                return;
+            const player = this.freeAgents.getPlayer(playerId);
+            if (!player)
+                return;
+            badgeContainer
+                .querySelectorAll(".dynamic-ovr-label, .dynamic-ovr-badge")
+                .forEach((el) => el.remove());
+            // Add MIN
+            badgeContainer.appendChild(this.createOvrLabelSpan("MIN"));
+            badgeContainer.appendChild(this.createRatingSpan(player.getMinOvr()));
+            // Add MAX
+            badgeContainer.appendChild(this.createOvrLabelSpan("MAX"));
+            badgeContainer.appendChild(this.createRatingSpan(player.getMaxOvr()));
+            card.setAttribute("data-ovr-badges-added", "true");
+        });
+    }
+    createOvrLabelSpan(text) {
+        const label = document.createElement("span");
+        label.classList.add("dynamic-ovr-label", "uppercase", "ml-3", "xs:inline-block", "hidden");
+        label.innerText = text;
+        return label;
+    }
+    createRatingSpan(ovr) {
+        const ratingSpan = document.createElement("span");
+        ratingSpan.classList.add("dynamic-ovr-badge", "badge", "ml-1");
+        ratingSpan.style.userSelect = "none";
+        ratingSpan.innerText = ovr.toString();
+        if (window.userData &&
+            typeof window.userData.getColorPair === "function" &&
+            ovr > 0) {
+            try {
+                const [bgColor, color] = window.userData.getColorPair(ovr);
+                ratingSpan.style.backgroundColor = bgColor;
+                ratingSpan.style.color = color;
+            }
+            catch (e) {
+                console.error("Error getting color pair for OVR:", ovr, e);
+            }
+        }
+        return ratingSpan;
+    }
+}
+const freeAgentVisualizerInstance = new FreeAgentVisualizer();
+function handleFreeAgentCenterData(data) {
+    const rosterData = { players: data };
+    const newRoster = new _roster__WEBPACK_IMPORTED_MODULE_0__.Roster(rosterData);
+    freeAgentVisualizerInstance.updateData(newRoster);
+    freeAgentVisualizerInstance.onDataReceived();
+}
+function manipulateFreeAgentCenterPage(el) {
+    freeAgentVisualizerInstance.attach(el);
+}
+
+
+/***/ },
+
+/***/ "./src/pages/player.ts"
+/*!*****************************!*\
+  !*** ./src/pages/player.ts ***!
+  \*****************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   Player: () => (/* binding */ Player),
+/* harmony export */   handlePlayerData: () => (/* binding */ handlePlayerData),
+/* harmony export */   manipulatePlayerPage: () => (/* binding */ manipulatePlayerPage)
+/* harmony export */ });
+/* harmony import */ var _mappings_skill_mappings__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../mappings/skill-mappings */ "./src/mappings/skill-mappings.ts");
+
+class Player {
+    stats;
+    minStats;
+    maxStats;
+    scoutLevel;
+    isAmateur;
+    ovr;
+    minOvr;
+    maxOvr;
+    constructor(data) {
+        const player = this.parsePlayerData(data);
+        this.stats = player.stats;
+        this.scoutLevel = player.scout;
+        this.isAmateur = data?.amateur ?? false;
+        this.minStats = this.calcMinStats(this.stats);
+        this.maxStats = this.calcMaxStats(this.stats);
+        this.ovr = data?.rating ?? 0;
+        this.minOvr = this.calculateOVR(this.minStats);
+        this.maxOvr = this.calculateOVR(this.maxStats);
+    }
+    getFloor() {
+        return this.isAmateur ? 3 : 4;
+    }
+    getCap() {
+        return this.isAmateur ? 5 : 10;
+    }
+    parsePlayerData(data) {
+        const player = {};
+        player.stats = {};
+        const allHidden = data.skills.every((skill) => skill?.hidden ?? false);
+        const someHidden = data.skills.some((skill) => skill?.hidden ?? false);
+        player.scout = allHidden ? 1 : someHidden ? 2 : 0;
+        for (const s of data.skills) {
+            player.stats[s.id] = {
+                rating: parseInt(s?.lvl ?? 0),
+                max: s?.max ?? false,
+                strength: null, // default, change below
+            };
+        }
+        if (data?.talents?.weakest) {
+            // if weakness exists so does strength
+            player.stats[data.talents.weakest].strength = "weakest";
+            data.talents.strongest.forEach((str) => (player.stats[str].strength =
+                "strongest"));
+        }
+        return player;
+    }
+    calcMinStats(stats) {
+        const minStats = structuredClone(stats);
+        let weakestRating = this.getCap();
+        let highestNonStrongestRating = 0;
+        // update ratings and find the highest non-strongest rating
+        for (const stat of Object.values(minStats)) {
+            stat.rating = stat.max
+                ? stat.rating
+                : Math.min(stat.rating + 1, this.getCap());
+            if (stat.strength !== "strongest") {
+                highestNonStrongestRating = Math.max(highestNonStrongestRating, stat.rating);
+            }
+        }
+        // find the weakest rating
+        for (const stat of Object.values(minStats)) {
+            if (stat.strength === "weakest") {
+                weakestRating = stat.rating;
+            }
+        }
+        // adjust strongest stats
+        for (const stat of Object.values(minStats)) {
+            if (stat.strength === "strongest" &&
+                stat.rating < highestNonStrongestRating) {
+                stat.rating = highestNonStrongestRating;
+            }
+        }
+        // adjust weakest stats
+        for (const stat of Object.values(minStats)) {
+            if (stat.rating < weakestRating) {
+                stat.rating = weakestRating;
+            }
+            if (stat.rating < this.getFloor()) {
+                stat.rating = this.getFloor();
+            }
+        }
+        return minStats;
+    }
+    calcMaxStats(stats) {
+        const maxStats = structuredClone(stats);
+        let strongestRating = this.getCap();
+        let lowestNonWeakestRating = this.getCap();
+        // find the strongest rating
+        for (const stat of Object.values(maxStats)) {
+            if (stat.strength === "strongest") {
+                strongestRating = Math.min(strongestRating, stat.max ? stat.rating : this.getCap());
+            }
+        }
+        // update ratings and find the lowest non-weakest rating
+        for (const stat of Object.values(maxStats)) {
+            if (!stat.max && stat.rating < strongestRating) {
+                stat.rating = strongestRating;
+            }
+            if (stat.strength !== "weakest") {
+                lowestNonWeakestRating = Math.min(lowestNonWeakestRating, stat.rating);
+            }
+        }
+        // adjust strongest stats
+        for (const stat of Object.values(maxStats)) {
+            if (stat.strength === "strongest" &&
+                !stat.max &&
+                stat.rating < this.getCap()) {
+                stat.rating = this.getCap();
+            }
+        }
+        // adjust weakest stats
+        for (const stat of Object.values(maxStats)) {
+            if (stat.strength === "weakest" &&
+                stat.rating > lowestNonWeakestRating) {
+                stat.rating = lowestNonWeakestRating;
+            }
+            if (stat.rating < this.getFloor()) {
+                stat.rating = this.getFloor();
+            }
+        }
+        return maxStats;
+    }
+    getStats() {
+        return this.stats;
+    }
+    getMinStats() {
+        return this.minStats;
+    }
+    getMaxStats() {
+        return this.maxStats;
+    }
+    getScoutLevel() {
+        return this.scoutLevel;
+    }
+    getOvr() {
+        return this.ovr;
+    }
+    getMaxOvr() {
+        return Math.max(this.maxOvr, this.ovr); // handles cases where ovr is known through scouting, but stats are unknown
+    }
+    getMinOvr() {
+        return Math.max(this.minOvr, this.ovr);
+    }
+    calculateOVR(stats) {
+        if (this.scoutLevel === 1)
+            return 0;
+        const statsValues = Object.values(stats);
+        const sum = statsValues.reduce((acc, stat) => acc + stat.rating, 0);
+        const avg = sum / statsValues.length;
+        const excess = statsValues.reduce((acc, stat) => stat.rating > avg ? acc + stat.rating - avg : acc, 0);
+        const correctedSum = sum + excess;
+        const correctedAverage = correctedSum / statsValues.length;
+        return Math.round(correctedAverage * 10);
+    }
+}
+class PlayerStatsVisualizer {
+    playerStats = null;
+    parent = null;
+    ovrElement = null;
+    statsTable = null;
+    statsRows = null;
+    skillsHeaderDiv = null;
+    dropdownElement = null;
+    dropdownListener = null; // store listeners
+    disabled = false;
+    constructor() { }
+    attach(el) {
+        this.detach(); // clean up previous state first
+        if (!this.playerStats)
+            return;
+        this.parent = el;
+        if (!this.initializeDOMReferences()) {
+            this.detach(); // clean up if initialization failed
+            return;
+        }
+        this.attachUIAndListeners();
+        this.updateHockeyPucks("Default");
+    }
+    detach() {
+        if (!this.parent)
+            return;
+        if (this.dropdownElement && this.dropdownListener) {
+            this.dropdownElement.removeEventListener("change", this.dropdownListener);
+        }
+        if (this.dropdownElement && this.dropdownElement.parentNode) {
+            this.dropdownElement.parentNode.removeChild(this.dropdownElement);
+        }
+        this.parent = null;
+        this.ovrElement = null;
+        this.statsTable = null;
+        this.statsRows = null;
+        this.skillsHeaderDiv = null;
+        this.dropdownElement = null;
+        this.dropdownListener = null;
+    }
+    initializeDOMReferences() {
+        if (!this.parent)
+            return false;
+        this.ovrElement =
+            this.parent.querySelector(".polygon text");
+        const puck = this.parent.querySelector("svg.fa-hockey-puck");
+        this.statsTable = puck
+            ? puck.closest(`tbody`)
+            : null;
+        if (this.statsTable) {
+            this.statsRows =
+                this.statsTable.querySelectorAll("tr");
+            if (!this.statsRows || this.statsRows.length === 0) {
+                return false; // critical
+            }
+        }
+        const headers = Array.from(this.parent.querySelectorAll(".card-header"));
+        this.skillsHeaderDiv = headers.find((d) => d?.textContent?.trim() === "Skills");
+        return !!(this.ovrElement && this.statsTable);
+    }
+    updatePlayer(player) {
+        this.playerStats = player;
+    }
+    attachUIAndListeners() {
+        if (!this.skillsHeaderDiv)
+            return;
+        if (this.skillsHeaderDiv.querySelector(".stats-dropdown-player"))
+            return; // safety
+        this.dropdownElement = document.createElement("select");
+        this.dropdownElement.classList.add("stats-dropdown-player");
+        this.dropdownElement.style.marginLeft = "auto";
+        this.dropdownElement.style.fontSize = "12px";
+        this.dropdownElement.style.padding = "2px";
+        this.dropdownElement.style.border = "none";
+        this.dropdownElement.style.backgroundColor = "#fff";
+        this.dropdownElement.style.color = "#000";
+        this.dropdownElement.style.width = "85px";
+        this.dropdownElement.style.height = "18px";
+        this.dropdownElement.style.lineHeight = "18px";
+        this.dropdownElement.style.paddingTop = "0px";
+        this.dropdownElement.style.paddingBottom = "0px";
+        this.dropdownElement.style.paddingRight = "21px";
+        this.dropdownElement.style.borderRadius = "2px";
+        // store the listener function
+        this.dropdownListener = (event) => {
+            const selectElement = event.target;
+            const selectedOption = selectElement.value;
+            this.updateHockeyPucks(selectedOption);
+        };
+        this.dropdownElement.addEventListener("change", this.dropdownListener);
+        const options = ["Default", "Min", "Max"];
+        options.forEach((option) => {
+            const optionElement = document.createElement("option");
+            optionElement.value = option;
+            optionElement.textContent = option;
+            optionElement.style.textAlign = "center";
+            this.dropdownElement.appendChild(optionElement);
+        });
+        this.skillsHeaderDiv.appendChild(this.dropdownElement);
+    }
+    updateHockeyPucks(option) {
+        if (!this.statsRows || !this.playerStats)
+            return;
+        const statsToUse = option === "Min"
+            ? this.playerStats.getMinStats()
+            : option === "Max"
+                ? this.playerStats.getMaxStats()
+                : this.playerStats.getStats();
+        if (!statsToUse)
+            return;
+        this.statsRows.forEach((row) => {
+            const skillNameText = row.cells[0]?.textContent?.trim();
+            if (!skillNameText)
+                return;
+            const statName = _mappings_skill_mappings__WEBPACK_IMPORTED_MODULE_0__.SKILL_NAME_TO_ID[skillNameText];
+            if (!statName)
+                return;
+            const pucksCell = row.cells[1];
+            const ratingCell = row.cells[2];
+            if (!pucksCell || !ratingCell)
+                return;
+            const pucks = pucksCell.querySelectorAll("svg.fa-hockey-puck");
+            const ratingSpan = ratingCell.querySelector("span");
+            // need base stats for comparison
+            const baseStats = this.playerStats.getStats(); // playerStats is checked above
+            const baseStat = baseStats ? baseStats[statName] : null;
+            const displayStat = statsToUse[statName];
+            if (baseStat && displayStat && pucks.length > 0) {
+                pucks.forEach((puck, index) => {
+                    puck.classList.remove("text-blue-400");
+                    if (index < displayStat.rating) {
+                        puck.classList.remove("text-gray-300");
+                        if (index >= baseStat.rating) {
+                            puck.classList.add("text-blue-400");
+                        }
+                    }
+                    else {
+                        puck.classList.add("text-gray-300");
+                    }
+                    if (index === displayStat.rating - 1 && baseStat.max) {
+                        puck.classList.add("max-level");
+                    }
+                    else {
+                        puck.classList.remove("max-level");
+                    }
+                });
+                if (ratingSpan) {
+                    ratingSpan.textContent = `(${displayStat.rating})`;
+                }
+            }
+        });
+        if (!this.playerStats)
+            return;
+        const ovr = option === "Min"
+            ? this.playerStats.getMinOvr()
+            : option === "Max"
+                ? this.playerStats.getMaxOvr()
+                : this.playerStats.getOvr();
+        const isDefaultScoutWithOvr = option === "Default" &&
+            this.playerStats.getScoutLevel() === 1 &&
+            this.playerStats.getOvr() > 0;
+        const ovrToShow = isDefaultScoutWithOvr
+            ? this.playerStats.getOvr()
+            : ovr;
+        this.updateOVR(ovrToShow);
+    }
+    updateOVR(ovr) {
+        if (!this.ovrElement)
+            return;
+        this.ovrElement.textContent = ovr > 0 ? ovr.toString() : "?"; // Show ? if OVR is 0, though in practice this should never happen
+        const polygonElement = this.ovrElement.parentElement?.querySelector("polygon");
+        if (polygonElement && ovr > 0) {
+            // only color if OVR > 0
+            if (window.userData &&
+                typeof window.userData.getColorPair === "function") {
+                try {
+                    const [bgColor, color] = window.userData.getColorPair(ovr);
+                    polygonElement.setAttribute("fill", bgColor);
+                    this.ovrElement.setAttribute("fill", color);
+                }
+                catch (e) {
+                    console.error("Failed to get color pair for OVR:", ovr, e);
+                }
+            }
+        }
+    }
+}
+const playerVisualizerInstance = new PlayerStatsVisualizer();
+function handlePlayerData(data) {
+    const player = new Player(data);
+    playerVisualizerInstance.updatePlayer(player);
+}
+function manipulatePlayerPage(el) {
+    playerVisualizerInstance.attach(el);
+}
+
+
+/***/ },
+
+/***/ "./src/pages/roster.ts"
+/*!*****************************!*\
+  !*** ./src/pages/roster.ts ***!
+  \*****************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   Roster: () => (/* binding */ Roster),
+/* harmony export */   handleRosterData: () => (/* binding */ handleRosterData),
+/* harmony export */   manipulateRosterPage: () => (/* binding */ manipulateRosterPage)
+/* harmony export */ });
+/* harmony import */ var _player__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./player */ "./src/pages/player.ts");
+
+class Roster {
+    players;
+    constructor(data) {
+        this.players = this.parseRosterData(data);
+    }
+    parseRosterData(data) {
+        const roster = {};
+        for (const p of data.players) {
+            roster[p.id] = new _player__WEBPACK_IMPORTED_MODULE_0__.Player(p);
+        }
+        return roster;
+    }
+    getPlayer(playerId) {
+        return this.players[playerId];
+    }
+    getAllPlayers() {
+        return this.players;
+    }
+}
+class RosterStatsVisualizer {
+    roster = null;
+    parent = null;
+    header = null;
+    footer = null;
+    dataRows = null;
+    tbody = null;
+    onGeneralPage = true;
+    minHeaderCell = null;
+    maxHeaderCell = null;
+    sortColumn = null;
+    sortAscending = true;
+    // store bound listeners for easier removal
+    generalButtonClickListener = null;
+    skillsButtonClickListener = null;
+    selectChangeListener = null;
+    headerClickListeners = new Map();
+    constructor() { }
+    attach(el) {
+        this.detach();
+        this.parent = el;
+        if (this.parent && this.roster) {
+            this.initializeVisualizerState();
+            this.initializeTableReferences();
+            this.attachEventListeners();
+            this.renderColumns();
+            // if (this.sortColumn) this.sortRows();
+        }
+        else {
+            // cleanup if attachment is incomplete
+            this.detach();
+        }
+    }
+    detach() {
+        if (!this.parent)
+            return;
+        const tabButtons = this.parent.querySelectorAll(`.btn-toggle`);
+        if (tabButtons.length >= 2) {
+            const isGeneral = tabButtons[0]?.textContent?.trim() === "General";
+            const generalButton = isGeneral ? tabButtons[0] : tabButtons[1];
+            const skillsButton = isGeneral ? tabButtons[1] : tabButtons[0];
+            if (this.generalButtonClickListener && generalButton)
+                generalButton.removeEventListener("click", this.generalButtonClickListener);
+            if (this.skillsButtonClickListener && skillsButton)
+                skillsButton.removeEventListener("click", this.skillsButtonClickListener);
+        }
+        const selectElement = this.parent.querySelector(`select[value]`);
+        if (this.selectChangeListener && selectElement)
+            selectElement.removeEventListener("input", this.selectChangeListener);
+        this.headerClickListeners.forEach((listener, th) => {
+            th.removeEventListener("click", listener);
+        });
+        this.headerClickListeners.clear();
+        this.parent
+            .querySelectorAll(`[data-column]`)
+            .forEach((node) => node.remove());
+        this.parent = null;
+        this.header = null;
+        this.footer = null;
+        this.dataRows = null;
+        this.tbody = null;
+        this.minHeaderCell = null;
+        this.maxHeaderCell = null;
+        this.generalButtonClickListener = null;
+        this.skillsButtonClickListener = null;
+        this.selectChangeListener = null;
+    }
+    updateRoster(newRoster) {
+        this.roster = newRoster;
+        if (this.parent && this.roster) {
+            this.initializeTableReferences();
+            this.renderColumns();
+            // if (this.sortColumn) this.sortRows();
+        }
+    }
+    initializeVisualizerState() {
+        if (!this.parent)
+            return;
+        const tabButtons = this.parent.querySelectorAll(`.btn-toggle`);
+        if (!tabButtons.length || tabButtons.length < 2) {
+            this.onGeneralPage = true;
+            return;
+        }
+        const isGeneral = tabButtons[0]?.textContent?.trim() === "General";
+        const generalButton = isGeneral ? tabButtons[0] : tabButtons[1];
+        this.onGeneralPage =
+            generalButton?.classList.contains("active") ?? true;
+    }
+    initializeTableReferences() {
+        if (!this.parent)
+            return;
+        this.header = this.parent.querySelector(`table thead tr`);
+        this.footer = this.parent.querySelector(`table tfoot tr`);
+        this.tbody = this.parent.querySelector("table tbody");
+        this.dataRows = {}; // reset row references
+        if (!this.tbody)
+            return;
+        const rows = this.tbody.querySelectorAll(`tr`);
+        rows.forEach((row) => {
+            const tableRow = row;
+            const playerLink = tableRow.querySelector("a.player-link");
+            const href = playerLink?.getAttribute("href");
+            if (href) {
+                const playerId = href.split("/").pop() || "";
+                if (playerId) {
+                    this.dataRows[playerId] = tableRow;
+                }
+            }
+        });
+    }
+    attachEventListeners() {
+        if (!this.parent)
+            return;
+        const tabButtons = this.parent.querySelectorAll(`.btn-toggle`);
+        if (tabButtons.length === 2) {
+            const isGeneral = tabButtons[0]?.textContent?.trim() === "General";
+            const generalButton = isGeneral ? tabButtons[0] : tabButtons[1];
+            const skillsButton = isGeneral ? tabButtons[1] : tabButtons[0];
+            // store the bound function to remove it later
+            this.generalButtonClickListener = () => {
+                if (this.onGeneralPage)
+                    return;
+                this.onGeneralPage = true;
+                // re-initialize references and render columns for the new state
+                this.initializeTableReferences();
+                this.renderColumns();
+                // if (this.sortColumn) this.sortRows();
+            };
+            if (generalButton)
+                generalButton.addEventListener("click", this.generalButtonClickListener);
+            this.skillsButtonClickListener = () => {
+                if (!this.onGeneralPage)
+                    return;
+                this.onGeneralPage = false;
+                this.initializeTableReferences();
+                this.renderColumns(); // remove columns as we are not on general page
+                // if (this.sortColumn) this.sortRows();
+            };
+            if (skillsButton)
+                skillsButton.addEventListener("click", this.skillsButtonClickListener);
+        }
+        const selectElement = this.parent.querySelector(`select[value]`);
+        if (selectElement) {
+            this.selectChangeListener = () => {
+                this.initializeTableReferences();
+                this.renderColumns();
+                // if (this.sortColumn) this.sortRows();
+            };
+            selectElement.addEventListener("input", this.selectChangeListener);
+        }
+        // clear any stale listeners first (though detach should handle this)
+        this.headerClickListeners.forEach((listener, th) => th.removeEventListener("click", listener));
+        this.headerClickListeners.clear();
+        // add listeners to existing TH elements (not the dynamic min/max ones yet)
+        this.header?.querySelectorAll(`th`).forEach((th) => {
+            // safety check
+            if (!th.hasAttribute("data-column")) {
+                const listener = () => {
+                    this.sortColumn = null;
+                    this.sortAscending = false;
+                    // Potentially update header styles (remove arrows) if sort indicators are used
+                    // Potentially re-sort rows to default if needed
+                };
+                th.addEventListener("click", listener);
+                this.headerClickListeners.set(th, listener); // stored for removal
+            }
+        });
+        // NOTE: Listeners for dynamically added Min/Max header cells
+        // should be added within `renderColumns` after the cells are created.
+    }
+    renderColumns() {
+        if (!this.parent ||
+            !this.roster ||
+            !this.dataRows ||
+            !this.header ||
+            !this.footer) {
+            return;
+        }
+        // remove previously added dynamic columns and their header/footer cells
+        this.parent
+            .querySelectorAll(`[data-column]`)
+            .forEach((node) => node.remove());
+        // TODO: Remove sorting listeners specifically attached to old min/max headers if sorting is added
+        this.minHeaderCell = null; // reset references
+        this.maxHeaderCell = null;
+        // add columns ONLY if on the General Page ---
+        if (!this.onGeneralPage)
+            return;
+        Object.entries(this.dataRows).forEach(([playerId, row]) => {
+            const player = this.roster.getPlayer(playerId);
+            if (!player)
+                return;
+            const minDataCell = document.createElement("td");
+            minDataCell.className = "md:px-4 px-2 py-2 text-center";
+            minDataCell.dataset.column = "min-ovr";
+            minDataCell.appendChild(this.createRatingSpan(player.getMinOvr(), player.getScoutLevel()));
+            const maxDataCell = document.createElement("td");
+            maxDataCell.className = "md:px-4 px-2 py-2 text-center";
+            maxDataCell.dataset.column = "max-ovr";
+            maxDataCell.appendChild(this.createRatingSpan(player.getMaxOvr(), player.getScoutLevel()));
+            // append to the end of the row
+            row.appendChild(minDataCell);
+            row.appendChild(maxDataCell);
+        });
+        //header
+        this.minHeaderCell = document.createElement("th");
+        this.minHeaderCell.className =
+            "md:px-4 px-2 py-2 text-center sort-column";
+        this.minHeaderCell.innerText = " Min ";
+        this.minHeaderCell.dataset.column = "min-ovr";
+        // TODO: Add click listener here for sorting if implemented
+        // this.minHeaderCell.addEventListener('click', this.handleMinSortClick);
+        this.header.appendChild(this.minHeaderCell);
+        this.maxHeaderCell = document.createElement("th");
+        this.maxHeaderCell.className =
+            "md:px-4 px-2 py-2 text-center sort-column";
+        this.maxHeaderCell.innerText = " Max ";
+        this.maxHeaderCell.dataset.column = "max-ovr";
+        // TODO: Add click listener here for sorting if implemented
+        // this.maxHeaderCell.addEventListener('click', this.handleMaxSortClick);
+        this.header.appendChild(this.maxHeaderCell);
+        // footer
+        const minFooterCell = document.createElement("td");
+        minFooterCell.className = "md:px-4 px-2 py-2 text-center";
+        minFooterCell.dataset.column = "min-ovr";
+        minFooterCell.appendChild(this.createRatingSpan(this.getRosterAvgOvr("Min"), 0));
+        const maxFooterCell = document.createElement("td");
+        maxFooterCell.className = "md:px-4 px-2 py-2 text-center";
+        maxFooterCell.dataset.column = "max-ovr";
+        maxFooterCell.appendChild(this.createRatingSpan(this.getRosterAvgOvr("Max"), 0));
+        this.footer.appendChild(minFooterCell);
+        this.footer.appendChild(maxFooterCell);
+    }
+    getRosterAvgOvr(ovrType) {
+        if (!this.roster)
+            return 0;
+        const playerOvr = {
+            Default: (player) => player.getOvr(),
+            Min: (player) => player.getMinOvr(),
+            Max: (player) => player.getMaxOvr(),
+        };
+        const players = this.roster.getAllPlayers();
+        if (!players)
+            return 0;
+        const values = Object.values(players)
+            .filter((player) => player &&
+            !(player.getScoutLevel() === 1) &&
+            player.getOvr() > 0) // ensure player exists & filter scouts without OVR
+            .map((player) => playerOvr[ovrType](player));
+        return values.length
+            ? Math.round(values.reduce((sum, value, _, array) => sum + value / array.length, 0))
+            : 0;
+    }
+    createRatingSpan(ovr, scout) {
+        const ratingSpan = document.createElement("span");
+        if (scout === 1 || !ovr || ovr <= 0) {
+            // treat 0 OVR for scout same as unknown
+            ratingSpan.classList.add("question-mark");
+            ratingSpan.innerText = "?";
+            ratingSpan.style.color = "#bcbabe";
+            ratingSpan.style.textAlign = "center";
+        }
+        else {
+            ratingSpan.classList.add("badge");
+            ratingSpan.style.userSelect = "none";
+            ratingSpan.innerText = ovr.toString() + (scout === 2 ? "*" : "");
+            if (window.userData &&
+                typeof window.userData.getColorPair === "function") {
+                try {
+                    const [bgColor, color] = window.userData.getColorPair(ovr);
+                    ratingSpan.style.backgroundColor = bgColor;
+                    ratingSpan.style.color = color;
+                }
+                catch (e) {
+                    console.error("Error getting color pair for OVR:", ovr, e);
+                }
+            }
+        }
+        return ratingSpan;
+    }
+}
+const rosterVisualizerInstance = new RosterStatsVisualizer();
+function handleRosterData(data) {
+    const newRoster = new Roster(data);
+    // notify the visualizer instance about the new data
+    rosterVisualizerInstance.updateRoster(newRoster);
+}
+function manipulateRosterPage(el) {
+    rosterVisualizerInstance.attach(el);
+}
+
+
+/***/ },
+
+/***/ "./src/pages/trade-center.ts"
+/*!***********************************!*\
+  !*** ./src/pages/trade-center.ts ***!
+  \***********************************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   handleTradeCenterData: () => (/* binding */ handleTradeCenterData),
+/* harmony export */   manipulateTradeCenterPage: () => (/* binding */ manipulateTradeCenterPage)
+/* harmony export */ });
+/* harmony import */ var _roster__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./roster */ "./src/pages/roster.ts");
+/*
+ * Basically the exact same as the FreeAgentCenter Page
+ * Kept decoupled to be flexible to site changes in the future
+ */
+// TODO: Similar break as coaching-staff
+
+class TradeVisualizer {
+    container = null;
+    tradePlayers = null;
+    tradePlayerCards = null;
+    paginationListeners = new Map();
+    mutationObserver = null;
+    observerTimeoutId = null;
+    constructor() { }
+    attach(el) {
+        this.detach();
+        this.container = el.parentElement;
+        if (!this.container)
+            return;
+        if (!this.tradePlayers)
+            return;
+        this.initializeDOMReferences();
+        this.attachPaginationListeners();
+        this.addBadges();
+    }
+    detach() {
+        if (!this.container)
+            return;
+        this.detachPaginationListeners();
+        this.disconnectObserver();
+        this.container = null;
+        this.tradePlayerCards = null;
+    }
+    updateData(newData) {
+        this.tradePlayers = newData;
+        if (this.container) {
+            this.initializeDOMReferences();
+            this.addBadges();
+        }
+    }
+    onDataReceived() {
+        if (!this.container)
+            return;
+        this.onTableUpdateTrigger();
+    }
+    getPaginationContainers() {
+        if (!this.container)
+            return [];
+        const paginationDivs = this.container.querySelectorAll("div.flex.justify-center.bg-gray-700");
+        return Array.from(paginationDivs);
+    }
+    initializeDOMReferences() {
+        if (!this.container)
+            return;
+        const cards = this.container.querySelectorAll("div.card.card-secondary");
+        const tc = {};
+        cards.forEach((card) => {
+            const cardEl = card;
+            const playerLink = cardEl.querySelector("a[href^='/player/']");
+            const badge = cardEl.querySelector(".badge");
+            if (!playerLink || !badge)
+                return;
+            const playerId = playerLink.getAttribute("href")?.split("/").pop();
+            if (playerId)
+                tc[playerId] = cardEl;
+        });
+        this.tradePlayerCards = tc;
+    }
+    attachPaginationListeners() {
+        if (!this.container)
+            return;
+        this.detachPaginationListeners();
+        const containers = this.getPaginationContainers();
+        containers.forEach((container) => {
+            const pageLinks = container.querySelectorAll("li a:not(.disabled)");
+            pageLinks.forEach((el) => {
+                const listener = () => {
+                    this.onTableUpdateTrigger();
+                };
+                el.addEventListener("click", listener);
+                this.paginationListeners.set(el, listener);
+            });
+        });
+    }
+    detachPaginationListeners() {
+        this.paginationListeners.forEach((listener, el) => {
+            el.removeEventListener("click", listener);
+        });
+        this.paginationListeners.clear();
+    }
+    onTableUpdateTrigger() {
+        if (this.observerTimeoutId) {
+            clearTimeout(this.observerTimeoutId);
+            this.observerTimeoutId = null;
+        }
+        if (!this.mutationObserver && this.container) {
+            this.mutationObserver = new MutationObserver((mutations) => {
+                if (!this.container?.isConnected) {
+                    this.detach();
+                    return;
+                }
+                const hasRelevantChanges = mutations.some((m) => m.addedNodes.length > 0 &&
+                    Array.from(m.addedNodes).some((node) => node.nodeType === Node.ELEMENT_NODE &&
+                        (node.classList?.contains("card") ||
+                            node.querySelector("div.card.card-secondary"))));
+                if (hasRelevantChanges)
+                    this.onTableUpdated();
+            });
+            this.mutationObserver.observe(this.container, {
+                childList: true,
+                subtree: true,
+            });
+        }
+        this.observerTimeoutId = window.setTimeout(() => {
+            this.onTableUpdated();
+        }, 3000);
+    }
+    onTableUpdated() {
+        this.disconnectObserver();
+        this.initializeDOMReferences();
+        this.addBadges();
+        this.attachPaginationListeners();
+    }
+    disconnectObserver() {
+        if (this.mutationObserver) {
+            this.mutationObserver.disconnect();
+            this.mutationObserver = null;
+        }
+        if (this.observerTimeoutId) {
+            clearTimeout(this.observerTimeoutId);
+            this.observerTimeoutId = null;
+        }
+    }
+    addBadges() {
+        if (!this.tradePlayerCards || !this.tradePlayers)
+            return;
+        Object.entries(this.tradePlayerCards).forEach(([playerId, card]) => {
+            if (card.getAttribute("data-ovr-badges-added") === "true")
+                return;
+            const badgeContainer = card.querySelector(".badge")?.parentElement;
+            if (!badgeContainer)
+                return;
+            const player = this.tradePlayers.getPlayer(playerId);
+            if (!player)
+                return;
+            badgeContainer
+                .querySelectorAll(".dynamic-ovr-label, .dynamic-ovr-badge")
+                .forEach((el) => el.remove());
+            // Add MIN
+            badgeContainer.appendChild(this.createOvrLabelSpan("MIN"));
+            badgeContainer.appendChild(this.createRatingSpan(player.getMinOvr()));
+            // Add MAX
+            badgeContainer.appendChild(this.createOvrLabelSpan("MAX"));
+            badgeContainer.appendChild(this.createRatingSpan(player.getMaxOvr()));
+            card.setAttribute("data-ovr-badges-added", "true");
+        });
+    }
+    createOvrLabelSpan(text) {
+        const label = document.createElement("span");
+        label.classList.add("dynamic-ovr-label", "uppercase", "ml-3", "xs:inline-block", "hidden");
+        label.innerText = text;
+        return label;
+    }
+    createRatingSpan(ovr) {
+        const ratingSpan = document.createElement("span");
+        ratingSpan.classList.add("dynamic-ovr-badge", "badge", "ml-1");
+        ratingSpan.style.userSelect = "none";
+        ratingSpan.innerText = ovr.toString();
+        if (window.userData &&
+            typeof window.userData.getColorPair === "function" &&
+            ovr > 0) {
+            try {
+                const [bgColor, color] = window.userData.getColorPair(ovr);
+                ratingSpan.style.backgroundColor = bgColor;
+                ratingSpan.style.color = color;
+            }
+            catch (e) {
+                console.error("Error getting color pair for OVR:", ovr, e);
+            }
+        }
+        return ratingSpan;
+    }
+}
+const tradeVisualizerInstance = new TradeVisualizer();
+function handleTradeCenterData(data) {
+    const rosterData = { players: data };
+    const newRoster = new _roster__WEBPACK_IMPORTED_MODULE_0__.Roster(rosterData);
+    tradeVisualizerInstance.updateData(newRoster);
+    tradeVisualizerInstance.onDataReceived();
+}
+function manipulateTradeCenterPage(el) {
+    tradeVisualizerInstance.attach(el);
+}
+
+
+/***/ },
+
+/***/ "./src/user.ts"
+/*!*********************!*\
+  !*** ./src/user.ts ***!
+  \*********************/
+(__unused_webpack_module, __webpack_exports__, __webpack_require__) {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   User: () => (/* binding */ User),
+/* harmony export */   handleUserData: () => (/* binding */ handleUserData)
+/* harmony export */ });
+/*
+This could be improved by also intercepting calls to settings api, and updating colors in the class as the user updates them
+This is because the settings object isn't sent again after colors are updated, making class colors slightly outdated
+Is resolved on a refresh though
+*/
+class User {
+    "bg-color-rating-90plus" = "#383839";
+    "bg-color-rating-85plus" = "#383839";
+    "bg-color-rating-80plus" = "#383839";
+    "bg-color-rating-75plus" = "#10b981";
+    "bg-color-rating-70plus" = "#10b981";
+    "bg-color-rating-65plus" = "#1995AD";
+    "bg-color-rating-60plus" = "#1995AD";
+    "bg-color-rating-55plus" = "#1995AD";
+    "bg-color-rating-50plus" = "#ed8936";
+    "bg-color-rating-45plus" = "#ed8936";
+    "bg-color-rating-40plus" = "#ed8936";
+    "bg-color-rating-40less" = "#f56565";
+    "color-rating-90plus" = "#f8f8f9";
+    "color-rating-85plus" = "#f8f8f9";
+    "color-rating-80plus" = "#f8f8f9";
+    "color-rating-75plus" = "#f8f8f9";
+    "color-rating-70plus" = "#f8f8f9";
+    "color-rating-65plus" = "#f8f8f9";
+    "color-rating-60plus" = "#f8f8f9";
+    "color-rating-55plus" = "#f8f8f9";
+    "color-rating-50plus" = "#f8f8f9";
+    "color-rating-45plus" = "#f8f8f9";
+    "color-rating-40plus" = "#f8f8f9";
+    "color-rating-40less" = "#f8f8f9";
+    constructor(data) {
+        data && data?.settings && this.loadFromConfig(data.settings);
+    }
+    loadFromConfig(config) {
+        for (const { id, value } of config) {
+            if (id in this) {
+                this[id] = value;
+            }
+        }
+    }
+    getColorPair(rating) {
+        const thresholds = [90, 85, 80, 75, 70, 65, 60, 55, 50, 45, 40];
+        const matched = thresholds.find((t) => rating >= t);
+        const suffix = matched !== undefined ? `${matched}plus` : "40less";
+        const bgKey = `bg-color-rating-${suffix}`;
+        const colorKey = `color-rating-${suffix}`;
+        return [this[bgKey], this[colorKey]];
+    }
+}
+function handleUserData(data) {
+    window.userData = new User(data);
+}
+
+
+/***/ }
+
+/******/ 	});
+/************************************************************************/
+/******/ 	// The module cache
+/******/ 	var __webpack_module_cache__ = {};
+/******/ 	
+/******/ 	// The require function
+/******/ 	function __webpack_require__(moduleId) {
+/******/ 		// Check if module is in cache
+/******/ 		var cachedModule = __webpack_module_cache__[moduleId];
+/******/ 		if (cachedModule !== undefined) {
+/******/ 			return cachedModule.exports;
+/******/ 		}
+/******/ 		// Create a new module (and put it into the cache)
+/******/ 		var module = __webpack_module_cache__[moduleId] = {
+/******/ 			// no module.id needed
+/******/ 			// no module.loaded needed
+/******/ 			exports: {}
+/******/ 		};
+/******/ 	
+/******/ 		// Execute the module function
+/******/ 		if (!(moduleId in __webpack_modules__)) {
+/******/ 			delete __webpack_module_cache__[moduleId];
+/******/ 			var e = new Error("Cannot find module '" + moduleId + "'");
+/******/ 			e.code = 'MODULE_NOT_FOUND';
+/******/ 			throw e;
+/******/ 		}
+/******/ 		__webpack_modules__[moduleId](module, module.exports, __webpack_require__);
+/******/ 	
+/******/ 		// Return the exports of the module
+/******/ 		return module.exports;
+/******/ 	}
+/******/ 	
+/************************************************************************/
+/******/ 	/* webpack/runtime/define property getters */
+/******/ 	(() => {
+/******/ 		// define getter functions for harmony exports
+/******/ 		__webpack_require__.d = (exports, definition) => {
+/******/ 			for(var key in definition) {
+/******/ 				if(__webpack_require__.o(definition, key) && !__webpack_require__.o(exports, key)) {
+/******/ 					Object.defineProperty(exports, key, { enumerable: true, get: definition[key] });
+/******/ 				}
+/******/ 			}
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/hasOwnProperty shorthand */
+/******/ 	(() => {
+/******/ 		__webpack_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/make namespace object */
+/******/ 	(() => {
+/******/ 		// define __esModule on exports
+/******/ 		__webpack_require__.r = (exports) => {
+/******/ 			if(typeof Symbol !== 'undefined' && Symbol.toStringTag) {
+/******/ 				Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' });
+/******/ 			}
+/******/ 			Object.defineProperty(exports, '__esModule', { value: true });
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/************************************************************************/
+var __webpack_exports__ = {};
+// This entry needs to be wrapped in an IIFE because it needs to be isolated against other modules in the chunk.
+(() => {
+/*!****************************!*\
+  !*** ./src/interceptor.ts ***!
+  \****************************/
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _pages_player__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./pages/player */ "./src/pages/player.ts");
+/* harmony import */ var _navigation_handler__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./navigation-handler */ "./src/navigation-handler.ts");
+/* harmony import */ var _pages_roster__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./pages/roster */ "./src/pages/roster.ts");
+/* harmony import */ var _user__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./user */ "./src/user.ts");
+/* harmony import */ var _pages_draft_class__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./pages/draft-class */ "./src/pages/draft-class.ts");
+/* harmony import */ var _pages_draft_ranking__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./pages/draft-ranking */ "./src/pages/draft-ranking.ts");
+/* harmony import */ var _pages_coach_market__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./pages/coach-market */ "./src/pages/coach-market.ts");
+/* harmony import */ var _pages_free_agent_center__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./pages/free-agent-center */ "./src/pages/free-agent-center.ts");
+/* harmony import */ var _pages_coaching_staff__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./pages/coaching-staff */ "./src/pages/coaching-staff.ts");
+/* harmony import */ var _pages_trade_center__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ./pages/trade-center */ "./src/pages/trade-center.ts");
+
+
+
+
+
+
+
+
+
+
+(function () {
+    window.userData = new _user__WEBPACK_IMPORTED_MODULE_3__.User(); // Initialize User Object with default settings, probably not needed but fixes some load inconsistencies
+    const URL_HANDLERS = {
+        player: {
+            pattern: /\/api\/player\/[^\/]+$/,
+            handler: (data) => {
+                (0,_pages_player__WEBPACK_IMPORTED_MODULE_0__.handlePlayerData)(data.data);
+            },
+        },
+        roster: {
+            pattern: /\/api\/team\/[^\/]+\/roster/,
+            handler: (data) => {
+                (0,_pages_roster__WEBPACK_IMPORTED_MODULE_2__.handleRosterData)(data.data);
+            },
+        },
+        draftClass: {
+            pattern: /\/api\/league\/[^\/]+\/draft-class/,
+            handler: (data) => {
+                (0,_pages_draft_class__WEBPACK_IMPORTED_MODULE_4__.handleDraftClassData)(data.data);
+            },
+        },
+        userInfo: {
+            pattern: /\/api\/user$/,
+            handler: (data) => {
+                (0,_user__WEBPACK_IMPORTED_MODULE_3__.handleUserData)(data);
+            },
+        },
+        draftRanking: {
+            pattern: /\/api\/draft\/[^\/]+\/rankings/,
+            handler: (data) => {
+                (0,_pages_draft_ranking__WEBPACK_IMPORTED_MODULE_5__.handleDraftRankingData)(data.data);
+            },
+        },
+        draftPicks: {
+            pattern: /\/api\/draft\/[^\/]+\/picks/,
+            handler: (data) => {
+                (0,_pages_draft_ranking__WEBPACK_IMPORTED_MODULE_5__.handleDraftPickData)(data.data);
+            },
+        },
+        coachingStaff: {
+            pattern: /\/api\/club\/[^\/]+\/coaching-staff/,
+            handler: (data) => {
+                (0,_pages_coaching_staff__WEBPACK_IMPORTED_MODULE_8__.handleCoachingStaffData)(data.data);
+            },
+        },
+        coachMarket: {
+            pattern: /\/api\/coach-center\/search/,
+            handler: (data) => {
+                (0,_pages_coach_market__WEBPACK_IMPORTED_MODULE_6__.handleCoachMarketData)(data.data);
+            },
+        },
+        freeAgentCenter: {
+            pattern: /\/api\/free-agent-center\/search/,
+            handler: (data) => {
+                (0,_pages_free_agent_center__WEBPACK_IMPORTED_MODULE_7__.handleFreeAgentCenterData)(data.data);
+            },
+        },
+        tradeCenter: {
+            pattern: /\/api\/trade-center\/search/,
+            handler: (data) => {
+                (0,_pages_trade_center__WEBPACK_IMPORTED_MODULE_9__.handleTradeCenterData)(data.data);
+            },
+        },
+    };
+    function findHandler(url) {
+        for (const { pattern, handler } of Object.values(URL_HANDLERS)) {
+            if (pattern.test(url))
+                return handler;
+        }
+        return null;
+    }
+    class Interceptor extends XMLHttpRequest {
+        interceptedUrl = null;
+        // @ts-ignore
+        open(method, url, ...rest) {
+            this.interceptedUrl = url;
+            // @ts-ignore
+            super.open(method, url, ...rest);
+        }
+        send(...args) {
+            const url = this.interceptedUrl ?? "";
+            const handler = findHandler(this.interceptedUrl ?? "");
+            if (handler) {
+                const originalOnReadyState = this.onreadystatechange;
+                this.onreadystatechange = function () {
+                    if (this.readyState === 4 && this.status === 200) {
+                        try {
+                            const data = JSON.parse(this.responseText);
+                            handler(data);
+                        }
+                        catch (e) {
+                            // most likely a null response body
+                        }
+                    }
+                    if (originalOnReadyState) {
+                        // @ts-ignore
+                        originalOnReadyState.apply(this, arguments);
+                    }
+                };
+            }
+            super.send(...args);
+        }
+    }
+    window.XMLHttpRequest = Interceptor;
+    // intercept fetch as well, although I don't think this is used
+    const originalFetch = window.fetch;
+    window.fetch = async function (resource, init) {
+        // handle strings & request obj
+        const url = typeof resource === "string"
+            ? resource
+            : resource instanceof Request
+                ? resource.url
+                : resource.toString();
+        const response = await originalFetch.call(this, resource, init);
+        const handler = url && findHandler(url);
+        if (handler) {
+            try {
+                const clonedResponse = response.clone();
+                const data = await clonedResponse.json();
+                handler(data);
+            }
+            catch (e) {
+                console.error("Error processing fetch response:", e);
+            }
+        }
+        return response;
+    };
+})();
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", _navigation_handler__WEBPACK_IMPORTED_MODULE_1__.initNavigationHandler, { once: true });
+}
+else {
+    (0,_navigation_handler__WEBPACK_IMPORTED_MODULE_1__.initNavigationHandler)();
+}
+
+})();
+
+/******/ })()
+;
+//# sourceMappingURL=interceptor.js.map
