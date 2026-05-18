@@ -7,6 +7,7 @@ import {
 	type MountedFeature,
 	type ResourceStore,
 } from "../runtime";
+import { isViewSettingEnabled } from "../view-settings";
 import { Coach } from "./coach-market";
 
 type TeamLevel = "PRO" | "FRM" | "U21" | "U17";
@@ -33,6 +34,7 @@ interface CoachingStaffResources {
 
 export const coachingStaffFeature: FeatureDefinition<CoachingStaffResources> = {
 	id: COACHING_STAFF_FEATURE_ID,
+	enabled: () => isViewSettingEnabled("coachingStaff"),
 	route: (url) => url.pathname.startsWith("/coaching-staff"),
 	target: {
 		selector: `table tbody a.coach-link[href^="/coach/"]`,

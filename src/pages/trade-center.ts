@@ -9,6 +9,7 @@ import {
 	type MountedFeature,
 	type ResourceStore,
 } from "../runtime";
+import { isViewSettingEnabled } from "../view-settings";
 import { Roster } from "./roster";
 
 interface TradeCenterResources {
@@ -22,6 +23,7 @@ const PLAYER_LINK_SELECTOR = `a[href^="/player/"]`;
 
 export const tradeCenterFeature: FeatureDefinition<TradeCenterResources> = {
 	id: TRADE_CENTER_FEATURE_ID,
+	enabled: () => isViewSettingEnabled("tradeCenter"),
 	route: (url) => url.pathname.startsWith("/office/trade-center"),
 	target: {
 		selector: CARD_SELECTOR,

@@ -6,6 +6,7 @@ import {
 	type MountedFeature,
 	type ResourceStore,
 } from "../runtime";
+import { isViewSettingEnabled } from "../view-settings";
 
 // import { CoachingStaff } from "./coaching-staff";
 
@@ -43,6 +44,7 @@ interface CoachMarketResources {
 
 export const coachMarketFeature: FeatureDefinition<CoachMarketResources> = {
 	id: COACH_MARKET_FEATURE_ID,
+	enabled: () => isViewSettingEnabled("coachMarket"),
 	route: (url) => url.pathname.startsWith("/coaching-staff"),
 	target: {
 		selector: "div[market-open] table tbody tr",

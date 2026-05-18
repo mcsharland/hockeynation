@@ -25,6 +25,7 @@ export interface MountedFeature<TResources = unknown> {
 
 export interface FeatureDefinition<TResources = unknown> {
 	id: string;
+	enabled?: () => boolean;
 	route: (url: URL) => boolean;
 	target: FeatureTarget;
 	getResources: (resources: ResourceStore) => TResources | null;
@@ -148,7 +149,7 @@ class ExtensionRuntime {
 		const activeKeys = new Set<string>();
 
 		for (const feature of this.features) {
-			if (!feature.route(url)) {
+			if (!feature.route(url) || feature.enabled?.() === false) {
 				this.disposeFeature(feature.id);
 				continue;
 			}

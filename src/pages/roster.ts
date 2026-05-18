@@ -5,6 +5,7 @@ import {
 	type MountedFeature,
 	type ResourceStore,
 } from "../runtime";
+import { isViewSettingEnabled } from "../view-settings";
 import { Player } from "./player";
 
 interface Players {
@@ -57,6 +58,7 @@ export class Roster {
 
 export const rosterFeature: FeatureDefinition<RosterResources> = {
 	id: ROSTER_FEATURE_ID,
+	enabled: () => isViewSettingEnabled("roster"),
 	route: (url) => url.pathname.startsWith("/club/roster"),
 	target: {
 		selector: `table tbody a.player-link[href^="/player/"]`,

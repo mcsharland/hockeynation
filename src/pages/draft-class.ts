@@ -4,6 +4,7 @@ import {
 	type MountedFeature,
 	type ResourceStore,
 } from "../runtime";
+import { isViewSettingEnabled } from "../view-settings";
 import { Roster } from "./roster";
 
 type ScoutLevel = 0 | 1 | 2;
@@ -18,6 +19,7 @@ const OWNED_SELECTOR = `[data-hn-feature="${DRAFT_CLASS_FEATURE_ID}"]`;
 
 export const draftClassFeature: FeatureDefinition<DraftClassResources> = {
 	id: DRAFT_CLASS_FEATURE_ID,
+	enabled: () => isViewSettingEnabled("draftClass"),
 	route: (url) => url.pathname.startsWith("/office/draft-center"),
 	target: {
 		selector: `[id^="draftee-card"] a[href^="/player/"]`,

@@ -5,6 +5,7 @@ import {
 	type MountedFeature,
 	type ResourceStore,
 } from "../runtime";
+import { isViewSettingEnabled } from "../view-settings";
 import { Roster } from "./roster";
 
 interface DraftRankingResources {
@@ -25,6 +26,7 @@ const OWNED_SELECTOR = `[data-hn-feature="${DRAFT_RANKING_FEATURE_ID}"]`;
 
 export const draftRankingFeature: FeatureDefinition<DraftRankingResources> = {
 	id: DRAFT_RANKING_FEATURE_ID,
+	enabled: () => isViewSettingEnabled("draftRanking"),
 	route: (url) => url.pathname.startsWith("/draft-ranking"),
 	target: {
 		selector: `table tbody a[href^="/player/"]`,

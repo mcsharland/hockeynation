@@ -5,7 +5,9 @@ import { draftRankingFeature } from "./pages/draft-ranking";
 import { freeAgentCenterFeature } from "./pages/free-agent-center";
 import { rosterFeature } from "./pages/roster";
 import { tradeCenterFeature } from "./pages/trade-center";
+import { userSettingsFeature } from "./pages/user-settings";
 import { extensionRuntime } from "./runtime";
+import { onViewSettingsChanged } from "./view-settings";
 
 export function initNavigationHandler() {
 	extensionRuntime.registerFeatures([
@@ -16,8 +18,12 @@ export function initNavigationHandler() {
 		freeAgentCenterFeature,
 		rosterFeature,
 		tradeCenterFeature,
+		userSettingsFeature,
 	]);
 	extensionRuntime.start();
+	onViewSettingsChanged(() => {
+		extensionRuntime.notifyRouteChanged();
+	});
 	handleNavigation();
 
 	// @ts-expect-error

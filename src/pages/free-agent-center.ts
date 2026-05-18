@@ -9,6 +9,7 @@ import {
 	type MountedFeature,
 	type ResourceStore,
 } from "../runtime";
+import { isViewSettingEnabled } from "../view-settings";
 import { Roster } from "./roster";
 
 interface FreeAgentCenterResources {
@@ -23,6 +24,7 @@ const PLAYER_LINK_SELECTOR = `a[href^="/player/"]`;
 export const freeAgentCenterFeature: FeatureDefinition<FreeAgentCenterResources> =
 	{
 		id: FREE_AGENT_CENTER_FEATURE_ID,
+		enabled: () => isViewSettingEnabled("freeAgentSearch"),
 		route: (url) => url.pathname.startsWith("/office/free-agent-center"),
 		target: {
 			selector: CARD_SELECTOR,
