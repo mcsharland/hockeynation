@@ -6,14 +6,3 @@ Calculates min &amp; max potential OVR for players in [hockey-nation](https://ho
 
 1. Clone the repo or download and unpack a zip.
 2. Go to `chrome://extensions` or your favorite browsers equivalent. Enable developer mode, click load unpacked and select the folder. Voila
-
-# Usage
-
-Adds extra information to roster and draft class, and draft ranking pages.
-
-# Extras
-
-Developed in the arc browser<br />
-Join with [my link](https://arc.net/gift/437e68d4) to help me get icons or something
-
-This extension may break as hockey-nation changes their page layout, and I will update it sporadically to fix it.
