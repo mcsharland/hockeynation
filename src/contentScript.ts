@@ -1,13 +1,4 @@
 (function () {
-    // inject the interceptor script
-    const script = document.createElement("script");
-    script.src = chrome.runtime.getURL("dist/interceptor.js");
-    (document.head || document.documentElement).appendChild(script);
-    // remove after load
-    script.onload = function () {
-        script.remove();
-    };
-
     const EXTENSION_STYLE_ID = `hockey-nation-ext-styles`;
     const DR_HIGHLIGHT_CLASS = "draft-ranking-highlight";
     const DR_GHOST_TRIM = "draft-ranking-ghost-trim";
