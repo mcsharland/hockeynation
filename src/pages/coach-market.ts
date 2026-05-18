@@ -1,4 +1,12 @@
 import { SKILL_NAME_TO_ID } from "../mappings/skill-mappings";
+import {
+	extensionRuntime,
+	type FeatureContext,
+	type FeatureDefinition,
+	type MountedFeature,
+	type ResourceStore,
+} from "../runtime";
+
 // import { CoachingStaff } from "./coaching-staff";
 
 type CoachType = "regular" | "interim" | "amateur";
@@ -26,6 +34,26 @@ interface ColumnGroupState {
 }
 
 const MATCH_SKILL_IDS = ["OFP", "DFP", "BAT", "PP", "PK"];
+const COACH_MARKET_RESOURCE = "coachMarket";
+const COACH_MARKET_FEATURE_ID = "coach-market-columns";
+
+interface CoachMarketResources {
+	marketData: any[];
+}
+
+export const coachMarketFeature: FeatureDefinition<CoachMarketResources> = {
+	id: COACH_MARKET_FEATURE_ID,
+	route: (url) => url.pathname.startsWith("/coaching-staff"),
+	target: {
+		selector: "div[market-open] table tbody tr",
+		resolveRoot: (match) => match.closest("div[market-open]"),
+		isReady: (root) =>
+			!!root.querySelector("table thead tr") &&
+			!!root.querySelector("table tbody tr a.coach-link"),
+	},
+	getResources: (resources) => getCoachMarketResources(resources),
+	mount: (context) => new CoachMarketFeatureInstance(context),
+};
 
 export class Coach {
 	private stats: Stats;
@@ -359,9 +387,9 @@ class CoachMarketVisualizer {
 		}
 	}
 
-	public attach(el: HTMLElement) {
+	public mount(container: HTMLElement) {
 		this.detach();
-		this.container = el.parentElement;
+		this.container = container;
 		if (!this.container) return;
 
 		// this.columnState = this.loadColumnState();
@@ -980,20 +1008,40 @@ class CoachMarketVisualizer {
 	}
 }
 
-const coachMarketVisualizerInstance = new CoachMarketVisualizer();
+class CoachMarketFeatureInstance
+	implements MountedFeature<CoachMarketResources>
+{
+	private readonly visualizer = new CoachMarketVisualizer();
+	private marketData: any[];
 
-// export function handleCoachingStaffData(data: any) {
-//     const staff = data.staff;
-//     if (!staff) return;
+	constructor(context: FeatureContext<CoachMarketResources>) {
+		this.marketData = context.resources.marketData;
+		this.visualizer.updateMarketCoaches(this.marketData);
+		this.visualizer.mount(context.root);
+	}
 
-//     coachMarketVisualizerInstance.updateCoachingStaff(new CoachingStaff(staff));
-// }
+	public update(context: FeatureContext<CoachMarketResources>): void {
+		if (context.resources.marketData === this.marketData) return;
 
-export function handleCoachMarketData(data: any[]) {
-	coachMarketVisualizerInstance.updateMarketCoaches(data);
-	coachMarketVisualizerInstance.onDataReceived();
+		this.marketData = context.resources.marketData;
+		this.visualizer.updateMarketCoaches(this.marketData);
+		this.visualizer.onDataReceived();
+	}
+
+	public dispose(): void {
+		this.visualizer.detach();
+	}
 }
 
-export function manipulateCoachMarketPage(el: HTMLElement) {
-	coachMarketVisualizerInstance.attach(el);
+function getCoachMarketResources(
+	resources: ResourceStore,
+): CoachMarketResources | null {
+	if (!resources.has(COACH_MARKET_RESOURCE)) return null;
+	return {
+		marketData: resources.get<any[]>(COACH_MARKET_RESOURCE) ?? [],
+	};
+}
+
+export function handleCoachMarketData(data: any[]) {
+	extensionRuntime.setResource(COACH_MARKET_RESOURCE, data);
 }

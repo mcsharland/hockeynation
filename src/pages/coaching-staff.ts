@@ -1,5 +1,12 @@
 // TODO: Accidentally selecting Interim page - improve selector to make it explicit
 // Also breaks when navigating back from another page via back arrow, then selecting first tab, needs to be properly initialized
+import {
+	extensionRuntime,
+	type FeatureContext,
+	type FeatureDefinition,
+	type MountedFeature,
+	type ResourceStore,
+} from "../runtime";
 import { Coach } from "./coach-market";
 
 type TeamLevel = "PRO" | "FRM" | "U21" | "U17";
@@ -17,6 +24,24 @@ interface CoachDataRow {
 }
 
 const MATCH_SKILL_IDS = ["OFP", "DFP", "BAT", "PP", "PK"];
+const COACHING_STAFF_RESOURCE = "coachingStaff";
+const COACHING_STAFF_FEATURE_ID = "coaching-staff-columns";
+
+interface CoachingStaffResources {
+	coachingStaff: CoachingStaff;
+}
+
+export const coachingStaffFeature: FeatureDefinition<CoachingStaffResources> = {
+	id: COACHING_STAFF_FEATURE_ID,
+	route: (url) => url.pathname.startsWith("/coaching-staff"),
+	target: {
+		selector: `table tbody a.coach-link[href^="/coach/"]`,
+		resolveRoot: (match) => findCoachingStaffRoot(match),
+		isReady: (root) => isCoachingStaffRootReady(root),
+	},
+	getResources: (resources) => getCoachingStaffResources(resources),
+	mount: (context) => new CoachingStaffFeatureInstance(context),
+};
 
 export class CoachingStaff {
 	private coachesByTeam: CoachesByTeam;
@@ -113,9 +138,9 @@ class CoachStaffVisualizer {
 	private mutationObserver: MutationObserver | null = null;
 	private coachingStaff: CoachingStaff | null = null;
 
-	public attach(el: HTMLElement) {
+	public mount(container: HTMLElement) {
 		this.detach();
-		this.container = el.parentElement;
+		this.container = container;
 		if (!this.container) return;
 
 		this.initializeTableReferences();
@@ -140,6 +165,10 @@ class CoachStaffVisualizer {
 
 	public updateCoachingStaff(staff: CoachingStaff) {
 		this.coachingStaff = staff;
+		if (this.container) {
+			this.initializeTableReferences();
+			this.renderColumns();
+		}
 	}
 	private observeChanges(): void {
 		if (!this.container) return;
@@ -348,15 +377,79 @@ class CoachStaffVisualizer {
 	}
 }
 
-const coachingStaffVisualizerInstance = new CoachStaffVisualizer();
+class CoachingStaffFeatureInstance
+	implements MountedFeature<CoachingStaffResources>
+{
+	private readonly visualizer = new CoachStaffVisualizer();
+	private coachingStaff: CoachingStaff;
+
+	constructor(context: FeatureContext<CoachingStaffResources>) {
+		this.coachingStaff = context.resources.coachingStaff;
+		this.visualizer.updateCoachingStaff(this.coachingStaff);
+		this.visualizer.mount(context.root);
+	}
+
+	public update(context: FeatureContext<CoachingStaffResources>): void {
+		if (context.resources.coachingStaff === this.coachingStaff) return;
+
+		this.coachingStaff = context.resources.coachingStaff;
+		this.visualizer.updateCoachingStaff(this.coachingStaff);
+	}
+
+	public dispose(): void {
+		this.visualizer.detach();
+	}
+}
+
+function getCoachingStaffResources(
+	resources: ResourceStore,
+): CoachingStaffResources | null {
+	const coachingStaff = resources.get<CoachingStaff>(COACHING_STAFF_RESOURCE);
+	return coachingStaff ? { coachingStaff } : null;
+}
+
+function findCoachingStaffRoot(match: HTMLElement): HTMLElement | null {
+	const table = match.closest("table");
+	if (!table) return null;
+
+	let current = table.parentElement;
+	while (current && current !== document.body) {
+		if (current.querySelector(".btn-toggle") && current.contains(table)) {
+			return current;
+		}
+		current = current.parentElement;
+	}
+
+	return table.parentElement;
+}
+
+function isCoachingStaffRootReady(root: HTMLElement): boolean {
+	if (!isCoachingStaffTabActive(root)) return false;
+
+	const headers = Array.from(root.querySelectorAll("table thead tr th")).map(
+		(th) => th.textContent?.trim() ?? "",
+	);
+
+	return (
+		headers.includes("Specials") &&
+		headers.includes("OVR") &&
+		!!root.querySelector(`table tbody a.coach-link[href^="/coach/"]`)
+	);
+}
+
+function isCoachingStaffTabActive(root: HTMLElement): boolean {
+	const activeButton =
+		root.querySelector<HTMLButtonElement>(".btn-toggle.active");
+	const text = activeButton?.textContent?.replace(/\s+/g, " ").trim() ?? "";
+	return text.includes("Coaching Staff") || text === "Coaches";
+}
 
 export function handleCoachingStaffData(data: any) {
 	const staff = data.staff;
 	if (!staff) return;
 
-	coachingStaffVisualizerInstance.updateCoachingStaff(new CoachingStaff(staff));
-}
-
-export function manipulateCoachingStaffPage(el: HTMLElement) {
-	coachingStaffVisualizerInstance.attach(el);
+	extensionRuntime.setResource(
+		COACHING_STAFF_RESOURCE,
+		new CoachingStaff(staff),
+	);
 }

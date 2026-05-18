@@ -1,4 +1,16 @@
+import {
+	extensionRuntime,
+	type FeatureContext,
+	type FeatureDefinition,
+	type MountedFeature,
+	type ResourceStore,
+} from "../runtime";
 import { Roster } from "./roster";
+
+interface DraftRankingResources {
+	draftRanking: Roster;
+	picks: number[];
+}
 
 interface DraftCards {
 	[id: string]: HTMLTableRowElement;
@@ -6,8 +18,66 @@ interface DraftCards {
 
 type ScoutLevel = 0 | 1 | 2;
 
-const DR_HIGHLIGHT_CLASS = "draft-ranking-highlight";
-const DR_GHOST_TRIM = "draft-ranking-ghost-trim";
+const DRAFT_RANKING_RESOURCE = "draftRanking";
+const DRAFT_RANKING_PICKS_RESOURCE = "draftRankingPicks";
+const DRAFT_RANKING_FEATURE_ID = "draft-ranking-min-max-columns";
+const OWNED_SELECTOR = `[data-hn-feature="${DRAFT_RANKING_FEATURE_ID}"]`;
+
+export const draftRankingFeature: FeatureDefinition<DraftRankingResources> = {
+	id: DRAFT_RANKING_FEATURE_ID,
+	route: (url) => url.pathname.startsWith("/draft-ranking"),
+	target: {
+		selector: `table tbody a[href^="/player/"]`,
+		resolveRoot: (match) => match.closest("table")?.parentElement ?? null,
+		isReady: (root) => !!root.querySelector(`table tbody a[href^="/player/"]`),
+	},
+	getResources: (resources) => getDraftRankingResources(resources),
+	mount: (context) => new DraftRankingMount(context),
+};
+
+class DraftRankingMount implements MountedFeature<DraftRankingResources> {
+	private readonly visualizer = new DraftRankingVisualizer();
+	private root: HTMLElement | null = null;
+	private ranking: Roster | null = null;
+	private picks: number[] | null = null;
+
+	constructor(context: FeatureContext<DraftRankingResources>) {
+		this.update(context);
+	}
+
+	public update(context: FeatureContext<DraftRankingResources>): void {
+		const rootChanged = this.root !== context.root;
+		const rankingChanged = this.ranking !== context.resources.draftRanking;
+		const picksChanged = this.picks !== context.resources.picks;
+
+		this.root = context.root;
+
+		if (picksChanged) {
+			this.picks = context.resources.picks;
+		}
+
+		if (rankingChanged) {
+			this.ranking = context.resources.draftRanking;
+			this.visualizer.updateRanking(context.resources.draftRanking);
+		}
+
+		if (rootChanged) {
+			this.visualizer.attach(context.root);
+		}
+	}
+
+	public dispose(): void {
+		this.visualizer.detach();
+		if (this.root) {
+			this.root
+				.querySelectorAll(OWNED_SELECTOR)
+				.forEach((node) => node.remove());
+		}
+		this.root = null;
+		this.ranking = null;
+		this.picks = null;
+	}
+}
 
 class DraftRankingVisualizer {
 	private parent: HTMLElement | null = null;
@@ -15,17 +85,11 @@ class DraftRankingVisualizer {
 	private draftCards: DraftCards | null = null;
 	private ovrTab: HTMLTableCellElement | null = null;
 	private tableHR: HTMLTableRowElement | null = null;
-	private picks: number[] | null = null;
 	private tbody: HTMLTableElement | null = null;
 
 	private dragStartListener: ((event: DragEvent) => void) | null = null;
 	private dragEndListener: ((event: DragEvent) => void) | null = null;
-	private highlightMutationObserver: MutationObserver | null = null;
-	private highlightObserverTimeoutId: number | null = null;
-	private highlightLast: boolean = false;
 	private rowMutationObserver: MutationObserver | null = null;
-
-	constructor() {}
 
 	public attach(el: HTMLElement) {
 		this.detach();
@@ -34,10 +98,8 @@ class DraftRankingVisualizer {
 
 		if (this.parent && this.draftRanking) {
 			this.initializeTableReferences();
-			this.attachEventListeners();
 			this.attachRowObserver();
 			this.renderColumns();
-			this.applyColumnHighlights();
 		} else {
 			this.detach();
 		}
@@ -47,15 +109,16 @@ class DraftRankingVisualizer {
 		if (!this.parent) return;
 
 		if (this.tbody) {
-			if (this.dragStartListener)
+			if (this.dragStartListener) {
 				this.tbody.removeEventListener("dragstart", this.dragStartListener);
-			if (this.dragEndListener)
+			}
+			if (this.dragEndListener) {
 				this.tbody.removeEventListener("dragend", this.dragEndListener);
+			}
 		}
 
 		if (this.rowMutationObserver) this.rowMutationObserver.disconnect();
 
-		// this.disconnectHighlightObserver();
 		this.parent = null;
 		this.draftCards = null;
 		this.ovrTab = null;
@@ -68,12 +131,7 @@ class DraftRankingVisualizer {
 		if (this.parent && this.draftRanking) {
 			this.initializeTableReferences();
 			this.renderColumns();
-			this.applyColumnHighlights();
 		}
-	}
-
-	public updatePicks(picks: number[]) {
-		this.picks = picks;
 	}
 
 	private initializeTableReferences() {
@@ -89,7 +147,7 @@ class DraftRankingVisualizer {
 				(span) => span.textContent?.trim() === "OVR",
 			)?.[0]?.parentElement as HTMLTableCellElement) ?? null;
 
-		this.draftCards = {} as DraftCards; // reset reference
+		this.draftCards = {};
 
 		const rows = this.tbody.querySelectorAll(`table tbody tr`);
 		rows.forEach((row) => {
@@ -106,83 +164,6 @@ class DraftRankingVisualizer {
 		});
 	}
 
-	private attachEventListeners() {
-		if (!this.parent || !this.tbody) return;
-
-		// only do this if its in the picks
-		this.dragStartListener = (event: DragEvent) => {
-			const row = event.target as HTMLTableRowElement;
-			this.highlightLast = this.picks?.includes(row.rowIndex) ?? false;
-
-			Array.from(row.children).forEach((el) => {
-				el.classList.remove(DR_HIGHLIGHT_CLASS);
-				if (el.hasAttribute("data-column") && this.highlightLast)
-					el.classList.add(DR_GHOST_TRIM);
-			});
-		};
-
-		// needs to improve logic to when elements doesn't update a pick
-		this.dragEndListener = (event: DragEvent) => {
-			const row = event.target as HTMLTableRowElement;
-			Array.from(row.children).forEach((el) => {
-				if (el.hasAttribute("data-column")) {
-					if (this.highlightLast) el.classList.add(DR_HIGHLIGHT_CLASS);
-					el.classList.remove(DR_GHOST_TRIM);
-				}
-			});
-			this.highlightLast = false;
-			this.disconnectHighlightObserver();
-			// is this the most unnecessary thing in the world? yes
-			// does it ensure that there is no visual discrepancy to the user? also yes
-			this.highlightMutationObserver = new MutationObserver((mutations) => {
-				mutations.forEach((mutation) => {
-					if (mutation.type === "childList") {
-						mutation.addedNodes.forEach((node) => {
-							if (node.nodeType === Node.TEXT_NODE) {
-								this.applyColumnHighlights();
-								this.disconnectHighlightObserver();
-							}
-						});
-					}
-					// if (
-					//   mutation.type === "attributes" &&
-					//   mutation.attributeName === "class"
-					// ) {
-					//   this.applyColumnHighlights();
-					//   this.disconnectHighlightObserver();
-					// }
-				});
-			});
-			this.highlightMutationObserver.observe(row, {
-				childList: true,
-				subtree: true,
-				attributes: true,
-			});
-			if (this.highlightObserverTimeoutId)
-				clearTimeout(this.highlightObserverTimeoutId);
-			this.highlightObserverTimeoutId = window.setTimeout(() => {
-				this.disconnectHighlightObserver();
-			}, 3000);
-		};
-
-		this.tbody.addEventListener("dragstart", this.dragStartListener);
-
-		this.tbody.addEventListener("dragend", this.dragEndListener, {
-			capture: true,
-		});
-	}
-
-	private disconnectHighlightObserver(): void {
-		if (this.highlightMutationObserver) {
-			this.highlightMutationObserver.disconnect();
-			this.highlightMutationObserver = null;
-		}
-		if (this.highlightObserverTimeoutId) {
-			clearTimeout(this.highlightObserverTimeoutId);
-			this.highlightObserverTimeoutId = null;
-		}
-	}
-
 	private attachRowObserver() {
 		if (!this.tableHR) return;
 
@@ -195,7 +176,6 @@ class DraftRankingVisualizer {
 							if (span?.textContent?.trim() === "OVR") {
 								this.initializeTableReferences();
 								this.renderColumns();
-								this.applyColumnHighlights();
 							}
 						}
 					});
@@ -235,7 +215,6 @@ class DraftRankingVisualizer {
 			return;
 		}
 
-		// remove previously added columns and their headers
 		this.removeColumns();
 
 		const tabElement = this.ovrTab;
@@ -244,7 +223,6 @@ class DraftRankingVisualizer {
 		const ovrIdx = Array.from(headerRow.children).indexOf(tabElement);
 
 		const minHeader = this.createOvrLabelSpan("MIN");
-
 		const maxHeader = this.createOvrLabelSpan("MAX");
 
 		this.tableHR.insertBefore(maxHeader, this.ovrTab.nextSibling);
@@ -256,10 +234,12 @@ class DraftRankingVisualizer {
 
 			const minDataCell = document.createElement("td");
 			minDataCell.className = "px-4 text-center";
+			minDataCell.dataset.hnFeature = DRAFT_RANKING_FEATURE_ID;
 			minDataCell.dataset.column = "min-ovr";
 
 			const maxDataCell = document.createElement("td");
 			maxDataCell.className = "px-4 text-center";
+			maxDataCell.dataset.hnFeature = DRAFT_RANKING_FEATURE_ID;
 			maxDataCell.dataset.column = "max-ovr";
 
 			minDataCell.appendChild(
@@ -274,30 +254,16 @@ class DraftRankingVisualizer {
 		});
 	}
 
-	private applyColumnHighlights(): void {
-		if (!this.parent || !this.picks) return;
-
-		this.parent.querySelectorAll(`[data-column]`).forEach((node) => {
-			node.classList.remove(DR_HIGHLIGHT_CLASS);
-			if (
-				this.picks?.includes(
-					(node.parentElement as HTMLTableRowElement)?.rowIndex,
-				)
-			)
-				node.classList.add(DR_HIGHLIGHT_CLASS);
-		});
-	}
-
 	private createOvrLabelSpan(text: string): HTMLTableCellElement {
 		const header = document.createElement("th");
 		header.classList.add("px-4", "py-2");
+		header.dataset.hnFeature = DRAFT_RANKING_FEATURE_ID;
 		header.dataset.column = `${text.toLowerCase()}-ovr`;
 
 		header.innerHTML = `<span>${text}</span>`;
 		return header;
 	}
 
-	// modify to include empty fields
 	private createRatingSpan(ovr: number, scout: ScoutLevel): HTMLSpanElement {
 		const ratingSpan: HTMLSpanElement = document.createElement("span");
 		if (scout === 1 || !ovr || ovr <= 0) {
@@ -326,18 +292,26 @@ class DraftRankingVisualizer {
 	}
 }
 
-const drVisualizerInstance = new DraftRankingVisualizer();
+function getDraftRankingResources(
+	resources: ResourceStore,
+): DraftRankingResources | null {
+	const draftRanking = resources.get<Roster>(DRAFT_RANKING_RESOURCE);
+	if (!draftRanking) return null;
+
+	return {
+		draftRanking,
+		picks: resources.get<number[]>(DRAFT_RANKING_PICKS_RESOURCE) ?? [],
+	};
+}
 
 export function handleDraftRankingData(data: any) {
-	const newDraftRanking = new Roster({ players: data });
-	drVisualizerInstance.updateRanking(newDraftRanking);
+	extensionRuntime.setResource(
+		DRAFT_RANKING_RESOURCE,
+		new Roster({ players: data }),
+	);
 }
 
 export function handleDraftPickData(data: any) {
 	const picks = data.map((pick: any) => pick.rank);
-	drVisualizerInstance.updatePicks(picks);
-}
-
-export function manipulateDraftRankingPage(el: HTMLElement) {
-	drVisualizerInstance.attach(el);
+	extensionRuntime.setResource(DRAFT_RANKING_PICKS_RESOURCE, picks);
 }

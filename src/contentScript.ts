@@ -1,34 +1,26 @@
 (() => {
 	const EXTENSION_STYLE_ID = `hockey-nation-ext-styles`;
-	const DR_HIGHLIGHT_CLASS = "draft-ranking-highlight";
-	const DR_GHOST_TRIM = "draft-ranking-ghost-trim";
 
 	if (document.getElementById(EXTENSION_STYLE_ID)) {
 		return;
 	}
 
 	const cssRules = `
-      [data-column] {
+    [data-column] {
         background-color: transparent;
-      }
+    }
 
-      tr.ghost [data-column] {
-          background-color: var(--bg-orange-300);
-        }
-
-      .${DR_HIGHLIGHT_CLASS} {
-        border-color: #6ee7b7;
+    tr.own [data-column] {
+        border-color: var(--border-green-300);
         border-bottom-width: 1px;
         border-top-width: 1px;
-        background-color: #d1fae5;
-      }
+        background-color: var(--bg-green-100);
+    }
 
-      .${DR_GHOST_TRIM} {
-        border-color: #6ee7b7;
-        border-bottom-width: 1px;
-        border-top-width: 1px;
-        background-color: #fbd38d;
-      }
+    tr.ghost [data-column] {
+        background-color: var(--bg-orange-300);
+    }
+
     `;
 
 	const styleElement = document.createElement("style");

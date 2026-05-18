@@ -1,290 +1,180 @@
+import {
+	extensionRuntime,
+	type FeatureDefinition,
+	type MountedFeature,
+	type ResourceStore,
+} from "../runtime";
 import { Roster } from "./roster";
-
-interface DraftCards {
-    [id: string]: HTMLElement;
-}
 
 type ScoutLevel = 0 | 1 | 2;
 
-class DraftClassVisualizer {
-    private parent: HTMLElement | null = null;
-    private draftClass: Roster | null = null;
-    private draftCards: DraftCards | null = null;
-
-    private toggleButtonListener: (() => void) | null = null;
-    private paginationButtonListeners: Map<HTMLButtonElement, () => void> =
-        new Map();
-    private selectMenuListeners: Map<HTMLSelectElement, () => void> = new Map();
-    private mutationObserver: MutationObserver | null = null;
-    private observerTimeoutId: number | null = null;
-
-    constructor() {}
-
-    public attach(el: HTMLElement) {
-        this.detach(); // clean up any previous state/listeners
-
-        this.parent = el;
-
-        if (this.parent && this.draftClass) {
-            this.initializeDOMReferences(); // Find cards within the new parent
-            this.attachEventListeners(); // Add listeners within the new parent scope
-            this.addBadges(); // Add badges based on current data/DOM
-        }
-    }
-
-    public detach() {
-        if (!this.parent) return;
-
-        const toggleButton = document.querySelectorAll(`.btn-toggle`)[1] as
-            | HTMLButtonElement
-            | undefined;
-        if (toggleButton && this.toggleButtonListener) {
-            toggleButton.removeEventListener(
-                "click",
-                this.toggleButtonListener,
-            );
-            this.toggleButtonListener = null;
-        }
-
-        // remove pagination listeners
-        this.paginationButtonListeners.forEach((listener, button) => {
-            button.removeEventListener("click", listener);
-        });
-        this.paginationButtonListeners.clear();
-
-        // remove select menu listeners and observer
-        this.selectMenuListeners.forEach((listener, select) => {
-            select.removeEventListener("change", listener);
-        });
-        this.selectMenuListeners.clear();
-        this.disconnectObserver(); // disconnect observer if active
-
-        this.parent = null;
-        this.draftCards = null;
-    }
-
-    public updateData(newData: Roster | null) {
-        this.draftClass = newData;
-
-        if (this.parent) {
-            this.initializeDOMReferences();
-            this.addBadges();
-        }
-    }
-
-    private initializeDOMReferences(): void {
-        if (!this.parent) return;
-
-        const rows = this.parent.querySelectorAll("[id^='draftee-card']");
-        const dc = {} as DraftCards;
-
-        rows.forEach((row) => {
-            const card = row as HTMLElement;
-
-            const playerLink = card.querySelector(`a[href^='/player/']`);
-            const badge = card.querySelector(".badge"); // needed by addBadges later
-
-            if (!playerLink || !badge) return;
-
-            const playerId = playerLink.getAttribute("href")?.split("/").pop();
-            if (playerId) {
-                dc[playerId] = card;
-            }
-        });
-
-        this.draftCards = dc;
-    }
-
-    private attachEventListeners(): void {
-        if (!this.parent) return;
-
-        const toggleButton = document.querySelectorAll(`.btn-toggle`)[1] as
-            | HTMLButtonElement
-            | undefined;
-        if (toggleButton) {
-            this.toggleButtonListener = () => {
-                this.initializeDOMReferences();
-                this.addBadges();
-            };
-            toggleButton.addEventListener("click", this.toggleButtonListener);
-        }
-
-        this.paginationButtonListeners.clear(); // clear map before adding
-        const buttons = Array.from(
-            this.parent.querySelectorAll("button"),
-        ).filter((btn) => {
-            const hasMatchingSpan = Array.from(
-                btn.querySelectorAll("span"),
-            ).some((span) =>
-                /^(1|21|41|61|81)-\d+$/.test(span.textContent?.trim() ?? ""),
-            );
-
-            const buttonText = Array.from(btn.childNodes)
-                .filter((node) => node.nodeType === Node.TEXT_NODE)
-                .map((node) => node.textContent?.trim())
-                .join("");
-            const hasMatchingDirectText = /^(1|21|41|61|81)-\d+$/.test(
-                buttonText,
-            );
-
-            return hasMatchingSpan || hasMatchingDirectText;
-        });
-
-        buttons.forEach((button) => {
-            const listener = () => {
-                this.initializeDOMReferences();
-                this.addBadges();
-            };
-            button.addEventListener("click", listener);
-            this.paginationButtonListeners.set(button, listener); // store for removal
-        });
-
-        this.selectMenuListeners.clear();
-        this.parent.querySelectorAll("select").forEach((menu) => {
-            const listener = () => {
-                this.disconnectObserver(); // disconnect previous observer
-
-                this.mutationObserver = new MutationObserver((mutations) => {
-                    const hasRelevantChanges = mutations.some(
-                        (mutation) =>
-                            mutation.addedNodes.length > 0 &&
-                            Array.from(mutation.addedNodes).some(
-                                (node) =>
-                                    node.nodeType === Node.ELEMENT_NODE &&
-                                    (node as Element).querySelector(
-                                        '[id^="draftee-card"]',
-                                    ),
-                            ),
-                    );
-
-                    if (hasRelevantChanges) {
-                        this.initializeDOMReferences();
-                        this.addBadges();
-                        this.disconnectObserver();
-                    }
-                });
-
-                this.mutationObserver.observe(this.parent!, {
-                    childList: true,
-                    subtree: true,
-                });
-
-                if (this.observerTimeoutId)
-                    clearTimeout(this.observerTimeoutId);
-                this.observerTimeoutId = window.setTimeout(() => {
-                    this.disconnectObserver();
-                }, 3000); // 3 seconds
-            };
-            menu.addEventListener("change", listener);
-            this.selectMenuListeners.set(menu, listener);
-        });
-    }
-
-    private disconnectObserver(): void {
-        if (this.mutationObserver) {
-            this.mutationObserver.disconnect();
-            this.mutationObserver = null;
-        }
-        if (this.observerTimeoutId) {
-            clearTimeout(this.observerTimeoutId);
-            this.observerTimeoutId = null;
-        }
-    }
-
-    private addBadges(): void {
-        // Adds Min/Max badges to draft cards
-        if (!this.draftCards || !this.draftClass) return;
-
-        Object.entries(this.draftCards).forEach(([playerId, card]) => {
-            // //safety
-            if (card.getAttribute("data-ovr-badges-added") === "true") return;
-
-            const badgeContainer = card.querySelector(`.badge`)?.parentElement;
-            if (!badgeContainer) return;
-
-            const player = this.draftClass!.getPlayer(playerId); // draftClass checked above
-            if (!player) return;
-
-            badgeContainer
-                .querySelectorAll(".dynamic-ovr-label, .dynamic-ovr-badge")
-                .forEach((el) => el.remove());
-
-            // Add MIN
-            badgeContainer.appendChild(this.createOvrLabelSpan("MIN"));
-            badgeContainer.appendChild(
-                this.createRatingSpan(
-                    player.getMinOvr(),
-                    player.getScoutLevel(),
-                ),
-            );
-
-            // Add MAX
-            badgeContainer.appendChild(this.createOvrLabelSpan("MAX"));
-            badgeContainer.appendChild(
-                this.createRatingSpan(
-                    player.getMaxOvr(),
-                    player.getScoutLevel(),
-                ),
-            );
-
-            card.setAttribute("data-ovr-badges-added", "true");
-        });
-    }
-
-    private createOvrLabelSpan(text: string): HTMLSpanElement {
-        const label = document.createElement("span");
-        // add a class to make it easier to remove later
-        label.classList.add(
-            "dynamic-ovr-label",
-            "uppercase",
-            "ml-3",
-            "xs:inline-block",
-            "hidden",
-        );
-        label.innerText = text;
-        return label;
-    }
-
-    private createRatingSpan(ovr: number, scout: ScoutLevel): HTMLSpanElement {
-        const ratingSpan = document.createElement("span");
-        if (scout === 1 || !ovr || ovr <= 0) {
-            ratingSpan.innerText = "N/A";
-            ratingSpan.style.color = "#FF2C2C";
-            ratingSpan.style.textAlign = "center";
-            ratingSpan.style.padding = ".25rem .375rem";
-            ratingSpan.style.fontWeight = "600";
-        } else {
-            ratingSpan.classList.add("dynamic-ovr-badge", "badge", "ml-1");
-            ratingSpan.style.userSelect = "none";
-            ratingSpan.innerText = ovr.toString() + (scout === 2 ? "*" : "");
-
-            if (
-                window.userData &&
-                typeof window.userData.getColorPair === "function" &&
-                ovr > 0
-            ) {
-                try {
-                    const [bgColor, color] = window.userData.getColorPair(ovr);
-                    ratingSpan.style.backgroundColor = bgColor;
-                    ratingSpan.style.color = color;
-                } catch (e) {
-                    console.error("Error getting color pair for OVR:", ovr, e);
-                }
-            }
-        }
-        return ratingSpan;
-    }
+interface DraftClassResources {
+	draftClass: Roster;
 }
 
-const draftVisualizerInstance = new DraftClassVisualizer();
+const DRAFT_CLASS_RESOURCE = "draftClass";
+const DRAFT_CLASS_FEATURE_ID = "draft-class-badges";
+const OWNED_SELECTOR = `[data-hn-feature="${DRAFT_CLASS_FEATURE_ID}"]`;
+
+export const draftClassFeature: FeatureDefinition<DraftClassResources> = {
+	id: DRAFT_CLASS_FEATURE_ID,
+	route: (url) => url.pathname.startsWith("/office/draft-center"),
+	target: {
+		selector: ".stats-container",
+		isReady: (root) =>
+			!!root.querySelector('[id^="draftee-card"] a[href^="/player/"]') &&
+			!!root.querySelector('[id^="draftee-card"] .badge'),
+	},
+	getResources: (resources) => getDraftClassResources(resources),
+	mount: (context) => new DraftClassBadgesFeature(context),
+};
+
+class DraftClassBadgesFeature implements MountedFeature<DraftClassResources> {
+	private root: HTMLElement;
+	private draftClass: Roster;
+
+	constructor(context: {
+		root: HTMLElement;
+		resources: DraftClassResources;
+	}) {
+		this.root = context.root;
+		this.draftClass = context.resources.draftClass;
+		this.render();
+	}
+
+	public update(context: {
+		root: HTMLElement;
+		resources: DraftClassResources;
+	}): void {
+		this.root = context.root;
+		this.draftClass = context.resources.draftClass;
+		this.render();
+	}
+
+	public dispose(): void {
+		clearDraftClassBadges(this.root);
+	}
+
+	private render(): void {
+		renderDraftClassBadges(this.root, this.draftClass);
+	}
+}
+
+function getDraftClassResources(
+	resources: ResourceStore,
+): DraftClassResources | null {
+	const draftClass = resources.get<Roster>(DRAFT_CLASS_RESOURCE);
+	return draftClass ? { draftClass } : null;
+}
+
+function renderDraftClassBadges(root: HTMLElement, draftClass: Roster): void {
+	const cards = root.querySelectorAll<HTMLElement>('[id^="draftee-card"]');
+
+	cards.forEach((card) => {
+		card.removeAttribute("data-ovr-badges-added");
+
+		const badgeContainer = card.querySelector(".badge")?.parentElement;
+		if (!badgeContainer) return;
+
+		const playerId = card
+			.querySelector(`a[href^="/player/"]`)
+			?.getAttribute("href")
+			?.split("/")
+			.pop();
+
+		if (!playerId) return;
+
+		const player = draftClass.getPlayer(playerId);
+		if (!player) return;
+
+		const signature = [
+			playerId,
+			player.getMinOvr(),
+			player.getMaxOvr(),
+			player.getScoutLevel(),
+		].join(":");
+
+		const existingBadgeGroup =
+			badgeContainer.querySelector<HTMLElement>(OWNED_SELECTOR);
+		if (existingBadgeGroup?.dataset.hnSignature === signature) return;
+
+		badgeContainer
+			.querySelectorAll(
+				`${OWNED_SELECTOR}, .dynamic-ovr-label, .dynamic-ovr-badge`,
+			)
+			.forEach((el) => el.remove());
+
+		const badgeGroup = document.createElement("span");
+		badgeGroup.dataset.hnFeature = DRAFT_CLASS_FEATURE_ID;
+		badgeGroup.dataset.hnSignature = signature;
+		badgeGroup.appendChild(createOvrLabelSpan("MIN"));
+		badgeGroup.appendChild(
+			createRatingSpan(player.getMinOvr(), player.getScoutLevel()),
+		);
+		badgeGroup.appendChild(createOvrLabelSpan("MAX"));
+		badgeGroup.appendChild(
+			createRatingSpan(player.getMaxOvr(), player.getScoutLevel()),
+		);
+		badgeContainer.appendChild(badgeGroup);
+	});
+}
+
+function clearDraftClassBadges(root: HTMLElement): void {
+	root.querySelectorAll(OWNED_SELECTOR).forEach((el) => el.remove());
+	root
+		.querySelectorAll("[data-ovr-badges-added]")
+		.forEach((el) => el.removeAttribute("data-ovr-badges-added"));
+}
+
+function createOvrLabelSpan(text: string): HTMLSpanElement {
+	const label = document.createElement("span");
+	label.dataset.hnFeature = DRAFT_CLASS_FEATURE_ID;
+	label.classList.add(
+		"dynamic-ovr-label",
+		"uppercase",
+		"ml-3",
+		"xs:inline-block",
+		"hidden",
+	);
+	label.innerText = text;
+	return label;
+}
+
+function createRatingSpan(ovr: number, scout: ScoutLevel): HTMLSpanElement {
+	const ratingSpan = document.createElement("span");
+	ratingSpan.dataset.hnFeature = DRAFT_CLASS_FEATURE_ID;
+
+	if (scout === 1 || !ovr || ovr <= 0) {
+		ratingSpan.innerText = "N/A";
+		ratingSpan.style.color = "#FF2C2C";
+		ratingSpan.style.textAlign = "center";
+		ratingSpan.style.padding = ".25rem .375rem";
+		ratingSpan.style.fontWeight = "600";
+		return ratingSpan;
+	}
+
+	ratingSpan.classList.add("dynamic-ovr-badge", "badge", "ml-1");
+	ratingSpan.style.userSelect = "none";
+	ratingSpan.innerText = ovr.toString() + (scout === 2 ? "*" : "");
+
+	if (
+		window.userData &&
+		typeof window.userData.getColorPair === "function" &&
+		ovr > 0
+	) {
+		try {
+			const [bgColor, color] = window.userData.getColorPair(ovr);
+			ratingSpan.style.backgroundColor = bgColor;
+			ratingSpan.style.color = color;
+		} catch (e) {
+			console.error("Error getting color pair for OVR:", ovr, e);
+		}
+	}
+
+	return ratingSpan;
+}
 
 export function handleDraftClassData(data: any) {
-    const rosterData = { ...data, players: data.draftees };
-    const newRoster = new Roster(rosterData);
-
-    draftVisualizerInstance.updateData(newRoster);
-}
-
-export function manipulateDraftClassPage(el: HTMLElement) {
-    draftVisualizerInstance.attach(el);
+	const rosterData = { ...data, players: data.draftees };
+	extensionRuntime.setResource(DRAFT_CLASS_RESOURCE, new Roster(rosterData));
 }
