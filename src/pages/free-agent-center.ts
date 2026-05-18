@@ -26,8 +26,9 @@ export const freeAgentCenterFeature: FeatureDefinition<FreeAgentCenterResources>
 		route: (url) => url.pathname.startsWith("/office/free-agent-center"),
 		target: {
 			selector: CARD_SELECTOR,
-			resolveRoot: (match) => match.parentElement,
+			resolveRoot: (match) => findFreeAgentCenterRoot(match),
 			isReady: (root) =>
+				isSearchTabActive(root) &&
 				!!root.querySelector(`${CARD_SELECTOR} ${PLAYER_LINK_SELECTOR}`) &&
 				!!root.querySelector(`${CARD_SELECTOR} .badge`),
 		},
@@ -73,6 +74,24 @@ function getFreeAgentCenterResources(
 ): FreeAgentCenterResources | null {
 	const freeAgents = resources.get<Roster>(FREE_AGENT_CENTER_RESOURCE);
 	return freeAgents ? { freeAgents } : null;
+}
+
+function findFreeAgentCenterRoot(match: HTMLElement): HTMLElement | null {
+	let current: HTMLElement | null = match;
+
+	while (current && current !== document.body) {
+		if (current.querySelector(".btn-toggle") && current.contains(match)) {
+			return current;
+		}
+		current = current.parentElement;
+	}
+
+	return match.parentElement;
+}
+
+function isSearchTabActive(root: HTMLElement): boolean {
+	const activeTab = root.querySelector<HTMLButtonElement>(".btn-toggle.active");
+	return activeTab?.textContent?.trim() === "Search";
 }
 
 export function handleFreeAgentCenterData(data: any[]) {

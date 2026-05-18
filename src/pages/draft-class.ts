@@ -20,10 +20,11 @@ export const draftClassFeature: FeatureDefinition<DraftClassResources> = {
 	id: DRAFT_CLASS_FEATURE_ID,
 	route: (url) => url.pathname.startsWith("/office/draft-center"),
 	target: {
-		selector: ".stats-container",
+		selector: `[id^="draftee-card"] a[href^="/player/"]`,
+		resolveRoot: (match) => match.closest<HTMLElement>('[id^="draftee-card"]'),
 		isReady: (root) =>
-			!!root.querySelector('[id^="draftee-card"] a[href^="/player/"]') &&
-			!!root.querySelector('[id^="draftee-card"] .badge'),
+			!!root.querySelector('a[href^="/player/"]') &&
+			!!root.querySelector(".badge"),
 	},
 	getResources: (resources) => getDraftClassResources(resources),
 	mount: (context) => new DraftClassBadgesFeature(context),
@@ -68,7 +69,7 @@ function getDraftClassResources(
 }
 
 function renderDraftClassBadges(root: HTMLElement, draftClass: Roster): void {
-	const cards = root.querySelectorAll<HTMLElement>('[id^="draftee-card"]');
+	const cards = getDraftClassCards(root);
 
 	cards.forEach((card) => {
 		card.removeAttribute("data-ovr-badges-added");
@@ -119,8 +120,21 @@ function renderDraftClassBadges(root: HTMLElement, draftClass: Roster): void {
 	});
 }
 
+function getDraftClassCards(root: HTMLElement): HTMLElement[] {
+	const cards = Array.from(
+		root.querySelectorAll<HTMLElement>('[id^="draftee-card"]'),
+	);
+
+	if (root.matches('[id^="draftee-card"]')) {
+		cards.unshift(root);
+	}
+
+	return cards;
+}
+
 function clearDraftClassBadges(root: HTMLElement): void {
 	root.querySelectorAll(OWNED_SELECTOR).forEach((el) => el.remove());
+	root.removeAttribute("data-ovr-badges-added");
 	root
 		.querySelectorAll("[data-ovr-badges-added]")
 		.forEach((el) => el.removeAttribute("data-ovr-badges-added"));
