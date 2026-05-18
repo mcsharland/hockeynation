@@ -173,7 +173,7 @@ function updateToggleVisual(toggle: HTMLElement, enabled: boolean): void {
 	toggle.setAttribute("aria-checked", String(enabled));
 	toggle.style.background = enabled
 		? "rgb(16, 185, 129)"
-		: "rgb(156, 163, 175)";
+		: "rgb(188, 186, 190)";
 
 	const dot = toggle.querySelector<HTMLElement>(".v-toggle-dot");
 	if (dot) {
