@@ -1,48 +1,57 @@
 export const VIEW_SETTINGS_STORAGE_KEY = "hn-view-settings-v1";
+// used b/c local storage's "storage" event doesn't broadcast in tab that writes the value
 export const VIEW_SETTINGS_CHANGED_EVENT = "hn-view-settings-changed";
 const VIEW_SETTINGS_CHANNEL = "hn-view-settings-channel";
 
+// display order matches index order
 export const VIEW_SETTING_DEFINITIONS = [
 	{
 		key: "roster",
 		title: "Roster Columns",
-		description: "Show projected overall columns on roster tables.",
+		description:
+			"Display Min/Max OVR columns on the roster tables. Disable to hide it.",
 		defaultEnabled: true,
 	},
 	{
 		key: "draftClass",
 		title: "Draft Class Cards",
-		description: "Show projected overall badges on draft class cards.",
+		description:
+			"Display Min/Max OVR badges on draft class cards. Disable to hide it.",
 		defaultEnabled: true,
 	},
 	{
 		key: "draftRanking",
 		title: "Draft Ranking Columns",
-		description: "Show projected overall columns on draft ranking tables.",
+		description:
+			"Display Min/Max OVR columns on draft ranking tables. Disable to hide it.",
 		defaultEnabled: true,
 	},
 	{
 		key: "freeAgentSearch",
 		title: "Free Agent Search Cards",
-		description: "Show projected overall badges on free agent search results.",
+		description:
+			"Display Min/Max OVR badges on free agent search results. Disable to hide it.",
 		defaultEnabled: true,
 	},
 	{
 		key: "tradeCenter",
 		title: "Trade Center Cards",
-		description: "Show projected overall badges on trade center cards.",
+		description:
+			"Display Min/Max OVR badges on trade center cards. Disable to hide it.",
 		defaultEnabled: true,
 	},
 	{
 		key: "coachingStaff",
 		title: "Coaching Staff Columns",
-		description: "Show projected overall columns on coaching staff tables.",
+		description:
+			"Display Min/Max columns on coaching staff tables. Disable to hide it.",
 		defaultEnabled: true,
 	},
 	{
 		key: "coachMarket",
 		title: "Coach Market Columns",
-		description: "Show projected overall columns on coach market tables.",
+		description:
+			"Display Min/Max columns on coach market tables. Disable to hide it.",
 		defaultEnabled: true,
 	},
 ] as const;
@@ -51,6 +60,7 @@ export type ViewSettingDefinition = (typeof VIEW_SETTING_DEFINITIONS)[number];
 export type ViewSettingKey = ViewSettingDefinition["key"];
 export type ViewSettings = Record<ViewSettingKey, boolean>;
 
+// only store overrides and fill with defaults
 export function getViewSettings(): ViewSettings {
 	return {
 		...getDefaultViewSettings(),
@@ -73,12 +83,14 @@ export function setViewSetting(key: ViewSettingKey, enabled: boolean): void {
 		return;
 	}
 
+	// notify current tab
 	window.dispatchEvent(
 		new CustomEvent(VIEW_SETTINGS_CHANGED_EVENT, {
 			detail: { key, enabled, settings },
 		}),
 	);
 
+	// notify other open tabs to refect the update
 	if ("BroadcastChannel" in window) {
 		const channel = new BroadcastChannel(VIEW_SETTINGS_CHANNEL);
 		channel.postMessage({ key, enabled });

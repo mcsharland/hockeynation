@@ -7,7 +7,7 @@ declare global {
 type ColorConfig = { id: string; value: string };
 
 /*
-This could be improved by also intercepting calls to settings api, and updating colors in the class as the user updates them
+This could be improved by also intercepting calls to settings api, and updating colors as the user updates them
 This is because the settings object isn't sent again after colors are updated, making class colors slightly outdated
 Is resolved on a refresh though
 */
@@ -39,7 +39,7 @@ export class User {
 	private "color-rating-40less": string = "#f8f8f9";
 
 	constructor(data?: any) {
-		data && data?.settings && this.loadFromConfig(data.settings);
+		data?.settings && this.loadFromConfig(data.settings);
 	}
 
 	private loadFromConfig(config: ColorConfig[]): void {

@@ -1,23 +1,35 @@
 export type ResourceKey = string;
 
+// runtime resources are api-derived data captured by the fetch interceptor
+// features can read from the store, but only the runtime writes to it
 export interface ResourceStore {
 	has(key: ResourceKey): boolean;
 	get<T>(key: ResourceKey): T | null;
 }
 
+// where a feature should mount in the HN DOM
 export interface FeatureTarget {
+	// broad selector to find candidate element
 	selector: string;
+	// optional step from a matched child element to the DOM region the feature owns
 	resolveRoot?: (match: HTMLElement) => HTMLElement | null;
+	// optional readiness check for pages that render in stages
+	// false delays mounting until DOM has expected structure
 	isReady?: (root: HTMLElement) => boolean;
+	// optional stable key for roots that should survive DOM churn
+	// if omitted runtime assigns a WeakMap id to the root element
 	getKey?: (root: HTMLElement) => string;
 }
 
+// passed to mounted features whenever they mount or update
 export interface FeatureContext<TResources> {
-	root: HTMLElement;
-	match: HTMLElement;
+	root: HTMLElement; // DOM region the feature owns
+	match: HTMLElement; // original selector hit
 	resources: TResources;
 }
 
+// live feature instance bound to one DOM root
+// dispose must undo all DOM injections, listerners, and observers owned by the feature
 export interface MountedFeature<TResources = unknown> {
 	update?: (context: FeatureContext<TResources>) => void;
 	dispose: () => void;
@@ -39,6 +51,7 @@ interface MountedFeatureRecord {
 }
 
 class RuntimeResourceStore implements ResourceStore {
+	// unknown because each feature owns shape it asks for
 	private values = new Map<ResourceKey, unknown>();
 
 	public set(key: ResourceKey, value: unknown): void {
@@ -55,6 +68,7 @@ class RuntimeResourceStore implements ResourceStore {
 }
 
 class ExtensionRuntime {
+	// latest intercepted api data
 	private readonly resources = new RuntimeResourceStore();
 	private readonly mounted = new Map<string, MountedFeatureRecord>();
 	private readonly rootIds = new WeakMap<HTMLElement, string>();
@@ -64,6 +78,7 @@ class ExtensionRuntime {
 	private started = false;
 	private nextRootId = 1;
 
+	// replace feature registry and reconsile immediately
 	public registerFeatures(features: FeatureDefinition<any>[]): void {
 		this.features = [...features];
 		this.scheduleReconcile();
@@ -85,6 +100,7 @@ class ExtensionRuntime {
 		this.scheduleReconcile();
 	}
 
+	// watch SPA DOM for changes, schedule reconciliation when page changes
 	private ensureObserver(): void {
 		if (this.observer || !document.body) return;
 
@@ -131,6 +147,7 @@ class ExtensionRuntime {
 		return !!node.parentElement?.closest("[data-hn-feature]");
 	}
 
+	// coalesces multiple rapid signals into one
 	private scheduleReconcile(): void {
 		if (this.reconcileScheduled) return;
 		this.reconcileScheduled = true;
@@ -150,11 +167,15 @@ class ExtensionRuntime {
 
 		for (const feature of this.features) {
 			if (!feature.route(url) || feature.enabled?.() === false) {
+				// dispose all live instances for given feature
 				this.disposeFeature(feature.id);
 				continue;
 			}
 
 			const resources = feature.getResources(this.resources);
+			// data has not arrived yet
+			// interceptor stores the data & feature will mount later when
+			// another reconciliation is scheduled
 			if (!resources) {
 				continue;
 			}
@@ -166,6 +187,7 @@ class ExtensionRuntime {
 				const mounted = this.mounted.get(key);
 
 				if (!mounted || mounted.root !== root) {
+					// dispose stale references before mounting against current node
 					mounted?.instance.dispose();
 					this.mounted.set(key, {
 						featureId: feature.id,
@@ -179,6 +201,7 @@ class ExtensionRuntime {
 			}
 		}
 
+		// safety
 		for (const [key, mounted] of this.mounted) {
 			if (!mounted.root.isConnected || !activeKeys.has(key)) {
 				mounted.instance.dispose();
@@ -197,6 +220,7 @@ class ExtensionRuntime {
 
 		for (const match of matches) {
 			const root = feature.target.resolveRoot?.(match) ?? match;
+			// seenRoots prevents remounting same feature multiple times
 			if (!root || !root.isConnected || seenRoots.has(root)) continue;
 			if (feature.target.isReady && !feature.target.isReady(root)) continue;
 
@@ -212,6 +236,8 @@ class ExtensionRuntime {
 		return targets;
 	}
 
+	// target identity tied to the actual DOM element
+	// if replaced it received a new id and the old one is replaced
 	private getRootId(root: HTMLElement): string {
 		const existing = this.rootIds.get(root);
 		if (existing) return existing;
