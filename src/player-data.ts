@@ -1,5 +1,5 @@
 export type StatStrength = "strongest" | "weakest" | null;
-export type ScoutLevel = 0 | 1 | 2;
+export type PlayerInfoVisibility = "full" | "none" | "partial";
 
 export interface ApiSkill {
 	id: string;
@@ -69,12 +69,16 @@ export function toSkillMap(skills: readonly NormalizedSkill[]): SkillMap {
 	}, {});
 }
 
-export function getScoutLevel(skills: readonly NormalizedSkill[]): ScoutLevel {
-	if (skills.length === 0) return 0;
+export function getPlayerInfoVisibility(
+	skills: readonly NormalizedSkill[],
+): PlayerInfoVisibility {
+	if (skills.length === 0) return "none";
 
 	const allHidden = skills.every((skill) => skill.hidden);
 	const someHidden = skills.some((skill) => skill.hidden);
-	return allHidden ? 1 : someHidden ? 2 : 0;
+	if (allHidden) return "none";
+	if (someHidden) return "partial";
+	return "full";
 }
 
 export function getPlayerFullName(player: Pick<ApiPlayer, "firstname" | "lastname">) {

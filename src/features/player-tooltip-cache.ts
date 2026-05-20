@@ -2,10 +2,10 @@ import {
 	type ApiPlayer,
 	type ApiPlayerTalents,
 	getPlayerFullName,
-	getScoutLevel,
+	getPlayerInfoVisibility,
 	type NormalizedSkill,
 	normalizeSkills,
-	type ScoutLevel,
+	type PlayerInfoVisibility,
 } from "../player-data";
 
 export interface PlayerTooltipData {
@@ -19,7 +19,7 @@ export interface PlayerTooltipData {
 	nationId?: string;
 	positions: string[];
 	skills: NormalizedSkill[];
-	scoutLevel: ScoutLevel;
+	infoVisibility: PlayerInfoVisibility;
 	talents?: ApiPlayerTalents;
 	specialSkillCount: number;
 	specialSkillIds: string[];
@@ -55,7 +55,7 @@ class PlayerTooltipCache {
 			nationId: player.nationId,
 			positions: player.positions ?? [],
 			skills,
-			scoutLevel: getScoutLevel(skills),
+			infoVisibility: getPlayerInfoVisibility(skills),
 			talents: player.talents,
 			specialSkillCount:
 				player.specialSkillCount ?? player.specialSkills?.length ?? 0,

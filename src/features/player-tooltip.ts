@@ -464,7 +464,7 @@ function renderCompactBody(): HTMLElement {
 }
 
 function hasFullTooltipDetails(player: PlayerTooltipData): boolean {
-	return player.scoutLevel === 0 && player.skills.length > 0;
+	return player.infoVisibility === "full";
 }
 
 function renderSkills(player: PlayerTooltipData): HTMLElement {

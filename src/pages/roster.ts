@@ -1,4 +1,5 @@
 import { playerTooltipCache } from "../features/player-tooltip-cache";
+import type { PlayerInfoVisibility } from "../player-data";
 import {
 	extensionRuntime,
 	type FeatureContext,
@@ -14,8 +15,6 @@ interface Players {
 }
 
 type OvrType = "Default" | "Min" | "Max";
-
-type ScoutLevel = 0 | 1 | 2;
 
 interface RosterResources {
 	roster: Roster;
@@ -217,7 +216,7 @@ function getRosterSignature(rows: RosterRow[], roster: Roster): string {
 				playerId,
 				player.getMinOvr(),
 				player.getMaxOvr(),
-				player.getScoutLevel(),
+				player.getInfoVisibility(),
 			].join(":"),
 		)
 		.join("|");
@@ -254,10 +253,10 @@ function renderRosterColumns(
 ): void {
 	rows.forEach(({ player, row }) => {
 		row.appendChild(
-			createDataCell("min-ovr", player.getMinOvr(), player.getScoutLevel()),
+			createDataCell("min-ovr", player.getMinOvr(), player.getInfoVisibility()),
 		);
 		row.appendChild(
-			createDataCell("max-ovr", player.getMaxOvr(), player.getScoutLevel()),
+			createDataCell("max-ovr", player.getMaxOvr(), player.getInfoVisibility()),
 		);
 	});
 
@@ -286,20 +285,20 @@ function createFooterCell(column: string, ovr: number): HTMLTableCellElement {
 	cell.className = "md:px-4 px-2 py-2 text-center";
 	cell.dataset.hnFeature = ROSTER_FEATURE_ID;
 	cell.dataset.column = column;
-	cell.appendChild(createRatingSpan(ovr, 0));
+	cell.appendChild(createRatingSpan(ovr, "full"));
 	return cell;
 }
 
 function createDataCell(
 	column: string,
 	ovr: number,
-	scout: ScoutLevel,
+	infoVisibility: PlayerInfoVisibility,
 ): HTMLTableCellElement {
 	const cell = document.createElement("td");
 	cell.className = "md:px-4 px-2 py-2 text-center";
 	cell.dataset.hnFeature = ROSTER_FEATURE_ID;
 	cell.dataset.column = column;
-	cell.appendChild(createRatingSpan(ovr, scout));
+	cell.appendChild(createRatingSpan(ovr, infoVisibility));
 	return cell;
 }
 
@@ -315,7 +314,7 @@ function getRosterAvgOvr(roster: Roster, ovrType: OvrType): number {
 	const values = Object.values(players)
 		.filter(
 			(player) =>
-				player && !(player.getScoutLevel() === 1) && player.getOvr() > 0,
+				player && player.getInfoVisibility() !== "none" && player.getOvr() > 0,
 		)
 		.map((player) => playerOvr[ovrType](player));
 
@@ -326,9 +325,12 @@ function getRosterAvgOvr(roster: Roster, ovrType: OvrType): number {
 		: 0;
 }
 
-function createRatingSpan(ovr: number, scout: ScoutLevel): HTMLSpanElement {
+function createRatingSpan(
+	ovr: number,
+	infoVisibility: PlayerInfoVisibility,
+): HTMLSpanElement {
 	const ratingSpan: HTMLSpanElement = document.createElement("span");
-	if (scout === 1 || !ovr || ovr <= 0) {
+	if (infoVisibility === "none" || !ovr || ovr <= 0) {
 		ratingSpan.classList.add("question-mark");
 		ratingSpan.innerText = "?";
 		ratingSpan.style.color = "#bcbabe";
@@ -338,7 +340,8 @@ function createRatingSpan(ovr: number, scout: ScoutLevel): HTMLSpanElement {
 
 	ratingSpan.classList.add("badge");
 	ratingSpan.style.userSelect = "none";
-	ratingSpan.innerText = ovr.toString() + (scout === 2 ? "*" : "");
+	ratingSpan.innerText =
+		ovr.toString() + (infoVisibility === "partial" ? "*" : "");
 
 	if (window.userData && typeof window.userData.getColorPair === "function") {
 		try {

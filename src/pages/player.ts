@@ -1,9 +1,9 @@
 import {
 	type ApiPlayer,
-	getScoutLevel,
+	getPlayerInfoVisibility,
 	type NormalizedSkill,
 	normalizeSkills,
-	type ScoutLevel,
+	type PlayerInfoVisibility,
 	type SkillMap,
 	toSkillMap,
 } from "../player-data";
@@ -13,14 +13,14 @@ type Stats = SkillMap;
 
 interface PlayerStats {
 	stats: Stats;
-	scout: ScoutLevel;
+	infoVisibility: PlayerInfoVisibility;
 }
 
 export class Player {
 	private stats: Stats;
 	private minStats: Stats;
 	private maxStats: Stats;
-	private scoutLevel: ScoutLevel;
+	private infoVisibility: PlayerInfoVisibility;
 	private isAmateur: boolean;
 	private ovr: number;
 	private minOvr: number;
@@ -29,7 +29,7 @@ export class Player {
 	constructor(data: ApiPlayer) {
 		const player = this.parsePlayerData(data);
 		this.stats = player.stats;
-		this.scoutLevel = player.scout;
+		this.infoVisibility = player.infoVisibility;
 		this.isAmateur = data?.amateur ?? false;
 		this.minStats = this.calcMinStats(this.stats);
 		this.maxStats = this.calcMaxStats(this.stats);
@@ -50,7 +50,7 @@ export class Player {
 		const skills = normalizeSkills(data.skills, data.talents);
 		return {
 			stats: toSkillMap(skills),
-			scout: getScoutLevel(skills),
+			infoVisibility: getPlayerInfoVisibility(skills),
 		};
 	}
 
@@ -165,8 +165,8 @@ export class Player {
 		return this.maxStats;
 	}
 
-	public getScoutLevel(): ScoutLevel {
-		return this.scoutLevel;
+	public getInfoVisibility(): PlayerInfoVisibility {
+		return this.infoVisibility;
 	}
 
 	public getOvr(): number {
@@ -181,7 +181,7 @@ export class Player {
 	}
 
 	private calculateOVR(stats: Stats): number {
-		if (this.scoutLevel === 1) return 0;
+		if (this.infoVisibility === "none") return 0;
 		const statsValues = Object.values(stats);
 		const sum = statsValues.reduce(
 			(acc: number, stat: Stat) => acc + stat.rating,

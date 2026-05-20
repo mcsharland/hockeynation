@@ -1,4 +1,5 @@
 import { playerTooltipCache } from "../features/player-tooltip-cache";
+import type { PlayerInfoVisibility } from "../player-data";
 import {
 	extensionRuntime,
 	type FeatureDefinition,
@@ -7,8 +8,6 @@ import {
 } from "../runtime";
 import { isViewSettingEnabled } from "../view-settings";
 import { Roster } from "./roster";
-
-type ScoutLevel = 0 | 1 | 2;
 
 interface DraftClassResources {
 	draftClass: Roster;
@@ -95,7 +94,7 @@ function renderDraftClassBadges(root: HTMLElement, draftClass: Roster): void {
 			playerId,
 			player.getMinOvr(),
 			player.getMaxOvr(),
-			player.getScoutLevel(),
+			player.getInfoVisibility(),
 		].join(":");
 
 		const existingBadgeGroup =
@@ -113,11 +112,11 @@ function renderDraftClassBadges(root: HTMLElement, draftClass: Roster): void {
 		badgeGroup.dataset.hnSignature = signature;
 		badgeGroup.appendChild(createOvrLabelSpan("MIN"));
 		badgeGroup.appendChild(
-			createRatingSpan(player.getMinOvr(), player.getScoutLevel()),
+			createRatingSpan(player.getMinOvr(), player.getInfoVisibility()),
 		);
 		badgeGroup.appendChild(createOvrLabelSpan("MAX"));
 		badgeGroup.appendChild(
-			createRatingSpan(player.getMaxOvr(), player.getScoutLevel()),
+			createRatingSpan(player.getMaxOvr(), player.getInfoVisibility()),
 		);
 		badgeContainer.appendChild(badgeGroup);
 	});
@@ -157,11 +156,14 @@ function createOvrLabelSpan(text: string): HTMLSpanElement {
 	return label;
 }
 
-function createRatingSpan(ovr: number, scout: ScoutLevel): HTMLSpanElement {
+function createRatingSpan(
+	ovr: number,
+	infoVisibility: PlayerInfoVisibility,
+): HTMLSpanElement {
 	const ratingSpan = document.createElement("span");
 	ratingSpan.dataset.hnFeature = DRAFT_CLASS_FEATURE_ID;
 
-	if (scout === 1 || !ovr || ovr <= 0) {
+	if (infoVisibility === "none" || !ovr || ovr <= 0) {
 		ratingSpan.innerText = "N/A";
 		ratingSpan.style.color = "#FF2C2C";
 		ratingSpan.style.textAlign = "center";
@@ -172,7 +174,8 @@ function createRatingSpan(ovr: number, scout: ScoutLevel): HTMLSpanElement {
 
 	ratingSpan.classList.add("dynamic-ovr-badge", "badge", "ml-1");
 	ratingSpan.style.userSelect = "none";
-	ratingSpan.innerText = ovr.toString() + (scout === 2 ? "*" : "");
+	ratingSpan.innerText =
+		ovr.toString() + (infoVisibility === "partial" ? "*" : "");
 
 	if (
 		window.userData &&

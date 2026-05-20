@@ -1,4 +1,5 @@
 import { playerTooltipCache } from "../features/player-tooltip-cache";
+import type { PlayerInfoVisibility } from "../player-data";
 import {
 	extensionRuntime,
 	type FeatureContext,
@@ -17,8 +18,6 @@ interface DraftRankingResources {
 interface DraftCards {
 	[id: string]: HTMLTableRowElement;
 }
-
-type ScoutLevel = 0 | 1 | 2;
 
 const DRAFT_RANKING_RESOURCE = "draftRanking";
 const DRAFT_RANKING_PICKS_RESOURCE = "draftRankingPicks";
@@ -246,10 +245,10 @@ class DraftRankingVisualizer {
 			maxDataCell.dataset.column = "max-ovr";
 
 			minDataCell.appendChild(
-				this.createRatingSpan(player.getMinOvr(), player.getScoutLevel()),
+				this.createRatingSpan(player.getMinOvr(), player.getInfoVisibility()),
 			);
 			maxDataCell.appendChild(
-				this.createRatingSpan(player.getMaxOvr(), player.getScoutLevel()),
+				this.createRatingSpan(player.getMaxOvr(), player.getInfoVisibility()),
 			);
 
 			row.insertBefore(maxDataCell, row.children[ovrIdx].nextSibling);
@@ -267,16 +266,20 @@ class DraftRankingVisualizer {
 		return header;
 	}
 
-	private createRatingSpan(ovr: number, scout: ScoutLevel): HTMLSpanElement {
+	private createRatingSpan(
+		ovr: number,
+		infoVisibility: PlayerInfoVisibility,
+	): HTMLSpanElement {
 		const ratingSpan: HTMLSpanElement = document.createElement("span");
-		if (scout === 1 || !ovr || ovr <= 0) {
+		if (infoVisibility === "none" || !ovr || ovr <= 0) {
 			ratingSpan.innerText = "-";
 			ratingSpan.style.color = "#555456";
 			ratingSpan.style.textAlign = "center";
 		} else {
 			ratingSpan.classList.add("badge");
 			ratingSpan.style.userSelect = "none";
-			ratingSpan.innerText = ovr.toString() + (scout === 2 ? "*" : "");
+			ratingSpan.innerText =
+				ovr.toString() + (infoVisibility === "partial" ? "*" : "");
 
 			if (
 				window.userData &&
