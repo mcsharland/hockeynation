@@ -1,5 +1,6 @@
 (() => {
 	const EXTENSION_STYLE_ID = `hockey-nation-ext-styles`;
+	document.documentElement.dataset.hnExtensionBaseUrl = chrome.runtime.getURL("");
 
 	if (document.getElementById(EXTENSION_STYLE_ID)) {
 		return;

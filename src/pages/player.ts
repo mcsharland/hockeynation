@@ -1,22 +1,20 @@
-type StatStrength = "strongest" | "weakest" | null;
+import {
+	type ApiPlayer,
+	getScoutLevel,
+	type NormalizedSkill,
+	normalizeSkills,
+	type ScoutLevel,
+	type SkillMap,
+	toSkillMap,
+} from "../player-data";
 
-interface Stat {
-	rating: number;
-	max: boolean;
-	dec: boolean;
-	strength: StatStrength;
-}
-
-interface Stats {
-	[id: string]: Stat;
-}
+type Stat = NormalizedSkill;
+type Stats = SkillMap;
 
 interface PlayerStats {
 	stats: Stats;
 	scout: ScoutLevel;
 }
-
-type ScoutLevel = 0 | 1 | 2;
 
 export class Player {
 	private stats: Stats;
@@ -28,7 +26,7 @@ export class Player {
 	private minOvr: number;
 	private maxOvr: number;
 
-	constructor(data: any) {
+	constructor(data: ApiPlayer) {
 		const player = this.parsePlayerData(data);
 		this.stats = player.stats;
 		this.scoutLevel = player.scout;
@@ -48,32 +46,12 @@ export class Player {
 		return this.isAmateur ? 5 : 10;
 	}
 
-	private parsePlayerData(data: any): PlayerStats {
-		const player = {} as PlayerStats;
-		player.stats = {};
-
-		const allHidden = data.skills.every((skill: any) => skill?.hidden ?? false);
-		const someHidden = data.skills.some((skill: any) => skill?.hidden ?? false);
-		player.scout = allHidden ? 1 : someHidden ? 2 : 0;
-
-		for (const s of data.skills) {
-			player.stats[s.id] = {
-				rating: parseInt(s?.lvl ?? 0),
-				max: s?.max ?? false,
-				dec: s?.dec === true,
-				strength: null, // default, change below
-			};
-		}
-		if (data?.talents?.weakest) {
-			// if weakness exists so does strength
-			player.stats[data.talents.weakest].strength = "weakest";
-			data.talents.strongest.forEach(
-				(str: string) =>
-					(player.stats[str as keyof typeof player.stats].strength =
-						"strongest"),
-			);
-		}
-		return player;
+	private parsePlayerData(data: ApiPlayer): PlayerStats {
+		const skills = normalizeSkills(data.skills, data.talents);
+		return {
+			stats: toSkillMap(skills),
+			scout: getScoutLevel(skills),
+		};
 	}
 
 	private canIncrease(stat: Stat): boolean {
@@ -157,10 +135,7 @@ export class Player {
 
 		// adjust strongest stats
 		for (const stat of Object.values(maxStats)) {
-			if (
-				stat.strength === "strongest" &&
-				stat.rating < this.getCap()
-			) {
+			if (stat.strength === "strongest" && stat.rating < this.getCap()) {
 				this.increaseStatTo(stat, this.getCap());
 			}
 		}

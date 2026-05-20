@@ -1,3 +1,4 @@
+import { playerTooltipCache } from "../features/player-tooltip-cache";
 import {
 	extensionRuntime,
 	type FeatureContext,
@@ -307,6 +308,7 @@ function getDraftRankingResources(
 }
 
 export function handleDraftRankingData(data: any) {
+	playerTooltipCache.ingestPlayers(data);
 	extensionRuntime.setResource(
 		DRAFT_RANKING_RESOURCE,
 		new Roster({ players: data }),

@@ -20,3 +20,7 @@ export const SKILL_NAME_TO_ID: Record<string, string> = {
 	"Power Play": "PP",
 	"Penalty Kill": "PK",
 };
+
+export const SKILL_ID_TO_NAME: Record<string, string> = Object.fromEntries(
+	Object.entries(SKILL_NAME_TO_ID).map(([name, id]) => [id, name]),
+);

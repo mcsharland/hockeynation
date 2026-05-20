@@ -1,3 +1,4 @@
+import { playerTooltipCache } from "../features/player-tooltip-cache";
 import {
 	extensionRuntime,
 	type FeatureDefinition,
@@ -192,5 +193,6 @@ function createRatingSpan(ovr: number, scout: ScoutLevel): HTMLSpanElement {
 
 export function handleDraftClassData(data: any) {
 	const rosterData = { ...data, players: data.draftees };
+	playerTooltipCache.ingestPlayers(rosterData.players);
 	extensionRuntime.setResource(DRAFT_CLASS_RESOURCE, new Roster(rosterData));
 }

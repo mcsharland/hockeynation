@@ -1,3 +1,4 @@
+import { playerTooltipCache } from "../features/player-tooltip-cache";
 import {
 	clearRosterCardBadges,
 	renderRosterCardBadges,
@@ -75,6 +76,7 @@ function getTradeCenterResources(
 }
 
 export function handleTradeCenterData(data: any[]) {
+	playerTooltipCache.ingestPlayers(data);
 	extensionRuntime.setResource(
 		TRADE_CENTER_RESOURCE,
 		new Roster({ players: data }),

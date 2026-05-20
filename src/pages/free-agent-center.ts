@@ -1,3 +1,4 @@
+import { playerTooltipCache } from "../features/player-tooltip-cache";
 import {
 	clearRosterCardBadges,
 	renderRosterCardBadges,
@@ -97,6 +98,7 @@ function isSearchTabActive(root: HTMLElement): boolean {
 }
 
 export function handleFreeAgentCenterData(data: any[]) {
+	playerTooltipCache.ingestPlayers(data);
 	extensionRuntime.setResource(
 		FREE_AGENT_CENTER_RESOURCE,
 		new Roster({ players: data }),

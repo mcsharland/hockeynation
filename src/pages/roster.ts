@@ -1,3 +1,4 @@
+import { playerTooltipCache } from "../features/player-tooltip-cache";
 import {
 	extensionRuntime,
 	type FeatureContext,
@@ -352,5 +353,6 @@ function createRatingSpan(ovr: number, scout: ScoutLevel): HTMLSpanElement {
 }
 
 export function handleRosterData(data: any) {
+	playerTooltipCache.ingestPlayers(data.players);
 	extensionRuntime.setResource(ROSTER_RESOURCE, new Roster(data));
 }
