@@ -76,7 +76,8 @@ function getTradeCenterResources(
 }
 
 export function handleTradeCenterData(data: any[]) {
-	playerTooltipCache.ingestPlayers(data);
+	// disabled on this page as information is redundant
+	// playerTooltipCache.ingestPlayers(data);
 	extensionRuntime.setResource(
 		TRADE_CENTER_RESOURCE,
 		new Roster({ players: data }),

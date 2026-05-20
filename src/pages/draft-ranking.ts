@@ -308,7 +308,8 @@ function getDraftRankingResources(
 }
 
 export function handleDraftRankingData(data: any) {
-	playerTooltipCache.ingestPlayers(data);
+	// disabled on this page as it lacks experience information
+	// playerTooltipCache.ingestPlayers(data);
 	extensionRuntime.setResource(
 		DRAFT_RANKING_RESOURCE,
 		new Roster({ players: data }),

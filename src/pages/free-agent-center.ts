@@ -98,7 +98,8 @@ function isSearchTabActive(root: HTMLElement): boolean {
 }
 
 export function handleFreeAgentCenterData(data: any[]) {
-	playerTooltipCache.ingestPlayers(data);
+	// disabled on this page as information is redundant
+	// playerTooltipCache.ingestPlayers(data);
 	extensionRuntime.setResource(
 		FREE_AGENT_CENTER_RESOURCE,
 		new Roster({ players: data }),

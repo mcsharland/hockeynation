@@ -193,6 +193,7 @@ function createRatingSpan(ovr: number, scout: ScoutLevel): HTMLSpanElement {
 
 export function handleDraftClassData(data: any) {
 	const rosterData = { ...data, players: data.draftees };
-	playerTooltipCache.ingestPlayers(rosterData.players);
+	// disabled on this page as it lacks experience information
+	// playerTooltipCache.ingestPlayers(rosterData.players);
 	extensionRuntime.setResource(DRAFT_CLASS_RESOURCE, new Roster(rosterData));
 }
