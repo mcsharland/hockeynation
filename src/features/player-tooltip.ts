@@ -47,6 +47,7 @@ class PlayerTooltipFeature implements MountedFeature<PlayerTooltipResources> {
 	private hideTimer: number | null = null;
 	private currentMiniTarget: HTMLElement | null = null;
 	private nativeObserver: MutationObserver | null = null;
+	private currentUrl = window.location.href;
 
 	constructor(context: FeatureContext<PlayerTooltipResources>) {
 		this.cache = context.resources.cache;
@@ -57,6 +58,7 @@ class PlayerTooltipFeature implements MountedFeature<PlayerTooltipResources> {
 
 	public update(context: FeatureContext<PlayerTooltipResources>): void {
 		this.cache = context.resources.cache;
+		this.hideIfContextChanged();
 	}
 
 	public dispose(): void {
@@ -81,6 +83,8 @@ class PlayerTooltipFeature implements MountedFeature<PlayerTooltipResources> {
 			true,
 		);
 		document.addEventListener("keydown", this.handleKeyDown, true);
+		document.addEventListener("visibilitychange", this.handleVisibilityChanged);
+		window.addEventListener("pagehide", this.handlePageHide);
 		window.addEventListener("scroll", this.handleViewportChanged, true);
 		window.addEventListener("resize", this.handleViewportChanged);
 	}
@@ -100,6 +104,11 @@ class PlayerTooltipFeature implements MountedFeature<PlayerTooltipResources> {
 			true,
 		);
 		document.removeEventListener("keydown", this.handleKeyDown, true);
+		document.removeEventListener(
+			"visibilitychange",
+			this.handleVisibilityChanged,
+		);
+		window.removeEventListener("pagehide", this.handlePageHide);
 		window.removeEventListener("scroll", this.handleViewportChanged, true);
 		window.removeEventListener("resize", this.handleViewportChanged);
 	}
@@ -145,6 +154,14 @@ class PlayerTooltipFeature implements MountedFeature<PlayerTooltipResources> {
 		if (event.key === "Escape") this.hide();
 	};
 
+	private handleVisibilityChanged = (): void => {
+		if (document.hidden) this.hide();
+	};
+
+	private handlePageHide = (): void => {
+		this.hide();
+	};
+
 	private handleViewportChanged = (): void => {
 		this.positionCard();
 		this.hideMiniTooltip();
@@ -154,6 +171,7 @@ class PlayerTooltipFeature implements MountedFeature<PlayerTooltipResources> {
 		this.clearHideTimer();
 		this.anchor = anchor;
 		this.currentPlayerId = player.id;
+		this.currentUrl = window.location.href;
 		this.hideMiniTooltip();
 
 		const card = this.ensureCard();
@@ -205,8 +223,25 @@ class PlayerTooltipFeature implements MountedFeature<PlayerTooltipResources> {
 		return card;
 	}
 
+	private hideIfContextChanged(): void {
+		const nextUrl = window.location.href;
+		if (nextUrl !== this.currentUrl) {
+			this.currentUrl = nextUrl;
+			this.hide();
+			return;
+		}
+
+		if (this.anchor && !this.anchor.isConnected) {
+			this.hide();
+		}
+	}
+
 	private positionCard(): void {
 		if (!this.card || !this.anchor || this.card.hidden) return;
+		if (!this.anchor.isConnected) {
+			this.hide();
+			return;
+		}
 
 		const margin = 8;
 		const referenceRect = this.anchor.getBoundingClientRect();
@@ -464,7 +499,8 @@ function renderCompactBody(): HTMLElement {
 }
 
 function hasFullTooltipDetails(player: PlayerTooltipData): boolean {
-	return player.infoVisibility === "full";
+	// return player.infoVisibility === "full";
+	return player.infoVisibility !== "none"; // show on partial players
 }
 
 function renderSkills(player: PlayerTooltipData): HTMLElement {

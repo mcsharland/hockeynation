@@ -28,8 +28,11 @@ export function initNavigationHandler() {
 	});
 	handleNavigation();
 
-	// @ts-expect-error
-	window.navigation.addEventListener("currententrychange", handleNavigation);
+	const navigation = (window as Window & { navigation?: EventTarget })
+		.navigation;
+	navigation?.addEventListener("currententrychange", handleNavigation);
+	window.addEventListener("popstate", handleNavigation);
+	window.addEventListener("hashchange", handleNavigation);
 }
 
 function handleNavigation() {
