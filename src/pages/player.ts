@@ -3,6 +3,7 @@ type StatStrength = "strongest" | "weakest" | null;
 interface Stat {
 	rating: number;
 	max: boolean;
+	dec: boolean;
 	strength: StatStrength;
 }
 
@@ -59,6 +60,7 @@ export class Player {
 			player.stats[s.id] = {
 				rating: parseInt(s?.lvl ?? 0),
 				max: s?.max ?? false,
+				dec: s?.dec === true,
 				strength: null, // default, change below
 			};
 		}
@@ -74,6 +76,16 @@ export class Player {
 		return player;
 	}
 
+	private canIncrease(stat: Stat): boolean {
+		return !stat.max && !stat.dec;
+	}
+
+	private increaseStatTo(stat: Stat, targetRating: number): void {
+		if (!this.canIncrease(stat)) return;
+
+		stat.rating = Math.min(Math.max(stat.rating, targetRating), this.getCap());
+	}
+
 	private calcMinStats(stats: Stats): Stats {
 		const minStats = structuredClone(stats);
 		let weakestRating = this.getCap();
@@ -81,9 +93,7 @@ export class Player {
 
 		// update ratings and find the highest non-strongest rating
 		for (const stat of Object.values(minStats)) {
-			stat.rating = stat.max
-				? stat.rating
-				: Math.min(stat.rating + 1, this.getCap());
+			this.increaseStatTo(stat, stat.rating + 1);
 			if (stat.strength !== "strongest") {
 				highestNonStrongestRating = Math.max(
 					highestNonStrongestRating,
@@ -104,17 +114,17 @@ export class Player {
 				stat.strength === "strongest" &&
 				stat.rating < highestNonStrongestRating
 			) {
-				stat.rating = highestNonStrongestRating;
+				this.increaseStatTo(stat, highestNonStrongestRating);
 			}
 		}
 
 		// adjust weakest stats
 		for (const stat of Object.values(minStats)) {
 			if (stat.rating < weakestRating) {
-				stat.rating = weakestRating;
+				this.increaseStatTo(stat, weakestRating);
 			}
 			if (stat.rating < this.getFloor()) {
-				stat.rating = this.getFloor();
+				this.increaseStatTo(stat, this.getFloor());
 			}
 		}
 		return minStats;
@@ -130,15 +140,15 @@ export class Player {
 			if (stat.strength === "strongest") {
 				strongestRating = Math.min(
 					strongestRating,
-					stat.max ? stat.rating : this.getCap(),
+					this.canIncrease(stat) ? this.getCap() : stat.rating,
 				);
 			}
 		}
 
 		// update ratings and find the lowest non-weakest rating
 		for (const stat of Object.values(maxStats)) {
-			if (!stat.max && stat.rating < strongestRating) {
-				stat.rating = strongestRating;
+			if (stat.rating < strongestRating) {
+				this.increaseStatTo(stat, strongestRating);
 			}
 			if (stat.strength !== "weakest") {
 				lowestNonWeakestRating = Math.min(lowestNonWeakestRating, stat.rating);
@@ -149,10 +159,9 @@ export class Player {
 		for (const stat of Object.values(maxStats)) {
 			if (
 				stat.strength === "strongest" &&
-				!stat.max &&
 				stat.rating < this.getCap()
 			) {
-				stat.rating = this.getCap();
+				this.increaseStatTo(stat, this.getCap());
 			}
 		}
 
@@ -162,7 +171,7 @@ export class Player {
 				stat.rating = lowestNonWeakestRating;
 			}
 			if (stat.rating < this.getFloor()) {
-				stat.rating = this.getFloor();
+				this.increaseStatTo(stat, this.getFloor());
 			}
 		}
 
