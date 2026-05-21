@@ -7,7 +7,7 @@ import {
 	type MountedFeature,
 	type ResourceStore,
 } from "../runtime";
-import { isViewSettingEnabled } from "../view-settings";
+import { isViewSettingEnabled, onViewSettingsChanged } from "../view-settings";
 import { Coach } from "./coach-market";
 
 type TeamLevel = "PRO" | "FRM" | "U21" | "U17";
@@ -24,9 +24,22 @@ interface CoachDataRow {
 	[coachId: string]: HTMLTableRowElement;
 }
 
+interface ColumnGroupState {
+	overallRating: boolean;
+	trainingOvr: boolean;
+	matchOvr: boolean;
+}
+
+interface CoachColumnDefinition {
+	id: string;
+	label: string;
+	getValue: (coach: Coach) => number;
+}
+
 const MATCH_SKILL_IDS = ["OFP", "DFP", "BAT", "PP", "PK"];
 const COACHING_STAFF_RESOURCE = "coachingStaff";
 const COACHING_STAFF_FEATURE_ID = "coaching-staff-columns";
+const COACHING_STAFF_MIN_MAX_STORAGE_KEY = "hn-coaching-staff-minmax";
 
 interface CoachingStaffResources {
 	coachingStaff: CoachingStaff;
@@ -34,7 +47,6 @@ interface CoachingStaffResources {
 
 export const coachingStaffFeature: FeatureDefinition<CoachingStaffResources> = {
 	id: COACHING_STAFF_FEATURE_ID,
-	enabled: () => isViewSettingEnabled("coachingStaff"),
 	route: (url) => url.pathname.startsWith("/coaching-staff"),
 	target: {
 		selector: `table tbody a.coach-link[href^="/coach/"]`,
@@ -136,44 +148,73 @@ export class CoachingStaff {
 
 class CoachStaffVisualizer {
 	private container: HTMLElement | null = null;
+	private table: HTMLTableElement | null = null;
+	private headerRows: HTMLTableRowElement[] = [];
 	private dataRows: CoachDataRow = {};
 	private mutationObserver: MutationObserver | null = null;
+	private headerObserver: MutationObserver | null = null;
+	private modalObserver: MutationObserver | null = null;
+	private columnToggleButton: HTMLButtonElement | null = null;
+	private columnToggleButtonListener: (() => void) | null = null;
 	private coachingStaff: CoachingStaff | null = null;
+	private showMinMax = false;
+	private columnState: ColumnGroupState = {
+		overallRating: false,
+		trainingOvr: false,
+		matchOvr: false,
+	};
+	private readonly columnGroupOrder: (keyof ColumnGroupState)[] = [
+		"overallRating",
+		"matchOvr",
+		"trainingOvr",
+	];
 
 	public mount(container: HTMLElement) {
 		this.detach();
 		this.container = container;
 		if (!this.container) return;
 
-		this.initializeTableReferences();
-		this.renderColumns();
+		this.showMinMax = this.loadMinMaxState();
+		this.refreshTable();
 		this.observeChanges();
 	}
 
 	public detach() {
-		if (!this.container) return;
-		this.container
-			.querySelectorAll(`[data-column^="hn-"]`)
-			.forEach((node) => node.remove());
-
-		if (this.mutationObserver) {
-			this.mutationObserver.disconnect();
-			this.mutationObserver = null;
-		}
+		this.removeInjectedColumns();
+		this.detachColumnToggleListener();
+		this.disconnectObservers();
 
 		this.container = null;
+		this.table = null;
+		this.headerRows = [];
 		this.dataRows = {};
 	}
 
 	public updateCoachingStaff(staff: CoachingStaff) {
 		this.coachingStaff = staff;
 		if (this.container) {
-			this.initializeTableReferences();
-			this.renderColumns();
+			this.refreshTable();
 		}
 	}
+
+	public refreshDisplay(): void {
+		this.renderColumns();
+	}
+
+	private refreshTable(): void {
+		this.initializeTableReferences();
+		this.attachHeaderObserver();
+		this.syncColumnStateFromTable();
+		this.attachColumnToggleListener();
+		this.renderColumns();
+	}
+
 	private observeChanges(): void {
 		if (!this.container) return;
+
+		if (this.mutationObserver) {
+			this.mutationObserver.disconnect();
+		}
 
 		this.mutationObserver = new MutationObserver((mutations) => {
 			if (!this.container?.isConnected) {
@@ -181,23 +222,14 @@ class CoachStaffVisualizer {
 				return;
 			}
 
-			const hasTableChanges = mutations.some(
-				(m) =>
-					m.addedNodes.length > 0 &&
-					Array.from(m.addedNodes).some(
-						(node) =>
-							node.nodeType === Node.ELEMENT_NODE &&
-							!(node as HTMLElement).dataset?.column?.startsWith("hn-") &&
-							((node as HTMLElement).tagName === "TR" ||
-								(node as HTMLElement).tagName === "TABLE" ||
-								(node as HTMLElement).querySelector?.("tr") ||
-								(node as HTMLElement).querySelector?.("table")),
-					),
+			const hasTableChanges = mutations.some((mutation) =>
+				[...Array.from(mutation.addedNodes), ...Array.from(mutation.removedNodes)].some(
+					(node) => this.isRelevantTableMutation(node),
+				),
 			);
 
 			if (hasTableChanges) {
-				this.initializeTableReferences();
-				this.renderColumns();
+				this.refreshTable();
 			}
 		});
 
@@ -210,9 +242,14 @@ class CoachStaffVisualizer {
 	private initializeTableReferences() {
 		if (!this.container) return;
 
+		this.table = this.getCoachTable();
+		this.headerRows = Array.from(
+			this.table?.querySelectorAll<HTMLTableRowElement>("thead tr") ?? [],
+		);
 		this.dataRows = {};
+		if (!this.table) return;
 
-		const rows = this.container.querySelectorAll(`table tbody tr`);
+		const rows = this.table.querySelectorAll(`tbody tr`);
 		rows.forEach((row) => {
 			const tableRow = row as HTMLTableRowElement;
 			const coachLink = tableRow.querySelector(`a.coach-link`);
@@ -227,90 +264,34 @@ class CoachStaffVisualizer {
 	}
 
 	private renderColumns() {
-		if (!this.container) return;
+		this.removeInjectedColumns();
 
-		this.container
-			.querySelectorAll(`[data-column^="hn-"]`)
-			.forEach((node) => node.remove());
+		if (!this.coachingStaff || !this.showMinMax) return;
+		if (!isViewSettingEnabled("coachingStaff")) return;
 
+		for (const group of this.columnGroupOrder) {
+			if (this.columnState[group]) {
+				this.renderColumnGroup(group);
+			}
+		}
+	}
+
+	private renderColumnGroup(group: keyof ColumnGroupState): void {
 		if (!this.coachingStaff) return;
 
-		const beforeOvr = [
-			{
-				id: "train-ovr",
-				label: "DRL",
-				getValue: (c: Coach) => c.getTrainingOvr(),
-			},
-			{
-				id: "train-min",
-				label: "D.Min",
-				getValue: (c: Coach) => c.getMinTrainingOvr(),
-			},
-			{
-				id: "train-max",
-				label: "D.Max",
-				getValue: (c: Coach) => c.getMaxTrainingOvr(),
-			},
-			{
-				id: "match-ovr",
-				label: "MATCH",
-				getValue: (c: Coach) => c.getMatchOvr(),
-			},
-			{
-				id: "match-min",
-				label: "M.Min",
-				getValue: (c: Coach) => c.getMinMatchOvr(),
-			},
-			{
-				id: "match-max",
-				label: "M.Max",
-				getValue: (c: Coach) => c.getMaxMatchOvr(),
-			},
-		];
+		const columns = this.getColumnsForGroup(group);
+		const parentHeaderText = this.getParentHeaderText(group);
+		const parentIndex = this.getFirstParentIndex(parentHeaderText);
+		if (parentIndex === -1) return;
 
-		const afterOvr = [
-			{
-				id: "min-ovr",
-				label: "Min",
-				getValue: (c: Coach) => c.getMinOvr(),
-			},
-			{
-				id: "max-ovr",
-				label: "Max",
-				getValue: (c: Coach) => c.getMaxOvr(),
-			},
-		];
+		this.headerRows.forEach((headerRow) => {
+			const parentHeader = this.findNativeHeader(headerRow, parentHeaderText);
+			if (!parentHeader) return;
 
-		// find OVR column index from first header
-		const allHeaders = this.container.querySelectorAll(`thead tr`);
-		if (!allHeaders.length) return;
-
-		const firstOvrTh = Array.from(allHeaders[0].querySelectorAll("th")).find(
-			(th) => th.textContent?.trim() === "OVR",
-		);
-		if (!firstOvrTh) return;
-
-		const parentIndex = Array.from(allHeaders[0].children).indexOf(firstOvrTh);
-
-		// inject headers into every thead row
-		allHeaders.forEach((headerRow) => {
-			const ovrTh = headerRow.children[parentIndex];
-			if (!ovrTh) return;
-
-			// inject before OVR
-			[...beforeOvr].forEach((col) => {
+			let insertAfter = parentHeader;
+			columns.forEach((col) => {
 				const th = document.createElement("th");
-				th.className = "py-2 px-4 w-1 select-none";
-				th.dataset.column = `hn-${col.id}`;
-				th.textContent = col.label;
-				ovrTh.before(th);
-			});
-
-			// inject after OVR
-			let insertAfter = ovrTh;
-			afterOvr.forEach((col) => {
-				const th = document.createElement("th");
-				th.className = "py-2 px-4 w-1 select-none";
+				th.className = parentHeader.className || "text-center px-2";
 				th.dataset.column = `hn-${col.id}`;
 				th.textContent = col.label;
 				insertAfter.after(th);
@@ -318,30 +299,16 @@ class CoachStaffVisualizer {
 			});
 		});
 
-		// insert data cells in each row
 		Object.entries(this.dataRows).forEach(([coachId, row]) => {
-			const coach = this.coachingStaff!.findCoachById(coachId);
+			const coach = this.coachingStaff?.findCoachById(coachId);
 			const parentCell = row.children[parentIndex];
 			if (!parentCell) return;
 
-			// inject before OVR cell
-			[...beforeOvr].forEach((col) => {
-				const td = document.createElement("td");
-				td.className = "px-2 py-1 whitespace-nowrap text-center";
-				td.dataset.column = `hn-${col.id}`;
-				if (coach) {
-					td.appendChild(this.createRatingSpan(col.getValue(coach)));
-				} else {
-					td.textContent = "-";
-				}
-				parentCell.before(td);
-			});
-
-			// inject after OVR cell
 			let insertAfterCell = parentCell;
-			afterOvr.forEach((col) => {
+			columns.forEach((col) => {
 				const td = document.createElement("td");
-				td.className = "px-2 py-1 whitespace-nowrap text-center";
+				td.className =
+					(parentCell as HTMLElement).className || "text-center px-2";
 				td.dataset.column = `hn-${col.id}`;
 				if (coach) {
 					td.appendChild(this.createRatingSpan(col.getValue(coach)));
@@ -352,6 +319,377 @@ class CoachStaffVisualizer {
 				insertAfterCell = td;
 			});
 		});
+	}
+
+	private getCoachTable(): HTMLTableElement | null {
+		if (!this.container) return null;
+
+		const coachLink = this.container.querySelector<HTMLAnchorElement>(
+			`table tbody a.coach-link[href^="/coach/"]`,
+		);
+		return (coachLink?.closest("table") as HTMLTableElement | null) ?? null;
+	}
+
+	private getParentHeaderText(group: keyof ColumnGroupState): string {
+		return {
+			overallRating: "OVR",
+			matchOvr: "MATCH",
+			trainingOvr: "DRL",
+		}[group];
+	}
+
+	private getColumnsForGroup(
+		group: keyof ColumnGroupState,
+	): CoachColumnDefinition[] {
+		switch (group) {
+			case "overallRating":
+				return [
+					{
+						id: "ovr-min",
+						label: "Min",
+						getValue: (c: Coach) => c.getMinOvr(),
+					},
+					{
+						id: "ovr-max",
+						label: "Max",
+						getValue: (c: Coach) => c.getMaxOvr(),
+					},
+				];
+			case "trainingOvr":
+				return [
+					{
+						id: "train-min",
+						label: "D.Min",
+						getValue: (c: Coach) => c.getMinTrainingOvr(),
+					},
+					{
+						id: "train-max",
+						label: "D.Max",
+						getValue: (c: Coach) => c.getMaxTrainingOvr(),
+					},
+				];
+			case "matchOvr":
+				return [
+					{
+						id: "match-min",
+						label: "M.Min",
+						getValue: (c: Coach) => c.getMinMatchOvr(),
+					},
+					{
+						id: "match-max",
+						label: "M.Max",
+						getValue: (c: Coach) => c.getMaxMatchOvr(),
+					},
+				];
+		}
+	}
+
+	private getFirstParentIndex(parentHeaderText: string): number {
+		for (const headerRow of this.headerRows) {
+			const parentHeader = this.findNativeHeader(headerRow, parentHeaderText);
+			if (parentHeader) {
+				return Array.from(headerRow.children).indexOf(parentHeader);
+			}
+		}
+		return -1;
+	}
+
+	private findNativeHeader(
+		headerRow: HTMLTableRowElement,
+		text: string,
+	): HTMLTableCellElement | null {
+		return (
+			Array.from(headerRow.querySelectorAll<HTMLTableCellElement>("th")).find(
+				(th) =>
+					!th.dataset.column?.startsWith("hn-") &&
+					th.textContent?.trim() === text,
+			) ?? null
+		);
+	}
+
+	private removeInjectedColumns(): void {
+		const scope = this.table ?? this.container;
+		scope
+			?.querySelectorAll(`[data-column^="hn-"]`)
+			.forEach((node) => node.remove());
+	}
+
+	private syncColumnStateFromTable(): void {
+		const nativeHeaderTexts = this.headerRows.flatMap((headerRow) =>
+			Array.from(
+				headerRow.querySelectorAll<HTMLTableCellElement>(
+					'th:not([data-column^="hn-"])',
+				),
+			).map((th) => th.textContent?.trim() ?? ""),
+		);
+
+		this.columnState.overallRating = nativeHeaderTexts.includes("OVR");
+		this.columnState.matchOvr = nativeHeaderTexts.includes("MATCH");
+		this.columnState.trainingOvr = nativeHeaderTexts.includes("DRL");
+	}
+
+	private attachHeaderObserver(): void {
+		if (this.headerObserver) {
+			this.headerObserver.disconnect();
+			this.headerObserver = null;
+		}
+
+		if (!this.headerRows.length) return;
+
+		this.headerObserver = new MutationObserver((mutations) => {
+			const shouldUpdate = mutations.some((mutation) =>
+				[...Array.from(mutation.addedNodes), ...Array.from(mutation.removedNodes)].some(
+					(node) => this.isNativeHeaderMutation(node),
+				),
+			);
+
+			if (shouldUpdate) {
+				this.refreshTable();
+			}
+		});
+
+		this.headerRows.forEach((headerRow) => {
+			this.headerObserver?.observe(headerRow, { childList: true });
+		});
+	}
+
+	private isNativeHeaderMutation(node: Node): boolean {
+		return (
+			node instanceof HTMLTableCellElement &&
+			node.tagName === "TH" &&
+			!node.dataset.column?.startsWith("hn-")
+		);
+	}
+
+	private isRelevantTableMutation(node: Node): boolean {
+		if (!(node instanceof HTMLElement)) return false;
+		if (node.dataset.column?.startsWith("hn-")) return false;
+
+		const relevantTags = new Set(["TABLE", "THEAD", "TBODY", "TR", "TH", "TD"]);
+		if (relevantTags.has(node.tagName)) return true;
+
+		return !!node.querySelector("table, thead, tbody, tr, a.coach-link");
+	}
+
+	private getColumnToggleButton(): HTMLButtonElement | null {
+		if (!this.container) return null;
+		const buttons =
+			this.container.querySelectorAll<HTMLButtonElement>("button");
+		return (
+			Array.from(buttons).find((btn) =>
+				btn.querySelector("svg.fa-table-cells"),
+			) ?? null
+		);
+	}
+
+	private attachColumnToggleListener(): void {
+		this.detachColumnToggleListener();
+
+		const toggleButton = this.getColumnToggleButton();
+		if (!toggleButton) return;
+
+		this.columnToggleButton = toggleButton;
+		this.columnToggleButtonListener = () => {
+			this.watchForModal();
+		};
+
+		toggleButton.addEventListener("click", this.columnToggleButtonListener);
+	}
+
+	private detachColumnToggleListener(): void {
+		if (this.columnToggleButton && this.columnToggleButtonListener) {
+			this.columnToggleButton.removeEventListener(
+				"click",
+				this.columnToggleButtonListener,
+			);
+		}
+		this.columnToggleButton = null;
+		this.columnToggleButtonListener = null;
+	}
+
+	private watchForModal(): void {
+		if (this.modalObserver) {
+			this.modalObserver.disconnect();
+		}
+
+		this.modalObserver = new MutationObserver(() => {
+			const modal = document.querySelector(".card-modal");
+			if (modal) {
+				this.modalObserver?.disconnect();
+				this.modalObserver = null;
+				this.injectModalCheckboxes(modal as HTMLElement);
+			}
+		});
+
+		this.modalObserver.observe(document.body, {
+			childList: true,
+			subtree: true,
+		});
+
+		const existingModal = document.querySelector(".card-modal");
+		if (existingModal) {
+			this.modalObserver.disconnect();
+			this.modalObserver = null;
+			this.injectModalCheckboxes(existingModal as HTMLElement);
+			return;
+		}
+
+		window.setTimeout(() => {
+			this.modalObserver?.disconnect();
+			this.modalObserver = null;
+		}, 2000);
+	}
+
+	private createCheckboxElement(
+		id: string,
+		label: string,
+		checked: boolean,
+	): DocumentFragment {
+		const fragment = document.createDocumentFragment();
+
+		const input = document.createElement("input");
+		input.id = id;
+		input.type = "checkbox";
+		input.checked = checked;
+		input.className = "mr-2 hidden";
+
+		const labelEl = document.createElement("label");
+		labelEl.htmlFor = id;
+		labelEl.className =
+			"flex flex-row items-center font-semibold text-gray-800 cursor-pointer select-none hover:text-orange-500";
+
+		const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+		svg.setAttribute(
+			"class",
+			`svg-inline--fa ${checked ? "fa-square-check" : "fa-square"} mr-2`,
+		);
+		svg.setAttribute("aria-hidden", "true");
+		svg.setAttribute("focusable", "false");
+		svg.setAttribute("data-prefix", checked ? "fas" : "far");
+		svg.setAttribute("data-icon", checked ? "square-check" : "square");
+		svg.setAttribute("role", "img");
+		svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+		svg.setAttribute("viewBox", "0 0 448 512");
+
+		const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+		path.setAttribute("fill", "currentColor");
+		path.setAttribute("d", this.getCheckboxPath(checked));
+
+		svg.appendChild(path);
+		labelEl.appendChild(svg);
+
+		const span = document.createElement("span");
+		span.textContent = label;
+		labelEl.appendChild(span);
+
+		fragment.appendChild(input);
+		fragment.appendChild(labelEl);
+
+		return fragment;
+	}
+
+	private updateCheckboxVisual(input: HTMLInputElement): void {
+		const modal = input.closest(".card-modal") ?? document;
+		const label = modal.querySelector(`label[for="${input.id}"]`);
+		const svg = label?.querySelector("svg");
+		if (!svg) return;
+
+		const checked = input.checked;
+		svg.setAttribute(
+			"class",
+			`svg-inline--fa ${checked ? "fa-square-check" : "fa-square"} mr-2`,
+		);
+		svg.setAttribute("data-prefix", checked ? "fas" : "far");
+		svg.setAttribute("data-icon", checked ? "square-check" : "square");
+
+		const path = svg.querySelector("path");
+		path?.setAttribute("d", this.getCheckboxPath(checked));
+	}
+
+	private getCheckboxPath(checked: boolean): string {
+		return checked
+			? "M64 32C28.7 32 0 60.7 0 96L0 416c0 35.3 28.7 64 64 64l320 0c35.3 0 64-28.7 64-64l0-320c0-35.3-28.7-64-64-64L64 32zM337 209L209 337c-9.4 9.4-24.6 9.4-33.9 0l-64-64c-9.4-9.4-9.4-24.6 0-33.9s24.6-9.4 33.9 0l47 47L303 175c9.4-9.4 24.6-9.4 33.9 0s9.4 24.6 0 33.9z"
+			: "M384 80c8.8 0 16 7.2 16 16l0 320c0 8.8-7.2 16-16 16L64 432c-8.8 0-16-7.2-16-16L48 96c0-8.8 7.2-16 16-16l320 0zM64 32C28.7 32 0 60.7 0 96L0 416c0 35.3 28.7 64 64 64l320 0c35.3 0 64-28.7 64-64l0-320c0-35.3-28.7-64-64-64L64 32z";
+	}
+
+	private injectModalCheckboxes(modal: HTMLElement): void {
+		const checkboxId = "hn-coaching-staff-min-max";
+		if (modal.querySelector(`#${checkboxId}`)) return;
+
+		const ovrLabel = modal.querySelector('label[for="OVR"]');
+		if (!ovrLabel) return;
+
+		const minMaxElement = this.createCheckboxElement(
+			checkboxId,
+			"Min/Max",
+			this.showMinMax,
+		);
+
+		ovrLabel.after(minMaxElement);
+
+		const minMaxInput = modal.querySelector<HTMLInputElement>(
+			`#${checkboxId}`,
+		);
+
+		modal
+			.querySelector(`label[for="${checkboxId}"]`)
+			?.addEventListener("click", (e) => {
+				e.preventDefault();
+				if (minMaxInput) {
+					minMaxInput.checked = !minMaxInput.checked;
+					this.updateCheckboxVisual(minMaxInput);
+				}
+			});
+
+		const updateButton = Array.from(modal.querySelectorAll("button")).find(
+			(btn) => btn.textContent?.trim().toLowerCase() === "update",
+		);
+
+		updateButton?.addEventListener("click", () => {
+			if (!minMaxInput) return;
+			this.showMinMax = minMaxInput.checked;
+			this.saveMinMaxState();
+			window.setTimeout(() => this.refreshTable(), 0);
+		});
+
+		const allCheckbox = modal.querySelector<HTMLInputElement>("#all");
+		const allLabel = modal.querySelector('label[for="all"]');
+
+		if (allCheckbox && allLabel) {
+			allLabel.addEventListener("click", () => {
+				window.setTimeout(() => {
+					if (!minMaxInput) return;
+					minMaxInput.checked = allCheckbox.checked;
+					this.updateCheckboxVisual(minMaxInput);
+				}, 0);
+			});
+		}
+	}
+
+	private loadMinMaxState(): boolean {
+		return localStorage.getItem(COACHING_STAFF_MIN_MAX_STORAGE_KEY) === "true";
+	}
+
+	private saveMinMaxState(): void {
+		localStorage.setItem(
+			COACHING_STAFF_MIN_MAX_STORAGE_KEY,
+			String(this.showMinMax),
+		);
+	}
+
+	private disconnectObservers(): void {
+		if (this.mutationObserver) {
+			this.mutationObserver.disconnect();
+			this.mutationObserver = null;
+		}
+		if (this.headerObserver) {
+			this.headerObserver.disconnect();
+			this.headerObserver = null;
+		}
+		if (this.modalObserver) {
+			this.modalObserver.disconnect();
+			this.modalObserver = null;
+		}
 	}
 
 	private createRatingSpan(ovr: number): HTMLSpanElement {
@@ -372,23 +710,22 @@ class CoachStaffVisualizer {
 
 		return span;
 	}
-
-	private getPaginationContainer(): HTMLElement | null {
-		if (!this.container) return null;
-		return this.container.querySelector(`div:has(> ul) ul`);
-	}
 }
 
 class CoachingStaffFeatureInstance
 	implements MountedFeature<CoachingStaffResources>
 {
 	private readonly visualizer = new CoachStaffVisualizer();
+	private readonly unsubscribeViewSettings: () => void;
 	private coachingStaff: CoachingStaff;
 
 	constructor(context: FeatureContext<CoachingStaffResources>) {
 		this.coachingStaff = context.resources.coachingStaff;
 		this.visualizer.updateCoachingStaff(this.coachingStaff);
 		this.visualizer.mount(context.root);
+		this.unsubscribeViewSettings = onViewSettingsChanged(() => {
+			this.visualizer.refreshDisplay();
+		});
 	}
 
 	public update(context: FeatureContext<CoachingStaffResources>): void {
@@ -399,6 +736,7 @@ class CoachingStaffFeatureInstance
 	}
 
 	public dispose(): void {
+		this.unsubscribeViewSettings();
 		this.visualizer.detach();
 	}
 }
@@ -428,15 +766,14 @@ function findCoachingStaffRoot(match: HTMLElement): HTMLElement | null {
 function isCoachingStaffRootReady(root: HTMLElement): boolean {
 	if (!isCoachingStaffTabActive(root)) return false;
 
-	const headers = Array.from(root.querySelectorAll("table thead tr th")).map(
-		(th) => th.textContent?.trim() ?? "",
+	const hasCoachRows = !!root.querySelector(
+		`table tbody a.coach-link[href^="/coach/"]`,
 	);
+	const hasTableOptionsButton = Array.from(
+		root.querySelectorAll<HTMLButtonElement>("button"),
+	).some((button) => button.querySelector("svg.fa-table-cells"));
 
-	return (
-		headers.includes("Specials") &&
-		headers.includes("OVR") &&
-		!!root.querySelector(`table tbody a.coach-link[href^="/coach/"]`)
-	);
+	return hasCoachRows && hasTableOptionsButton;
 }
 
 function isCoachingStaffTabActive(root: HTMLElement): boolean {

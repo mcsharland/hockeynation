@@ -6,7 +6,7 @@ import {
 	type MountedFeature,
 	type ResourceStore,
 } from "../runtime";
-import { isViewSettingEnabled } from "../view-settings";
+import { isViewSettingEnabled, onViewSettingsChanged } from "../view-settings";
 
 // import { CoachingStaff } from "./coaching-staff";
 
@@ -44,7 +44,6 @@ interface CoachMarketResources {
 
 export const coachMarketFeature: FeatureDefinition<CoachMarketResources> = {
 	id: COACH_MARKET_FEATURE_ID,
-	enabled: () => isViewSettingEnabled("coachMarket"),
 	route: (url) => url.pathname.startsWith("/coaching-staff"),
 	target: {
 		selector: "div[market-open] table tbody tr",
@@ -808,7 +807,7 @@ class CoachMarketVisualizer {
 			.querySelectorAll(`[data-column^="hn-"]`)
 			.forEach((node) => node.remove());
 
-		if (!this.showMinMax) return;
+		if (!this.showMinMax || !isViewSettingEnabled("coachMarket")) return;
 
 		// render groups in consistent order, appending to end
 		for (const group of this.columnGroupOrder) {
@@ -842,7 +841,7 @@ class CoachMarketVisualizer {
 		let insertAfter = parentHeader;
 		columns.forEach((col) => {
 			const th = document.createElement("th");
-			th.className = "py-2 px-4 w-1 select-none";
+			th.className = parentHeader.className || "text-center px-2";
 			th.dataset.column = `hn-${col.id}`;
 			th.textContent = col.label;
 			insertAfter.after(th);
@@ -859,7 +858,8 @@ class CoachMarketVisualizer {
 			let insertAfterCell = parentCell;
 			columns.forEach((col) => {
 				const td = document.createElement("td");
-				td.className = "px-2 py-1 whitespace-nowrap text-center";
+				td.className =
+					(parentCell as HTMLElement).className || "text-center px-2";
 				td.dataset.column = `hn-${col.id}`;
 
 				if (coach) {
@@ -1008,18 +1008,26 @@ class CoachMarketVisualizer {
 		if (!this.container) return;
 		this.onTableUpdateTrigger();
 	}
+
+	public refreshDisplay(): void {
+		this.renderColumns();
+	}
 }
 
 class CoachMarketFeatureInstance
 	implements MountedFeature<CoachMarketResources>
 {
 	private readonly visualizer = new CoachMarketVisualizer();
+	private readonly unsubscribeViewSettings: () => void;
 	private marketData: any[];
 
 	constructor(context: FeatureContext<CoachMarketResources>) {
 		this.marketData = context.resources.marketData;
 		this.visualizer.updateMarketCoaches(this.marketData);
 		this.visualizer.mount(context.root);
+		this.unsubscribeViewSettings = onViewSettingsChanged(() => {
+			this.visualizer.refreshDisplay();
+		});
 	}
 
 	public update(context: FeatureContext<CoachMarketResources>): void {
@@ -1031,6 +1039,7 @@ class CoachMarketFeatureInstance
 	}
 
 	public dispose(): void {
+		this.unsubscribeViewSettings();
 		this.visualizer.detach();
 	}
 }
