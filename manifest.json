@@ -2,7 +2,7 @@
 	"manifest_version": 3,
 	"name": "Hockey Nation OVR Calculator",
 	"description": "Calculates player's min and max potential on various pages",
-	"version": "1.5.3",
+	"version": "1.5.4",
 	"permissions": [],
 	"content_scripts": [
 		{

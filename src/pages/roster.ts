@@ -1,4 +1,4 @@
-import { playerTooltipCache } from "../features/player-tooltip-cache";
+// import { playerTooltipCache } from "../features/player-tooltip-cache";
 import type { PlayerInfoVisibility } from "../player-data";
 import {
 	extensionRuntime,
@@ -356,6 +356,6 @@ function createRatingSpan(
 }
 
 export function handleRosterData(data: any) {
-	playerTooltipCache.ingestPlayers(data.players);
+	// playerTooltipCache.ingestPlayers(data.players);
 	extensionRuntime.setResource(ROSTER_RESOURCE, new Roster(data));
 }

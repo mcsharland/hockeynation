@@ -1,4 +1,4 @@
-import { playerTooltipFeature } from "./features/player-tooltip";
+// import { playerTooltipFeature } from "./features/player-tooltip";
 import { coachMarketFeature } from "./pages/coach-market";
 import { coachingStaffFeature } from "./pages/coaching-staff";
 import { draftClassFeature } from "./pages/draft-class";
@@ -17,7 +17,7 @@ export function initNavigationHandler() {
 		draftClassFeature,
 		draftRankingFeature,
 		freeAgentCenterFeature,
-		playerTooltipFeature,
+		// playerTooltipFeature,
 		rosterFeature,
 		tradeCenterFeature,
 		userSettingsFeature,

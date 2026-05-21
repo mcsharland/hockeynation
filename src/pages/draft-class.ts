@@ -1,4 +1,4 @@
-import { playerTooltipCache } from "../features/player-tooltip-cache";
+// import { playerTooltipCache } from "../features/player-tooltip-cache";
 import type { PlayerInfoVisibility } from "../player-data";
 import {
 	extensionRuntime,
