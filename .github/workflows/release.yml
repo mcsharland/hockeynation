@@ -1,0 +1,38 @@
+name: Release
+
+on:
+    push:
+        tags:
+            - "v*"
+    workflow_dispatch:
+
+jobs:
+    build-and-release:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+                  cache: "npm"
+
+            - run: npm ci
+            - run: npm run build
+
+            - name: Package extension
+              run: |
+                  cp manifest.json package/
+                  cp -r dist package/
+                  cp -r images package/
+                  cd package
+                  zip -r "../hockey-nation-ovr-${{ github.ref_name }}.zip" .
+
+            - name: Create release
+              uses: softprops/action-gh-release@v2
+              if: startsWith(github.ref, 'refs/tags/v')
+              with:
+                  files: hockey-nation-ovr-${{ github.ref_name }}.zip
+                  generate_release_notes: true

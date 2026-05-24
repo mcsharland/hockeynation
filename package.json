@@ -6,7 +6,9 @@
 	"scripts": {
 		"build": "webpack --mode production",
 		"dev": "webpack --mode development",
-		"version": "node script/sync-manifest-version.js && git add manifest.json"
+		"version": "node script/sync-manifest-version.js && git add manifest.json",
+		"preversion": "npm run build",
+		"postversion": "git push && git push --tags"
 	},
 	"keywords": [],
 	"author": "",
