@@ -133,3 +133,4 @@ out
 scripts/
 dist/
 *.zip
+node_modules/
