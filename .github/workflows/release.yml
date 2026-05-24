@@ -24,11 +24,11 @@ jobs:
 
             - name: Package extension
               run: |
-                  cp manifest.json package/
-                  cp -r dist package/
-                  cp -r images package/
-                  cd package
-                  zip -r "../hockey-nation-ovr-${{ github.ref_name }}.zip" .
+                  mkdir -p hockey-nation-ovr
+                  cp manifest.json hockey-nation-ovr/
+                  cp -r dist hockey-nation-ovr/
+                  cp -r images hockey-nation-ovr/
+                  zip -r "hockey-nation-ovr-${{ github.ref_name }}.zip" hockey-nation-ovr/
 
             - name: Create release
               uses: softprops/action-gh-release@v2
