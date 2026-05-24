@@ -5,7 +5,8 @@
 	"main": "index.js",
 	"scripts": {
 		"build": "webpack --mode production",
-		"dev": "webpack --mode development"
+		"dev": "webpack --mode development",
+		"version": "node script/sync-manifest-version.js && git add manifest.json"
 	},
 	"keywords": [],
 	"author": "",
